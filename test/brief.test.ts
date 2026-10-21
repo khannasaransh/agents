@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 import type { FetchResult } from '../steps/fetch.ts'
+import type { Finding, ReviewResult } from '../steps/review.ts'
 import { makeWorkspace, type Workspace } from './helpers.ts'
 
 let ws: Workspace
@@ -9,11 +10,15 @@ afterEach(() => ws.cleanup())
 const runId = '2026-10-22-0530'
 const sha = (n: number) => String(n).repeat(40)
 
-function prepareRun(results: FetchResult[], steps = [{ name: 'fetch', status: 'succeeded' }, { name: 'brief', status: 'pending' }]) {
+function prepareRun(
+  results: FetchResult[],
+  { steps = [{ name: 'fetch', status: 'succeeded' }, { name: 'brief', status: 'pending' }], reviews = [] as ReviewResult[], dryRun = false } = {},
+) {
   ws = makeWorkspace()
   ws.writeRepoList([])
-  ws.prepareRun(runId, steps)
+  ws.prepareRun(runId, { steps, dryRun })
   for (const result of results) ws.writeRunFile(runId, `fetch/${result.repo}.json`, result)
+  for (const result of reviews) ws.writeRunFile(runId, `review/${result.repo}.json`, result)
 }
 
 async function brief(): Promise<string> {
@@ -54,7 +59,7 @@ test("the Brief notes a Repo's baseline on its first Run", async () => {
 test('the Run health names failed Steps and the Repos that failed to fetch', async () => {
   prepareRun(
     [{ repo: 'gone', team: 'android', branch: 'main', previous: null, status: 'failed', error: 'fatal: repository not found\nmore detail' }],
-    [{ name: 'fetch', status: 'failed' }, { name: 'brief', status: 'pending' }],
+    { steps: [{ name: 'fetch', status: 'failed' }, { name: 'brief', status: 'pending' }] },
   )
 
   const health = (await brief()).split('## Run health')[1]
@@ -64,7 +69,7 @@ test('the Run health names failed Steps and the Repos that failed to fetch', asy
 })
 
 test('the Run health names skipped Steps', async () => {
-  prepareRun([], [{ name: 'fetch', status: 'skipped' }, { name: 'brief', status: 'pending' }])
+  prepareRun([], { steps: [{ name: 'fetch', status: 'skipped' }, { name: 'brief', status: 'pending' }] })
 
   assert.match((await brief()).split('## Run health')[1], /- fetch: skipped/)
 })
@@ -73,4 +78,70 @@ test('a healthy Run says so in its Run health', async () => {
   prepareRun([{ repo: 'crux_flutter', team: 'flutter', branch: 'main', previous: sha(1), status: 'unchanged', head: sha(1), commits: [] }])
 
   assert.match((await brief()).split('## Run health')[1], /No Step failed or was skipped/)
+})
+
+const changed: FetchResult = {
+  repo: 'crux_flutter',
+  team: 'flutter',
+  branch: 'main',
+  previous: sha(1),
+  status: 'new-commits',
+  head: sha(3),
+  commits: [commit(3, 'Fix paywall copy'), commit(2, 'Add paywall')],
+}
+const range = { repo: 'crux_flutter', team: 'flutter', branch: 'main', from: sha(1), to: sha(3) } as const
+
+const finding = (severity: Finding['severity'], summary: string, bySaransh = false): Finding => ({
+  severity,
+  file: 'lib/paywall.dart',
+  line: 42,
+  commit: sha(bySaransh ? 3 : 2),
+  author: bySaransh ? 'Saransh' : 'Asha',
+  summary,
+  bySaransh,
+})
+
+test("the Brief shows each changed Repo's review, with findings by severity and Saransh's own first", async () => {
+  const findings = [finding('low', 'Unused import'), finding('medium', 'Copy is cut off', true), finding('critical', 'Paywall can be skipped'), finding('high', 'Price shows before it loads', true)]
+  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall and fixes its copy.', findings }] })
+
+  const text = await brief()
+
+  const review = text.slice(text.indexOf('Review:'), text.indexOf('## Run health')).trim()
+  assert.equal(
+    review,
+    [
+      'Review: Adds a paywall and fixes its copy.',
+      '',
+      '- **high** `lib/paywall.dart:42` in `3333333` by Saransh (yours): Price shows before it loads',
+      '- **medium** `lib/paywall.dart:42` in `3333333` by Saransh (yours): Copy is cut off',
+      '- **critical** `lib/paywall.dart:42` in `2222222` by Asha: Paywall can be skipped',
+      '- **low** `lib/paywall.dart:42` in `2222222` by Asha: Unused import',
+    ].join('\n'),
+  )
+})
+
+test('the Brief says when a review found nothing', async () => {
+  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall.', findings: [] }] })
+
+  assert.match(await brief(), /Review: Adds a paywall\.\n\nNo findings\./)
+})
+
+test("the Brief says when a Repo's review failed, and its Run health names the Repo", async () => {
+  prepareRun([changed], {
+    steps: [{ name: 'fetch', status: 'succeeded' }, { name: 'review', status: 'failed' }, { name: 'brief', status: 'pending' }],
+    reviews: [{ ...range, status: 'failed', error: 'Quota limit reached\nmore detail' }],
+  })
+
+  const [repos, health] = (await brief()).split('## Run health')
+
+  assert.match(repos, /### crux_flutter[\s\S]*Review failed: Quota limit reached\n/)
+  assert.match(health, /- review: failed/)
+  assert.match(health, /Repos whose review failed:\n\n- crux_flutter \(flutter\): Quota limit reached\n/)
+})
+
+test("a dry run's Brief says its reviews came from the fake Worker", async () => {
+  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Answered by the fake Worker.', findings: [] }], dryRun: true })
+
+  assert.match(await brief(), /^# Brief 2026-10-22-0530\n\nDry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done\./)
 })

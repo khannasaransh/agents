@@ -5,6 +5,8 @@ import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { FetchResult } from '../steps/fetch.ts'
+import type { CannedAnswer } from '../src/workers/fake.ts'
 
 const cli = fileURLToPath(new URL('../src/cli.ts', import.meta.url))
 
@@ -35,8 +37,8 @@ export interface RepoEntry {
 export interface TestRepo {
   entry: RepoEntry
   folder: string
-  /** Pushes a commit to the remote's production branch without touching the local clone. */
-  pushCommit(subject: string): string
+  /** Pushes a commit, adding any given files, to the remote's production branch without touching the local clone. */
+  pushCommit(subject: string, options?: { files?: Record<string, string>; author?: string }): string
 }
 
 export interface CliResult {
@@ -49,6 +51,7 @@ export interface RunRecordShape {
   id: string
   pipeline: string
   status: string
+  dryRun?: boolean
   startedAt: string
   endedAt?: string
   steps: { name: string; status: string; startedAt?: string; endedAt?: string; log: string }[]
@@ -62,18 +65,32 @@ export interface Workspace {
   /** Writes the Repo list: every Repo added so far, unless given entries. */
   writeRepoList(entries?: RepoEntry[]): void
   /** Prepares a Run folder holding just a Run record, as a Step's input. */
-  prepareRun(id: string, steps?: { name: string; status: string }[]): void
+  prepareRun(id: string, options?: { steps?: { name: string; status: string }[]; dryRun?: boolean }): void
   /** Writes a file into a Run folder, as a Step's input. */
   writeRunFile(id: string, path: string, content: unknown): void
   writeRepoState(state: Record<string, { lastReviewed: string }>): void
   readRepoState(): Record<string, { lastReviewed: string }>
+  /**
+   * Fetches a Repo's clone and writes what Fetch records for it in a Run, as a Step's input: the
+   * commits since `from`, or a first-Run baseline when `from` is null.
+   */
+  writeFetchResult(id: string, repo: TestRepo, from: string | null): void
+  /** Sets what the fake Worker answers, per Agent. */
+  writeCannedAnswers(answers: Record<string, CannedAnswer[]>): void
+  /** Writes the local env file. */
+  writeEnvFile(text: string): void
+  /** Writes an Agent folder. From then on the CLI uses the workspace's Agents, not this repo's. */
+  writeAgent(name: string, files: Record<string, string>): void
   agents(...args: string[]): Promise<CliResult>
   /** Starts the CLI without waiting for it, in its own process group so a test can kill it and its Steps. */
   start(...args: string[]): { killAll(): void; result: Promise<CliResult> }
   runIds(): string[]
   readRun(id: string): RunRecordShape
   readRunFile(id: string, ...path: string[]): string
+  /** The files in a folder of a Run, or none when it doesn't exist. */
+  runFiles(id: string, folder: string): string[]
   fetchResult(id: string, repo: string): any
+  reviewResult(id: string, repo: string): any
   cleanup(): void
 }
 
@@ -81,7 +98,11 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
   const root = mkdtempSync(join(tmpdir(), 'agents-test-'))
   const dataDir = join(root, 'data')
   const repoListFile = join(root, 'repos.ts')
+  const cannedAnswersFile = join(root, 'fake-answers.json')
+  const envFile = join(root, '.env')
+  const agentsDir = join(root, 'agents')
   const entries: RepoEntry[] = []
+  let ownAgents = false
 
   const ws: Workspace = {
     dataDir,
@@ -103,8 +124,13 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       return {
         entry,
         folder,
-        pushCommit(subject) {
-          git(upstream, 'commit', '-q', '--allow-empty', '-m', subject)
+        pushCommit(subject, { files = {}, author } = {}) {
+          for (const [path, content] of Object.entries(files)) {
+            mkdirSync(join(upstream, path, '..'), { recursive: true })
+            writeFileSync(join(upstream, path), content)
+            git(upstream, 'add', path)
+          }
+          git(upstream, 'commit', '-q', '--allow-empty', '-m', subject, ...(author ? [`--author=${author}`] : []))
           git(upstream, 'push', '-q', 'origin', branch)
           return git(upstream, 'rev-parse', 'HEAD')
         },
@@ -124,11 +150,12 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       writeFileSync(repoListFile, `export default ${JSON.stringify(list, null, 2)}\n`)
     },
 
-    prepareRun(id, steps = [{ name: 'fetch', status: 'pending' }, { name: 'brief', status: 'pending' }]) {
+    prepareRun(id, { steps = ['fetch', 'review', 'brief', 'save-state'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
       ws.writeRunFile(id, 'run.json', {
         id,
         pipeline: 'daily',
         status: 'running',
+        dryRun,
         startedAt: new Date().toISOString(),
         steps: steps.map((s) => ({ ...s, log: `logs/${s.name}.log` })),
       })
@@ -149,13 +176,43 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       return JSON.parse(readFileSync(join(dataDir, 'state', 'repos.json'), 'utf8'))
     },
 
+    writeFetchResult(id, { entry }, from) {
+      git(entry.folder, 'fetch', '-q', 'origin', `+refs/heads/${entry.branch}:refs/remotes/origin/${entry.branch}`)
+      const head = git(entry.folder, 'rev-parse', `origin/${entry.branch}`)
+      const log = from && from !== head ? git(entry.folder, 'log', '--format=%H%x1f%an%x1f%ae%x1f%aI%x1f%s', `${from}..${head}`) : ''
+      const commits = log
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => {
+          const [sha, author, email, date, subject] = line.split('\x1f')
+          return { sha, author, email, date, subject }
+        })
+      const status = from === null ? 'baseline' : from === head ? 'unchanged' : 'new-commits'
+      const result = { repo: entry.name, team: entry.team, branch: entry.branch, previous: from, status, head, commits } as FetchResult
+      ws.writeRunFile(id, `fetch/${entry.name}.json`, result)
+    },
+
+    writeCannedAnswers(answers) {
+      writeFileSync(cannedAnswersFile, JSON.stringify(answers))
+    },
+
+    writeEnvFile(text) {
+      writeFileSync(envFile, text)
+    },
+
+    writeAgent(name, files) {
+      mkdirSync(join(agentsDir, name), { recursive: true })
+      for (const [file, content] of Object.entries(files)) writeFileSync(join(agentsDir, name, file), content)
+      ownAgents = true
+    },
+
     agents(...args) {
       return ws.start(...args).result
     },
 
     start(...args) {
       const child = spawn(process.execPath, [cli, ...args], {
-        env: { ...gitEnv, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, ...env },
+        env: { ...gitEnv, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, AGENTS_ENV_FILE: envFile, AGENTS_FAKE_ANSWERS: cannedAnswersFile, ...(ownAgents && { AGENTS_AGENTS_DIR: agentsDir }), ...env },
         detached: true,
       })
       let stdout = ''
@@ -182,8 +239,20 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       return readFileSync(join(dataDir, 'runs', id, ...path), 'utf8')
     },
 
+    runFiles(id, folder) {
+      try {
+        return readdirSync(join(dataDir, 'runs', id, folder)).sort()
+      } catch {
+        return []
+      }
+    },
+
     fetchResult(id, repo) {
       return JSON.parse(ws.readRunFile(id, 'fetch', `${repo}.json`))
+    },
+
+    reviewResult(id, repo) {
+      return JSON.parse(ws.readRunFile(id, 'review', `${repo}.json`))
     },
 
     cleanup() {

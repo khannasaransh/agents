@@ -5,18 +5,19 @@ import { runDir } from './paths.ts'
 import { runPipeline, runSingleStep } from './pipeline.ts'
 
 const usage = `Usage:
-  agents run <pipeline>                     Start a Run of a Pipeline, such as daily
+  agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily; a dry run
+                                            runs every Agent on the fake Worker
   agents step <name> --run <id> [--force]   Run one Step inside an existing Run`
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv
   switch (command) {
     case 'run': {
-      const { positionals } = parseArgs({ args: rest, allowPositionals: true })
+      const { values, positionals } = parseArgs({ args: rest, allowPositionals: true, options: { 'dry-run': { type: 'boolean', default: false } } })
       const [pipeline] = positionals
       if (!pipeline) return fail(usage)
-      const run = await runPipeline(pipeline)
-      console.log(`Run ${run.id} ${run.status}: ${runDir(run.id)}`)
+      const run = await runPipeline(pipeline, { dryRun: values['dry-run'] })
+      console.log(`Run ${run.id} ${run.status}${run.dryRun ? ' (dry run)' : ''}: ${runDir(run.id)}`)
       console.log(`Brief: ${join(runDir(run.id), 'brief.md')}`)
       return run.status === 'succeeded' ? 0 : 2
     }

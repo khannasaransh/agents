@@ -22,6 +22,8 @@ export interface RunRecord {
   id: string
   pipeline: string
   status: RunStatus
+  /** Every Agent Step runs on the fake Worker. */
+  dryRun?: boolean
   startedAt: string
   endedAt?: string
   steps: StepRecord[]
@@ -39,7 +41,7 @@ export function writeRun(run: RunRecord): void {
 }
 
 /** Creates the Run folder, named by local start date and time, and its record. */
-export function createRun(pipeline: string, steps: string[]): RunRecord {
+export function createRun(pipeline: string, steps: string[], { dryRun = false } = {}): RunRecord {
   const now = new Date()
   mkdirSync(runsDir(), { recursive: true })
   const base = localStamp(now)
@@ -57,6 +59,7 @@ export function createRun(pipeline: string, steps: string[]): RunRecord {
     id,
     pipeline,
     status: 'running',
+    dryRun,
     startedAt: now.toISOString(),
     steps: steps.map((name) => ({ name, status: 'pending', log: join('logs', `${name}.log`) })),
   }

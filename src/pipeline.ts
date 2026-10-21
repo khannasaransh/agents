@@ -13,13 +13,13 @@ export interface Pipeline {
 
 /**
  * Starts a Run of the named Pipeline and runs every Step in order, even after one fails.
- * Refuses to start while another Run is active.
+ * Refuses to start while another Run is active. A dry run runs every Agent Step on the fake Worker.
  */
-export async function runPipeline(name: string): Promise<RunRecord> {
+export async function runPipeline(name: string, { dryRun = false } = {}): Promise<RunRecord> {
   const pipeline: Pipeline = (await import(pathToFileURL(definitionFile('pipelines', name)).href)).default
   const release = acquireLock()
   try {
-    const run = createRun(name, pipeline.steps)
+    const run = createRun(name, pipeline.steps, { dryRun })
     try {
       for (const step of pipeline.steps) await runStep(run.id, step)
       const done = readRun(run.id)

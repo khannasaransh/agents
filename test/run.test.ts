@@ -7,7 +7,7 @@ import { makeWorkspace, type Workspace } from './helpers.ts'
 let ws: Workspace
 afterEach(() => ws.cleanup())
 
-test('agents run daily creates a Run named by local start date and time that runs Fetch then Brief', async () => {
+test('agents run daily creates a Run named by local start date and time that runs its Steps in order', async () => {
   ws = makeWorkspace()
   ws.addRepo('crux_flutter')
   ws.writeRepoList()
@@ -27,7 +27,9 @@ test('agents run daily creates a Run named by local start date and time that run
     run.steps.map((s) => [s.name, s.status]),
     [
       ['fetch', 'succeeded'],
+      ['review', 'succeeded'],
       ['brief', 'succeeded'],
+      ['save-state', 'succeeded'],
     ],
   )
   for (const step of run.steps) {
@@ -53,7 +55,9 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
     run.steps.map((s) => [s.name, s.status]),
     [
       ['fetch', 'failed'],
+      ['review', 'succeeded'],
       ['brief', 'succeeded'],
+      ['save-state', 'succeeded'],
     ],
   )
   assert.match(ws.readRunFile(id, 'brief.md'), /## Run health[\s\S]*fetch: failed/)
@@ -63,12 +67,48 @@ test("a Repo's second Run lists the commits pushed since its first", async () =>
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   ws.writeRepoList()
-  await ws.agents('run', 'daily')
+  await ws.agents('run', 'daily', '--dry-run')
   repo.pushCommit('Add paywall')
 
-  await ws.agents('run', 'daily')
+  await ws.agents('run', 'daily', '--dry-run')
 
   const [first, second] = ws.runIds()
   assert.match(ws.readRunFile(first, 'brief.md'), /Baseline recorded/)
   assert.match(ws.readRunFile(second, 'brief.md'), /1 new commit on main:\n\n- `\w{7}` Add paywall/)
+})
+
+test('agents run daily --dry-run reviews new commits on the fake Worker, and leaves them for a real review', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  ws.writeRepoList()
+  await ws.agents('run', 'daily', '--dry-run')
+  const baseline = ws.readRepoState().crux_flutter.lastReviewed
+  repo.pushCommit('Add paywall')
+
+  const result = await ws.agents('run', 'daily', '--dry-run')
+
+  assert.equal(result.status, 0, result.stderr)
+  const [, id] = ws.runIds()
+  const run = ws.readRun(id)
+  assert.equal(run.dryRun, true)
+  assert.equal(run.status, 'succeeded')
+  assert.deepEqual(ws.reviewResult(id, 'crux_flutter').findings, [])
+  assert.match(ws.readRunFile(id, 'brief.md'), /### crux_flutter[\s\S]*Review: Answered by the fake Worker\.\n\nNo findings\./)
+  assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: baseline } })
+})
+
+test('a Run whose review fails ends partial, and its Brief says so', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  ws.writeRepoList()
+  await ws.agents('run', 'daily', '--dry-run')
+  repo.pushCommit('Add paywall')
+  ws.writeCannedAnswers({ reviewer: [{ error: 'Quota limit reached' }] })
+
+  const result = await ws.agents('run', 'daily', '--dry-run')
+
+  assert.equal(result.status, 2)
+  const [, id] = ws.runIds()
+  assert.equal(ws.readRun(id).status, 'partial')
+  assert.match(ws.readRunFile(id, 'brief.md'), /Review failed: Quota limit reached[\s\S]*## Run health[\s\S]*- review: failed/)
 })

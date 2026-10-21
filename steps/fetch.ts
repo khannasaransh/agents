@@ -1,13 +1,13 @@
 // Fetch: brings each Repo's production branch up to date from the remote in the Repo list, into
 // the clone's origin/<branch>, and records per Repo the last reviewed commit, the new head and the
 // commits between them. It never pulls, checks out or touches a working tree, so Saransh's
-// uncommitted changes and branches stay as they are.
+// uncommitted changes and branches stay as they are. Save state, not Fetch, records baselines.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, writeJson } from '../src/files.ts'
 import { runGit } from '../src/git.ts'
 import { loadRepos, type Repo } from '../src/repos.ts'
-import { readRepoState, writeRepoState } from '../src/state.ts'
+import { readRepoState } from '../src/state.ts'
 import { runAsStep } from '../src/step.ts'
 
 export interface Commit {
@@ -75,10 +75,6 @@ await runAsStep(async ({ runFolder, force }) => {
     let result: FetchResult
     try {
       const ok = await fetchRepo(repo, fetched)
-      if (ok.status === 'baseline') {
-        state[repo.name] = { lastReviewed: ok.head }
-        writeRepoState(state)
-      }
       console.log(`${repo.name}: ${ok.status}${ok.commits.length ? ` (${ok.commits.length})` : ''}`)
       result = ok
     } catch (error) {

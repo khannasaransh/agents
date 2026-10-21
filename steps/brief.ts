@@ -1,26 +1,45 @@
 // Brief: renders the day's Brief as Markdown in the Run folder from what earlier Steps wrote there,
-// grouped by Team, ending with the Run's health. It runs even when earlier Steps failed.
-import { existsSync, readdirSync, writeFileSync } from 'node:fs'
+// grouped by Team: each Repo's new commits and review, then the Run's health. It runs even when
+// earlier Steps failed.
+import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { readJson } from '../src/files.ts'
+import { readJsonFiles } from '../src/files.ts'
 import { teams } from '../src/repos.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
 import type { FetchResult } from './fetch.ts'
-
-function readFetchResults(runFolder: string): FetchResult[] {
-  const fetchDir = join(runFolder, 'fetch')
-  if (!existsSync(fetchDir)) return []
-  return readdirSync(fetchDir)
-    .filter((file) => file.endsWith('.json'))
-    .map((file) => readJson<FetchResult>(join(fetchDir, file)))
-    .sort((a, b) => a.repo.localeCompare(b.repo))
-}
+import { severities } from '../agents/reviewer/config.ts'
+import type { Finding, ReviewResult } from './review.ts'
 
 const short = (sha: string) => sha.slice(0, 7)
+const firstLine = (text: string) => text.split('\n')[0]
 
-function render(run: RunRecord, results: FetchResult[]): string {
+/** Saransh's own findings first, then the worst first. */
+const byPriority = (a: Finding, b: Finding) => Number(b.bySaransh) - Number(a.bySaransh) || severities.indexOf(a.severity) - severities.indexOf(b.severity)
+
+function reviewLines(review: ReviewResult | undefined): string[] {
+  if (!review) return []
+  if (review.status === 'failed') return [`Review failed: ${firstLine(review.error)}`, '']
+  const lines = [`Review: ${review.summary}`, '']
+  if (!review.findings.length) lines.push('No findings.')
+  for (const f of review.findings.toSorted(byPriority)) {
+    const where = f.line === null ? f.file : `${f.file}:${f.line}`
+    lines.push(`- **${f.severity}** \`${where}\` in \`${short(f.commit)}\` by ${f.author}${f.bySaransh ? ' (yours)' : ''}: ${f.summary}`)
+  }
+  lines.push('')
+  return lines
+}
+
+/** Under `heading`, each Repo whose result failed, with the first line of its error. */
+function failureLines(heading: string, results: (FetchResult | ReviewResult)[]): string[] {
+  const failed = results.flatMap((r) => (r.status === 'failed' ? [r] : []))
+  if (!failed.length) return []
+  return ['', heading, '', ...failed.map((r) => `- ${r.repo} (${r.team}): ${firstLine(r.error)}`)]
+}
+
+function render(run: RunRecord, results: FetchResult[], reviews: Map<string, ReviewResult>): string {
   const lines = [`# Brief ${run.id}`, '']
+  if (run.dryRun) lines.push('Dry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done.', '')
   if (!results.length) lines.push('No Repo was fetched in this Run.', '')
 
   for (const team of teams) {
@@ -35,7 +54,7 @@ function render(run: RunRecord, results: FetchResult[]): string {
       const count = r.commits.length === 1 ? '1 new commit' : `${r.commits.length} new commits`
       lines.push(`### ${r.repo}`, '', `${count} on ${r.branch}:`, '')
       for (const c of r.commits) lines.push(`- \`${short(c.sha)}\` ${c.subject} (${c.author})`)
-      lines.push('')
+      lines.push('', ...reviewLines(reviews.get(r.repo)))
     }
     for (const r of baselines) {
       lines.push(`### ${r.repo}`, '', `Baseline recorded at \`${short(r.head)}\` on ${r.branch}. New commits are listed from the next Run.`, '')
@@ -47,11 +66,7 @@ function render(run: RunRecord, results: FetchResult[]): string {
   const notSucceeded = stepsNotSucceeded(run.steps).filter((s) => s.name !== 'brief')
   if (notSucceeded.length) for (const s of notSucceeded) lines.push(`- ${s.name}: ${s.status}. Log: ${s.log}`)
   else lines.push('- No Step failed or was skipped.')
-  const failed = results.flatMap((r) => (r.status === 'failed' ? [r] : []))
-  if (failed.length) {
-    lines.push('', 'Repos that failed to fetch:', '')
-    for (const r of failed) lines.push(`- ${r.repo} (${r.team}): ${r.error.split('\n')[0]}`)
-  }
+  lines.push(...failureLines('Repos that failed to fetch:', results), ...failureLines('Repos whose review failed:', [...reviews.values()]))
   return `${lines.join('\n')}\n`
 }
 
@@ -61,6 +76,7 @@ await runAsStep(({ runId, runFolder, force }) => {
     console.log('Brief already written in this Run, skipping')
     return
   }
-  writeFileSync(out, render(readRun(runId), readFetchResults(runFolder)))
+  const reviews = new Map(readJsonFiles<ReviewResult>(join(runFolder, 'review')).map((r) => [r.repo, r]))
+  writeFileSync(out, render(readRun(runId), readJsonFiles<FetchResult>(join(runFolder, 'fetch')), reviews))
   console.log(`Wrote ${out}`)
 })

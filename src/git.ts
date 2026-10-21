@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { worktreesDir } from './paths.ts'
 
 /**
  * Settings that stop git from ever asking for credentials, so an unattended Run fails instead of
@@ -18,10 +21,10 @@ const nonInteractive = {
  * Runs git in `cwd` without prompts, returning its stdout. Rejects with git's error output on a
  * non-zero exit, and kills git and everything it started once `timeoutMs` passes.
  */
-export function runGit(cwd: string, args: string[], { timeoutMs = 60_000 } = {}): Promise<string> {
+export function runGit(cwd: string, args: string[], { timeoutMs = 60_000, env = {} } = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     // Its own process group, so a timeout also kills the transport git started (ssh, https helper).
-    const child = spawn('git', args, { cwd, env: { ...process.env, ...nonInteractive }, detached: true })
+    const child = spawn('git', args, { cwd, env: { ...process.env, ...env, ...nonInteractive }, detached: true })
     let stdout = ''
     let stderr = ''
     let timedOut = false
@@ -44,4 +47,26 @@ export function runGit(cwd: string, args: string[], { timeoutMs = 60_000 } = {})
       else resolve(stdout)
     })
   })
+}
+
+/**
+ * Runs `work` in a temporary clean worktree of the clone at `repoFolder`, checked out at `commit`
+ * without taking a branch, and removes the worktree afterwards even when `work` fails. The clone's
+ * hooks don't run and Git LFS files stay as pointers, so making the worktree starts nothing and
+ * downloads nothing.
+ */
+export async function withWorktree<T>(repoFolder: string, commit: string, work: (folder: string) => Promise<T>): Promise<T> {
+  mkdirSync(worktreesDir(), { recursive: true })
+  const folder = mkdtempSync(join(worktreesDir(), `${basename(repoFolder)}-`))
+  try {
+    await runGit(repoFolder, ['-c', 'core.hooksPath=/dev/null', 'worktree', 'add', '--detach', folder, commit], {
+      timeoutMs: 10 * 60_000,
+      env: { GIT_LFS_SKIP_SMUDGE: '1' },
+    })
+    return await work(folder)
+  } finally {
+    await runGit(repoFolder, ['worktree', 'remove', '--force', folder]).catch(() => {})
+    rmSync(folder, { recursive: true, force: true })
+    await runGit(repoFolder, ['worktree', 'prune']).catch(() => {})
+  }
 }

@@ -31,7 +31,7 @@ test('Fetch updates the production branch without touching the working tree or c
   assert.equal(readFileSync(join(repo.folder, 'notes.txt'), 'utf8'), 'uncommitted work\n')
 })
 
-test("on a Repo's first Run, Fetch records its head as the baseline instead of listing history", async () => {
+test("on a Repo's first Run, Fetch records its head as the baseline instead of listing history, leaving state to Save state", async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   repo.pushCommit('Old work')
@@ -50,7 +50,7 @@ test("on a Repo's first Run, Fetch records its head as the baseline instead of l
     head,
     commits: [],
   })
-  assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: head } })
+  assert.equal(existsSync(join(ws.dataDir, 'state')), false)
 })
 
 test('Fetch lists the commits since the last recorded commit, newest first, and marks unchanged Repos', async () => {
