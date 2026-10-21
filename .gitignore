@@ -1,0 +1,4 @@
+node_modules/
+# Runs, state, Memory, the PRD inbox and temporary worktrees. Never committed.
+data/
+.env
