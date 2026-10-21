@@ -1,0 +1,337 @@
+# Local agent Pipeline
+
+Status: ready-for-agent
+
+## Problem Statement
+
+Saransh tracks 29 company Repos across seven Teams, a busy company Discord server, a stream of PRDs, and an org wiki he maintains alone. Keeping up means pulling each Repo by hand, reading new commits, scrolling Discord for anything aimed at him, and remembering which wiki pages the new code or PRDs have made stale. None of that happens reliably every day, so reviews get skipped, requests in Discord get missed, and the wiki drifts from the code.
+
+He already pays for three coding-agent CLIs (Claude Code, Codex and Antigravity) that can do the judgment-heavy parts headlessly, but nothing ties them together. Existing tools don't fit. Vercel Eve can't use those CLIs on his subscriptions or reach his local Repos. Multi-agent session managers (Conductor, claude-squad, Superset) are for steering sessions by hand. Dagu would work but adds a daemon he doesn't need yet.
+
+## Solution
+
+A local agent system in its own repo, run by one command or by a Schedule. Every weekday at 03:00 IST a daily Pipeline runs on his Mac:
+
+1. It fetches every Repo, without ever touching his working copies.
+2. It reviews each Repo's new commits with a Reviewer Agent.
+3. It collects Discord messages and any PRD files posted there.
+4. It runs a PM Agent that sums up the day.
+5. It runs a Docs Agent that updates the org wiki on a branch from the new commits and PRDs.
+6. It writes a Brief: one Markdown file, for Saransh alone, waiting for him when he starts his day.
+
+Each Agent is a folder laid out like an Eve agent, with instructions, config, Tools, skills and Memory. Its config names the Worker (Claude Code, Codex or Antigravity) that runs it on his own subscription. The Pipeline itself is plain code, because its order never changes. Agents are used only at the Steps that need judgment. Every Step is a standalone command with files in and files out, so Dagu can take over scheduling later without rewriting any Step.
+
+The same repo also sets up a new machine, Mac or Windows. It clones the Repos by Team and installs the Workers' config.
+
+## User Stories
+
+### Running the Pipeline
+
+1. As Saransh, I want the daily Pipeline to run by itself every weekday at 03:00 IST, so that the Brief is ready before I start work.
+2. As Saransh, I want a missed Run to happen when the Mac next wakes, so that a sleeping laptop costs me a delay, not a day.
+3. As Saransh, I want to start the daily Pipeline by hand with one command, so that I can get a fresh Brief whenever I want.
+4. As Saransh, I want to run a single Step inside an existing Run, so that I can retry or tune one part without redoing the rest.
+5. As Saransh, I want a dry run that exercises every Step with a fake Worker, so that I can check the Pipeline without spending any quota.
+6. As Saransh, I want a second Run to refuse to start while one is already running, so that two Runs never fight over the same Repos or wiki branch.
+7. As Saransh, I want each Run to have its own folder named by date and start time, so that I can find any day's inputs and outputs at a glance.
+8. As Saransh, I want Run folders never to be deleted automatically, so that I decide when to prune them by month or year.
+9. As Saransh, I want a failed Step not to stop the other Steps, so that one broken source still leaves me a useful Brief.
+10. As Saransh, I want a Run with failed Steps to be marked partial, so that I can tell a complete day from an incomplete one.
+11. As Saransh, I want every Step to write its own log in the Run folder, so that I can see why something failed without rerunning it.
+12. As Saransh, I want re-running a Step to skip work whose output already exists unless I force it, so that retries are cheap and safe.
+
+### Repos and Teams
+
+13. As Saransh, I want one Repo list that names every Repo with its Team, remote, local folder and production branch, so that the Pipeline and machine setup share one source of truth.
+14. As Saransh, I want only company Repos in that list, with personal repos, repos without a remote and SDK clones left out, so that reviews cover the work that matters.
+15. As Saransh, I want each Repo's production branch recorded explicitly, so that reviews follow what ships even when my checkout is on another branch.
+16. As Saransh, I want the Pipeline to fetch Repos and never pull, so that my uncommitted changes and feature branches are never disturbed.
+17. As Saransh, I want a Repo that fails to fetch to be reported and skipped, so that one bad remote doesn't block the other Repos.
+18. As Saransh, I want git never to prompt for credentials during a Run, so that an unattended Run can't hang waiting for input.
+19. As Saransh, I want the Brief grouped by Team, so that I read the mobile, backend and data changes as separate blocks.
+
+### Reviews
+
+20. As Saransh, I want each Repo with new commits on its production branch to get one review per Run, so that I see every change exactly once.
+21. As Saransh, I want a review to cover all commits since the last reviewed commit for that Repo, so that nothing slips between Runs.
+22. As Saransh, I want the Reviewer to read a clean copy of the production branch at the new commit, never my working files, so that its findings match what actually shipped.
+23. As Saransh, I want the clean copy removed after the review, so that my clones carry no leftovers.
+24. As Saransh, I want the Reviewer to run read-only, so that a review can never change a Repo.
+25. As Saransh, I want each finding to carry severity, file, line, commit, author and a one-line summary, so that I can triage findings without opening the diff.
+26. As Saransh, I want findings on commits I wrote to be marked, so that I see my own fixes first.
+27. As Saransh, I want reviews to run on a different model from the one that usually writes the code, so that the review is a genuine second opinion.
+28. As Saransh, I want the last reviewed commit to advance only for Repos whose review succeeded, so that a failed review is retried in the next Run.
+29. As Saransh, I want the Reviewer to remember each Repo's conventions and the findings I've waved off, so that it stops repeating noise.
+30. As Saransh, I want the first Run to record each Repo's current head without reviewing its whole history, so that day one doesn't review years of commits.
+
+### Discord and PRDs
+
+31. As Saransh, I want the Pipeline to read the Discord channels I choose through a read-only bot, so that I keep up without scrolling.
+32. As Saransh, I want the Discord Step to be skipped cleanly until the bot is set up, so that the rest of the Pipeline works from day one.
+33. As Saransh, I want messages that mention me to be flagged, so that requests aimed at me surface first.
+34. As Saransh, I want PRD files attached in the watched channels saved to the PRD inbox, so that new PRDs reach the wiki without me copying them.
+35. As Saransh, I want PRD links I have to download by hand (such as Google Docs) to show up as To-dos, so that I know exactly what to fetch.
+36. As Saransh, I want to drop PRD files I downloaded into the PRD inbox, so that they go through the same path as Discord attachments.
+37. As Saransh, I want processed PRD files moved out of the inbox, and files that aren't PRDs set aside, so that the inbox shows only what's still waiting.
+38. As Saransh, I want the bot never to read DMs or use my own account, so that nothing breaks Discord's terms or risks my account.
+
+### PM Agent and the Brief
+
+39. As Saransh, I want a PM Agent to turn reviews, commits and Discord messages into a line per Repo, Discord highlights and To-dos, so that I get the day's meaning, not raw data.
+40. As Saransh, I want the PM Agent to carry open items from earlier Runs in its Memory, so that unfinished things don't vanish after one day.
+41. As Saransh, I want the Brief written by a fixed command from the Agents' outputs, so that it looks the same every day and still gets written when an Agent fails.
+42. As Saransh, I want the Brief to list which Steps failed or were skipped, so that I know which parts of the day are missing.
+43. As Saransh, I want the Brief to list wiki drafts and the docs branch waiting for my review, so that wiki work doesn't pile up unseen.
+44. As Saransh, I want the Brief to list undocumented Repos that changed a lot, so that I can decide when to document them.
+45. As Saransh, I want the Brief to show how many Repos were reviewed, so that I can see what each Run costs.
+46. As Saransh, I want no notification or posting anywhere, so that the Brief stays a private file I open when I choose.
+
+### Docs Agent and the wiki
+
+47. As Saransh, I want a Docs Agent to update existing wiki pages whose sources cite files changed by new commits, so that the wiki keeps up with the code.
+48. As Saransh, I want the Docs Agent to turn each PRD in the inbox into a PRD page with the wiki's PRD skill, so that PRDs are documented the same way every time.
+49. As Saransh, I want a PRD page made from a Discord attachment to cite the Discord message as where the copy came from, so that its origin is traceable.
+50. As Saransh, I want the Docs Agent never to use Discord messages as a source of wiki facts, so that the wiki rests only on code and PRDs.
+51. As Saransh, I want the Docs Agent never to document a Repo for the first time, so that first-time documentation stays a deliberate job I run myself.
+52. As Saransh, I want the Docs Agent to work in its own copy of the wiki, so that my checkout and any edits in progress are never touched.
+53. As Saransh, I want its work on one rolling branch that it keeps adding to until I merge, so that each day builds on the last instead of conflicting with it.
+54. As Saransh, I want the Docs Agent to bring in my latest wiki changes before it starts, and to stop and tell me on a conflict, so that it never overwrites my work.
+55. As Saransh, I want its commits made under my identity with trailers naming the Agent and the Run, so that I can trace every change back to its Run.
+56. As Saransh, I want its pages left as drafts and the wiki's own stamp, region and check tools run until they report no errors, so that its work meets the wiki's rules before I review it.
+57. As Saransh, I want the Docs Agent never to push or merge, so that nothing reaches the wiki's main line without my review.
+
+### Agents, Workers, Tools, Memory
+
+58. As Saransh, I want each Agent to be a folder with its instructions, config, Tools, skills and Memory, so that I can read or change one Agent without touching code.
+59. As Saransh, I want an Agent's config to name its Worker, model, effort, permissions, inputs, outputs and output schema, so that its behavior is declared, not buried in code.
+60. As Saransh, I want each Agent to name a fallback Worker, so that a quota limit or outage on one subscription doesn't cost me the Step.
+61. As Saransh, I want Antigravity used only as a fallback for now, so that its known headless bugs can't break a normal Run.
+62. As Saransh, I want the same instructions to run on any of the three Workers, so that I can move an Agent to another Worker by changing one setting.
+63. As Saransh, I want Agents that return data to have their answers checked against a schema, so that later Steps can rely on the shape.
+64. As Saransh, I want every Agent call capped by a timeout and a maximum number of turns, so that a stuck Worker can't hold up the Run.
+65. As Saransh, I want an Agent to run only the Tools it declares, plus its Worker's built-in reading and searching, so that I know exactly what each Agent can do.
+66. As Saransh, I want an Agent's skills given to its Worker without copying anything into the Repo or wiki it works in, so that those folders stay untouched.
+67. As Saransh, I want Agents to propose Memory changes in their output, and the Step to apply them, so that every change to Memory is logged with its Run.
+
+### Setup on a new machine
+
+68. As Saransh, I want one setup command that works on Mac and Windows, so that a new machine matches this one without following a long manual guide.
+69. As Saransh, I want setup to clone each Repo into a folder named for its Team, on its production branch, so that a new machine has the same layout.
+70. As Saransh, I want to set up only some Teams, so that a machine for one kind of work doesn't carry every Repo.
+71. As Saransh, I want setup to install the Workers' config from this repo, so that Claude Code, Codex and Antigravity behave the same on every machine.
+72. As Saransh, I want setup to check that the tools the Pipeline needs are installed, so that missing pieces show up before the first Run.
+73. As Saransh, I want setup to print a checklist of what it can't do (SDKs, IDEs, secrets, non-Repo folders), so that nothing manual is forgotten.
+74. As Saransh, I want setup to install the Schedule on the Mac from the Schedule definition, so that the launchd entry is never hand-edited.
+
+### Secrets and identity
+
+75. As Saransh, I want the Discord bot token, my Discord user ID and my git author emails kept in a local env file that is never committed, so that secrets and identity stay on my machine.
+76. As Saransh, I want all Run data, Memory, state and the PRD inbox kept in an area git ignores, so that Discord messages and findings about company code never leave the machine through this repo.
+
+### Moving to Dagu later
+
+77. As Saransh, I want every Step callable as a standalone command that reads and writes only the Run folder, so that a Dagu pipeline can call the same commands later.
+78. As Saransh, I want Steps to signal failure only through their exit code, so that any runner can tell success from failure.
+
+## Implementation Decisions
+
+### Language and shape
+
+- TypeScript run directly by Node 25's built-in type stripping. There is no build step and, at first, no npm dependencies.
+- The Pipeline is plain code, not an agent and not a workflow engine (ADR 0001). It declares an ordered list of Steps. The Discord Step runs alongside the reviews; everything else runs in order.
+- The repo holds:
+  - the Agents, one folder each;
+  - the Pipeline definitions;
+  - the command Steps;
+  - the Schedule definitions;
+  - the Repo list;
+  - the setup command and the Workers' config;
+  - a git-ignored data area;
+  - the glossary, ADRs and this PRD.
+- A single `agents` command, linked as a bin, is the only entry point:
+  - `agents run <pipeline>` starts a Run. `--dry-run` uses the fake Worker for every Agent Step.
+  - `agents step <name> --run <id>` runs one Step inside an existing Run. `--force` redoes work whose output exists.
+  - `agents setup` prepares a machine. `--team` limits it to the named Teams.
+  - `agents schedule install` writes the launchd entry from the Schedule definitions.
+
+### The Step contract (ADR 0001)
+
+- Every Step is a standalone command that takes a Run id.
+- A Step reads its inputs only from the Run folder and from state, writes its outputs only to the Run folder, and passes nothing in memory.
+- A Step exits zero on success and non-zero on failure.
+- A Step is safe to re-run: it skips work whose output already exists unless forced.
+- Each Run keeps a record of the Pipeline, each Step's status, start and end times, and the path of its log.
+- A Run is succeeded, partial (some Steps failed or were skipped) or failed (the Run couldn't start or record itself).
+- A lock stops a second Run from starting while one is active.
+- A Run's folder name starts with its local start date (year-month-day) followed by hour and minute. Run data is never deleted automatically.
+
+### Daily Pipeline Steps
+
+1. **Fetch** (command): for each Repo, it fetches the production branch from the remote, with credential prompts disabled and a timeout. It never pulls, checks out, or touches the working tree. It records, per Repo, the previous reviewed commit and the new head. On a Repo's first Run it records the current head as the baseline without reviewing history. A fetch failure is recorded for that Repo and doesn't fail the others.
+2. **Review** (Agent, one call per Repo with new commits, a few at a time):
+   - It runs on a temporary clean worktree of the production branch at the new head, made from Saransh's clone and removed afterwards.
+   - The Reviewer runs on Codex in read-only mode, with Claude Code as its fallback.
+   - Input: the commit range and the Repo's Memory.
+   - Output, checked against a schema: a list of findings (severity, file, line, commit, author, summary, whether Saransh authored it) plus a short summary of what changed.
+3. **Discord** (command, alongside Review): it reads the configured channels and their threads through a read-only bot over Discord's REST API.
+   - It covers messages since the last successful Discord Step, or the last 24 hours on the first Run.
+   - It writes the messages to the Run folder and flags mentions of Saransh.
+   - It saves attached PRD-type files (Word, PDF, Markdown) into the PRD inbox.
+   - It records links it can't download, such as Google Docs, as To-do candidates.
+   - It is skipped, not failed, while the bot isn't configured.
+4. **PM** (Agent): runs on Claude Code.
+   - Input: review outputs, commit summaries, Discord messages, the Run's health so far, and its Memory.
+   - Output, checked against a schema: a line per Repo, Discord highlights, and To-dos.
+   - The rules for what counts as a To-do are open (see Further Notes). The candidates are Discord requests aimed at Saransh with no reply from him, findings on his commits, wiki drafts waiting for him, and PRD links he has to download.
+5. **Docs** (Agent): runs on Claude Code in its own worktree of the wiki, on a single rolling docs branch.
+   - **Branch:** it continues an unmerged branch, starts fresh from the wiki's main line once the branch has been merged, and merges main in first if main has moved. On a conflict it stops and reports.
+   - **Scope:** existing pages whose sources cite files changed by new commits, and every file in the PRD inbox. It uses the wiki's own skills: the PRD skill for PRDs and the update procedure for code changes.
+   - **PRD files:** it decides whether each one is a PRD and which Codebase it belongs to, copies it into that Codebase's PRD sources, and writes the PRD page. A copy from Discord cites the Discord message link in the page's sources. It moves processed files out of the inbox, and files that aren't PRDs to a separate holding area.
+   - **Never:** it doesn't use Discord messages as wiki sources, doesn't document a Repo for the first time, and doesn't push or merge.
+   - **Wiki rules:** it follows them throughout. It reads code only at pinned commits, leaves pages as drafts, and runs the wiki's stamp, region and check tools until the check reports no errors. It commits under Saransh's git identity with trailers naming the Agent and the Run.
+   - **Output:** the pages changed, the PRDs processed, and undocumented Repos with large changes, for the Brief.
+6. **Brief** (command): renders the Brief as Markdown in the Run folder, grouped by Team. Sections:
+   - per Repo, one line on what changed;
+   - findings by severity, with Saransh's own first;
+   - Discord highlights;
+   - To-dos;
+   - wiki drafts and the docs branch waiting for review;
+   - undocumented Repos with large changes;
+   - the number of Repos reviewed;
+   - Run health.
+
+   It runs even when earlier Steps failed. There is no notification.
+7. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run.
+
+### Agents
+
+- An Agent is a folder laid out like an Eve agent. It holds:
+  - a config module;
+  - an instructions file;
+  - skills;
+  - Tools;
+  - subagents;
+  - Memory.
+
+  Eve's channels, connections, sandbox, hooks, instrumentation and lib slots are left out.
+- An Agent's config declares:
+  - its Worker and one fallback Worker, plus model and effort;
+  - its permissions, either read-only or the folders it may write;
+  - its Tools, inputs and outputs;
+  - an optional output schema;
+  - a timeout and a maximum number of turns.
+- Tools are small commands owned by the Agent. The Step allows exactly those commands, plus the Worker's built-in read and search tools, and lists them with their usage in the prompt. Tools exposed over MCP come later.
+- Skills reach the Worker without being written into the target folder:
+  - Claude Code loads them as a session-only plugin.
+  - Codex and Antigravity get the skill text in the prompt, until it's confirmed they can load skills from outside their working folder.
+- Subagents: the slot exists, but none ship in v1. When one is added, it is handed to the Worker's own subagent feature, so the parent Agent decides when to call it. Such an Agent can run only on Workers that support this.
+- Memory is Markdown notes per Agent, and for the Reviewer one file per Repo. It is read at the start of a call. The Agent proposes edits in its output, and Save state applies them.
+
+### Workers
+
+- One interface, "call this Agent with these inputs and return its result", with implementations for Claude Code (headless print mode), Codex (non-interactive exec) and Antigravity (print mode), plus a fake Worker for tests and dry runs.
+- Each implementation:
+  - builds its CLI's command line;
+  - requests JSON output and, where the Agent has a schema, the CLI's schema-checked final answer;
+  - maps the Agent's permissions onto the CLI's sandbox or allowlist;
+  - enforces the timeout by ending the process;
+  - parses the result.
+- If a call fails, times out or hits a quota limit, it is retried once on the fallback Worker. Both attempts are logged.
+- Claude Code runs on Saransh's logged-in subscription, so it is never run in the minimal mode that ignores that login.
+- Nothing runs with permission checks disabled.
+
+### Repo list and Teams
+
+- Each Repo entry has a name, Team, remote, local folder on this Mac, and production branch.
+- 29 Repos are seeded from the local clones. The production branch defaults to each remote's default branch, with exceptions recorded: skill-up uses main, inshortsapp uses master, and flutter_payment uses main.
+- Left out: personal repos, repos without a remote, the Flutter SDK clone, and autopay-android.
+- Teams are flutter, android, ios, backend, data, frontend and other.
+  - On this Mac, existing folders stay as they are.
+  - On a new machine, the Team is the folder a Repo is cloned into.
+
+### Schedule
+
+- The daily Schedule runs Monday to Friday at 05:30 on the Mac's local clock (Singapore), which is 03:00 IST.
+- The launchd entry is generated from the Schedule definition. It sets its own PATH, since launchd doesn't load the shell profile.
+- launchd runs a missed time once when the Mac wakes. Saransh keeps the Mac awake, so there is no scheduled wake.
+
+### Setup
+
+- Setup runs on Mac or Windows and uses no bash.
+  - It creates the Team folders and clones each selected Repo onto its production branch, with an optional Team filter.
+  - It installs the Workers' config held in this repo: Claude Code settings, status line and plugins; Codex config; Antigravity config.
+  - It checks that the tools are present: git, Node, and the three Worker CLIs.
+  - It prints a checklist of the manual steps: SDKs and IDEs, secrets and env files, and folders that aren't Repos.
+- The Pipeline itself runs only on the Mac for now.
+
+### Secrets, identity and data
+
+- A local, git-ignored env file holds the Discord bot token, the channel list, Saransh's Discord user ID and his git author emails.
+- A git-ignored data area holds Runs, state (the last reviewed commit per Repo, and the time of the last successful Discord read), Memory, the PRD inbox and temporary worktrees.
+
+## Testing Decisions
+
+- **One test boundary: the Step command.** A test prepares a Run folder and state as inputs, runs one Step with the fake Worker standing in for the real ones, and checks only the files the Step wrote and its exit code. Tests never reach into a Step's internals.
+- **Using real git, never the network.** Steps that touch git (Fetch, Review's worktree, Docs' branch handling, Save state) run against temporary git repos created by the test, including a local "remote" to fetch from.
+- **Behavior covered:**
+  - Fetch: never changes the working tree or the checked-out branch; records baselines on the first Run; reports one failing Repo without failing the others.
+  - Review: runs only for Repos with new commits; removes its worktree even when the call fails.
+  - Save state: advances state only for successful reviews; applies Memory edits.
+  - Discord: is skipped cleanly without configuration; routes attachments to the PRD inbox. It is tested against recorded API responses.
+  - Docs: continues, restarts or merges the rolling branch correctly; stops on conflict; moves PRD inbox files.
+  - Brief: is written, with Run health, when earlier Steps failed.
+  - Re-runs: skip completed work unless forced.
+  - Lock: blocks a second Run.
+- **Whole-Pipeline test:** the dry run (`agents run daily --dry-run`) covers the Pipeline end to end, including Step order and a partial Run.
+- **Command-line tests:** a small separate set checks that each real Worker builds the right command line for a given Agent config: permissions, schema, Tools, skills and timeout. These are pure checks that never start a CLI.
+- **What makes a good test:** it asserts on files, exit codes and git state that Saransh would notice. It doesn't assert on how a Step is written inside.
+- **Prior art:** none. The repo is new, and the wiki's tools have no tests. Use Node's built-in test runner, so tests add no dependencies.
+
+## Out of Scope
+
+- Dagu, and any runner other than launchd. The Step contract keeps that move open.
+- Running the Pipeline on Windows. Windows gets setup only.
+- Pulling Repos, or reviewing working copies or branches other than production.
+- Commenting on GitHub PRs, reviewing open PRs, or anything that needs the GitHub CLI.
+- Posting the Brief anywhere, and notifications of any kind.
+- Reading Discord DMs, using Saransh's own Discord account, or using Discord content as a wiki source.
+- Downloading Google Docs or other links that need a login.
+- First-time documentation of a Repo, and pushing or merging the docs branch.
+- Personal repos, repos without a remote, SDK clones, and autopay-android.
+- Subagents and MCP-based Tools in v1.
+- A hosted team bot, which is where Vercel Eve would fit.
+- Deleting Run data automatically.
+
+## Further Notes
+
+- **Open decision, To-dos:** what counts as a To-do, beyond PRD links to download by hand. The PM Agent's schema reserves the field, and its rules are settled before the PM Agent ships.
+- **Waiting on Saransh, Discord:** the bot, its installation on the company server by someone with Manage Server, and the list of channels. The Discord Step is skipped until then.
+- **Unconfirmed:** whether Codex and Antigravity can load skills from outside their working folder. If they can, the inlined skill text goes away.
+- **Antigravity headless bugs:**
+  - print mode ignores its permission allowlist (antigravity-cli #548);
+  - it can report success while a command it started is still running (#1044).
+
+  A piped test run on this Mac returned clean JSON in 10 seconds. It stays a fallback until these are fixed.
+- **Billing:** every Run draws on Saransh's plans. Claude Code headless calls count against plan limits, and Max and Team plans also get a monthly API credit. Codex has 5-hour and weekly limits. Antigravity's quota refreshes every 5 hours up to a weekly cap. The Brief's review count is the cost signal.
+- **Versions:** codex-cli 0.154.0 and agy 1.1.27 are installed, while 0.163.0 and 1.4.4 are current. Setup should flag outdated Workers.
+- **Defaults chosen while writing this PRD, not discussed:**
+  - the Discord window runs from the last successful Discord Step, so Monday's Run covers the weekend;
+  - the first Run records baselines instead of reviewing history;
+  - reviews run a few at a time.
+- **Build order:**
+  1. Reviews only, run by hand.
+  2. The PM Agent and the Brief.
+  3. Discord, once the bot exists.
+  4. The Docs Agent.
+  5. The Schedule.
+- **Seed Repo list by Team:**
+  - **flutter:** crux_flutter, customcard_flutter, flutter_payment, inpix_flutter, skill-up, tangy_tv_flutter
+  - **android:** Public-Messenger-Module, android-core-dependencies, autopay-alerts-android, drama-android, inshortsapp, video-shorts
+  - **ios:** inshortsapp_swift_uikit
+  - **backend:** inpix-parse-service, inpix-read-service, inpix-user-service, inpix-write-service, inshorts-write-go, news-read-go, nis-payments-platform, nis-payments-service, nis-search-go
+  - **data:** inpix-analytics, inpix-recommendation, inpix-share-dashboard
+  - **frontend:** cards-autogen, inpix-panel, inpix-website, video-shorts-webapp
+- **References:**
+  - the glossary and ADR 0001 in this repo;
+  - the org wiki's AGENTS.md, for the rules the Docs Agent follows;
+  - the build-or-buy research page: https://claude.ai/artifact/9ZXjixmpvTgeL5oGziTYEW
