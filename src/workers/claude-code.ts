@@ -1,17 +1,27 @@
 // The Claude Code Worker: runs an Agent through `claude --print`, Claude Code's headless mode, on
-// Saransh's logged-in subscription, and reads the answer from its JSON result.
+// Saransh's logged-in subscription, and reads the answer from its JSON result. The Agent's skills
+// reach it as a plugin for that session only.
+import { cpSync, mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { Agent } from '../agent.ts'
 import type { ProcessResult } from '../process.ts'
 import type { CallOptions, Inputs, Worker } from '../worker.ts'
-import { agentPrompt, lastLine, runCommandLine, writeFolders, type CommandLine } from './cli.ts'
+import { agentPrompt, lastLine, runCommandLine, withTempFolder, writeFolders, type CommandLine } from './cli.ts'
+
+interface ClaudeCodeOptions extends CallOptions {
+  /** Where the Agent's skills are laid out as a plugin for the session. */
+  pluginDir: string
+}
 
 /**
  * The `claude --print` command line for one call of `agent`, with the prompt on stdin. It never
  * uses --bare, which ignores Saransh's login.
  */
-export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort }: CallOptions): CommandLine {
+export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort, pluginDir }: ClaudeCodeOptions): CommandLine {
   const { outputSchema, maxTurns, timeoutSeconds } = agent.config
   const writable = writeFolders(agent, cwd)
+  const hasSkills = agent.skills.length > 0
+  const allowed = [...agent.tools.map((tool) => `Bash(${tool.path}:*)`), ...writable.map((folder) => `Edit(/${folder}/**)`)]
   return {
     command: 'claude',
     args: [
@@ -25,19 +35,21 @@ export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model
       effort,
       '--max-turns',
       String(maxTurns),
-      // No settings files (Saransh's, or any the Repo commits), so no hooks, plugins or allow rules
-      // from them, and no MCP servers. File tools stay inside the folders the call may use.
+      // No settings files (Saransh's, or any the Repo commits), so no hooks, plugins, skills or allow
+      // rules from them, and no MCP servers. File tools stay inside the folders the call may use.
       '--restricted',
       '--strict-mcp-config',
-      // Anything not allowed here is denied without asking. Bash runs only the commands Claude Code
-      // itself counts as read-only, such as git log and git diff.
+      // Anything not allowed here is denied without asking. Bash runs only the Agent's Tools and the
+      // commands Claude Code itself counts as read-only, such as git log and git diff.
       '--permission-mode',
       'dontAsk',
       '--tools',
-      writable.length ? 'Read,Grep,Glob,Bash,Edit,Write' : 'Read,Grep,Glob,Bash',
+      ['Read', 'Grep', 'Glob', 'Bash', ...(writable.length ? ['Edit', 'Write'] : []), ...(hasSkills ? ['Skill'] : [])].join(','),
+      // The Agent's skills, as a plugin for this session only. Its folder is added so a skill can read its own files.
+      ...(hasSkills ? ['--plugin-dir', pluginDir, '--add-dir', pluginDir] : []),
       ...writable.flatMap((folder) => ['--add-dir', folder]),
       // An Edit rule covers every tool that writes files. `//` starts an absolute path.
-      ...(writable.length ? ['--allowedTools', ...writable.map((folder) => `Edit(/${folder}/**)`)] : []),
+      ...(allowed.length ? ['--allowedTools', ...allowed] : []),
     ],
     stdin: agentPrompt(agent, inputs),
     // A key or token in the environment would take precedence over Saransh's logged-in subscription.
@@ -48,9 +60,22 @@ export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model
 
 export const claudeCodeWorker: Worker = {
   name: 'claude-code',
-  async call(agent, inputs, options) {
-    return claudeCodeAnswer(agent, await runCommandLine(claudeCodeCommandLine(agent, inputs, options), options.cwd))
+  call(agent, inputs, options) {
+    return withTempFolder('agents-claude-code-', async (pluginDir) => {
+      if (agent.skills.length) writeSessionPlugin(agent, pluginDir)
+      return claudeCodeAnswer(agent, await runCommandLine(claudeCodeCommandLine(agent, inputs, { ...options, pluginDir }), options.cwd))
+    })
   },
+}
+
+/**
+ * Lays the Agent's skills out as a Claude Code plugin named after it, in `folder`. Each skill is
+ * copied, not linked, so its files stay inside the folder the session may read.
+ */
+function writeSessionPlugin(agent: Agent, folder: string) {
+  mkdirSync(join(folder, '.claude-plugin'))
+  writeFileSync(join(folder, '.claude-plugin', 'plugin.json'), JSON.stringify({ name: agent.name }))
+  for (const skill of agent.skills) cpSync(skill.folder, join(folder, 'skills', skill.name), { recursive: true, dereference: true })
 }
 
 /** The JSON result `claude --print --output-format json` prints, as far as reading its answer needs. */

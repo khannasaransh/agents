@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import reviewer from '../agents/reviewer/config.ts'
@@ -298,6 +298,85 @@ test('a review fails, naming both failures, when Codex answers in the wrong shap
     crux.error,
     /^codex failed: The reviewer Agent's answer doesn't match its output schema: answer\.findings\[0\]\.severity must be one of critical, high, medium, low \(got "urgent"\); then claude-code failed: You've hit your session limit · resets 3:45pm$/,
   )
+})
+
+test("an Agent's Tools and skills reach each Worker without a file being added or changed in the Repo it reviews", async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Add paywall', { files: { 'lib/paywall.dart': 'class Paywall {}\n' } })
+  const usage = 'blame <file> <line>: prints the commit that last changed that line'
+  const skill = '---\nname: checklist\ndescription: What to check in a Flutter change.\n---\n\nCheck every `await` for a missing `mounted` check. The full list is in list.md.\n'
+  ws.writeAgent('reviewer', {
+    'config.ts': `export default ${JSON.stringify({ ...reviewer, tools: { blame: usage } })}\n`,
+    'instructions.md': '# Reviewer\n',
+    'tools/blame': '#!/bin/sh\ngit log -1 --format=%H -L "$2,$2:$1"\n',
+    'skills/checklist/SKILL.md': skill,
+    'skills/checklist/list.md': '- mounted checks\n',
+  })
+  // Codex answers in the wrong shape, so the review falls back to Claude Code and reaches both Workers.
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.' }))
+  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  prepareRun([[repo, from]], { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  const [codex] = ws.workerCliCalls('codex')
+  const [claude] = ws.workerCliCalls('claude')
+  for (const call of [codex, claude]) {
+    assert.equal(call.cwdChanges, '')
+    assert.match(call.stdin, new RegExp(`- \`/[^\`]+/reviewer/tools/blame\`: ${usage}\n`))
+  }
+  assert.ok(codex.stdin.includes(skill.trim()), codex.stdin)
+  assert.deepEqual(claude.pluginFiles, {
+    '.claude-plugin/plugin.json': '{"name":"reviewer"}',
+    'skills/checklist/SKILL.md': skill,
+    'skills/checklist/list.md': '- mounted checks\n',
+  })
+  assert.ok(!existsSync(claude.pluginDir!), 'the session plugin was left behind')
+})
+
+test("Codex can't read or run a Tool the Agent doesn't declare, and gets no skill it would find by itself: its own, Saransh's, the Repo's or any above it", async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  const found = '---\nname: found\ndescription: Found by Codex.\n---\n\nDo it this way.\n'
+  repo.pushCommit('Add a house style', { files: { '.agents/skills/house-style/SKILL.md': found } })
+  ws.writeAgent('reviewer', {
+    'config.ts': `export default ${JSON.stringify({ ...reviewer, tools: { blame: 'blame <file> <line>' } })}\n`,
+    'instructions.md': '# Reviewer\n',
+    'tools/blame': '#!/bin/sh\n',
+    'tools/secret': '#!/bin/sh\n',
+  })
+  ws.writeAgent('docs', { 'tools/commit': '#!/bin/sh\n' })
+  const ownSkill = join(ws.codexHomeDir, 'skills', '.system', 'imagegen')
+  const saranshSkill = join(ws.homeDir, '.agents', 'skills', 'review')
+  const skillAbove = join(ws.dataDir, '.agents', 'skills', 'team-style')
+  for (const folder of [ownSkill, saranshSkill, skillAbove]) {
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, 'SKILL.md'), found)
+  }
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a house style.', findings: [] }))
+  prepareRun([[repo, from]], { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  const [{ args }] = ws.workerCliCalls('codex')
+  const settings = args.flatMap((arg, i) => (args[i - 1] === '--config' ? [arg] : []))
+  const profile = settings.find((setting) => setting.startsWith('permissions.agent='))!
+  const denied = [...profile.matchAll(/"([^"]+)"="deny"/g)].map(([, path]) => path.replace(/^.*\/agents\//, ''))
+  assert.deepEqual(denied, ['docs/tools/commit', 'reviewer/tools/secret'])
+  const skills = settings.find((setting) => setting.startsWith('skills.config='))!
+  const turnedOff = [...skills.matchAll(/path="([^"]+)"/g)].map(([, path]) => path)
+  const worktree = args[args.indexOf('--cd') + 1]
+  assert.deepEqual(turnedOff, [
+    join(ownSkill, 'SKILL.md'),
+    join(saranshSkill, 'SKILL.md'),
+    join(worktree, '.agents', 'skills', 'house-style', 'SKILL.md'),
+    join(skillAbove, 'SKILL.md'),
+  ])
 })
 
 test("a review fails when the Step doesn't pass every input the Reviewer's config declares", async () => {

@@ -1,62 +1,102 @@
 // The Codex Worker: runs an Agent through `codex exec`, Codex's non-interactive mode, in its
-// sandbox, and reads the answer from its JSON event stream.
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import type { Agent } from '../agent.ts'
+// sandbox, and reads the answer from its JSON event stream. Codex can't load skills from outside the
+// folders it searches, so the Agent's skills go in the prompt.
+import { readdirSync, writeFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { basename, dirname, join } from 'node:path'
+import { undeclaredTools, type Agent } from '../agent.ts'
 import type { ProcessResult } from '../process.ts'
 import type { CallOptions, Inputs, Worker } from '../worker.ts'
-import { agentPrompt, lastLine, runCommandLine, writeFolders, type CommandLine } from './cli.ts'
+import { agentPrompt, lastLine, runCommandLine, withTempFolder, writeFolders, type CommandLine } from './cli.ts'
 
 interface CodexOptions extends CallOptions {
   /** Where the Agent's output schema is written for Codex to check its final answer against. */
   schemaFile: string
+  /** The Tools the Agent doesn't declare, which Codex can't read or run. */
+  undeclaredTools: string[]
+  /** Every SKILL.md Codex would find by itself, all of them turned off. */
+  foundSkills: string[]
 }
 
+/**
+ * Codex features that give the model tools beyond reading, searching, running commands and editing
+ * files, such as ChatGPT apps that act on Saransh's account, browsing and image generation.
+ */
+const extraToolFeatures = ['apps', 'plugins', 'browser_use', 'computer_use', 'image_generation', 'goals', 'tool_suggest']
+
+/** A path in Codex's sandbox, and what the Agent may do with it. */
+type SandboxRule = [path: string, access: 'write' | 'deny']
+
 /** The `codex exec` command line for one call of `agent`, with the prompt on stdin. */
-export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort, schemaFile }: CodexOptions): CommandLine {
+export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort, schemaFile, undeclaredTools, foundSkills }: CodexOptions): CommandLine {
   const { outputSchema, timeoutSeconds } = agent.config
-  const writable = writeFolders(agent, cwd)
+  const sandboxRules = [
+    ...writeFolders(agent, cwd).map((folder): SandboxRule => [folder, 'write']),
+    ...undeclaredTools.map((tool): SandboxRule => [tool, 'deny']),
+  ]
   return {
     command: 'codex',
     args: [
       'exec',
-      // Only what this command line asks for: no MCP servers, plugins or notify hook from Saransh's Codex config.
+      // Only what this command line asks for: no MCP servers, plugins or notify hook from Saransh's
+      // Codex config, no command rules from his or the Repo's, and none of Codex's extra tools.
       '--ignore-user-config',
+      '--ignore-rules',
+      ...extraToolFeatures.flatMap((feature) => ['--disable', feature]),
+      '--config',
+      'web_search="disabled"',
       '--model',
       model,
       '--config',
       `model_reasoning_effort="${effort}"`,
-      // Codex's workspace-write sandbox always lets the Agent write the folder it runs in too, so a
-      // write Agent runs in one of its write folders. The temporary folders it would open are closed.
-      '--sandbox',
-      ...(writable.length
-        ? ['workspace-write', '--config', 'sandbox_workspace_write.exclude_slash_tmp=true', '--config', 'sandbox_workspace_write.exclude_tmpdir_env_var=true']
-        : ['read-only']),
-      ...writable.flatMap((folder) => ['--add-dir', folder]),
+      // Its sandbox reads everywhere, writes only the Agent's write folders (not even the folder it
+      // runs in), has no network, and can't read or run a Tool the Agent doesn't declare.
+      '--config',
+      'default_permissions="agent"',
+      '--config',
+      `permissions.agent={extends=":read-only",filesystem={${sandboxRules.map(([path, access]) => `${JSON.stringify(path)}="${access}"`).join(',')}}}`,
+      // The Agent's skills are in the prompt, so every skill Codex would find by itself is turned off.
+      ...(foundSkills.length ? ['--config', `skills.config=[${foundSkills.map((file) => `{path=${JSON.stringify(file)},enabled=false}`).join(',')}]`] : []),
       '--cd',
       cwd,
       '--json',
       ...(outputSchema ? ['--output-schema', schemaFile] : []),
       '-',
     ],
-    stdin: agentPrompt(agent, inputs),
+    stdin: agentPrompt(agent, inputs, { inlineSkills: true }),
     env: {},
     timeoutSeconds,
   }
 }
 
+/**
+ * Every SKILL.md Codex would find by itself: its own bundled skills, Saransh's, the machine's, and
+ * any in the folders from `cwd` up.
+ */
+function skillsCodexFinds(cwd: string): string[] {
+  const codexHome = process.env.CODEX_HOME ?? join(homedir(), '.codex')
+  const above = (folder: string): string[] => (dirname(folder) === folder ? [folder] : [folder, ...above(dirname(folder))])
+  const roots = [join(codexHome, 'skills'), join(homedir(), '.agents', 'skills'), '/etc/codex/skills', ...above(cwd).map((folder) => join(folder, '.agents', 'skills'))]
+  const skillFiles = (path: string): string[] => {
+    if (basename(path) === 'SKILL.md') return [path]
+    try {
+      return readdirSync(path).flatMap((entry) => skillFiles(join(path, entry)))
+    } catch {
+      return []
+    }
+  }
+  return roots.flatMap(skillFiles)
+}
+
 export const codexWorker: Worker = {
   name: 'codex',
-  async call(agent, inputs, { cwd, model, effort }) {
-    const temp = mkdtempSync(join(tmpdir(), 'agents-codex-'))
-    try {
+  call(agent, inputs, { cwd, model, effort }) {
+    return withTempFolder('agents-codex-', async (temp) => {
       const schemaFile = join(temp, 'output-schema.json')
       if (agent.config.outputSchema) writeFileSync(schemaFile, JSON.stringify(agent.config.outputSchema))
-      return codexAnswer(agent, await runCommandLine(codexCommandLine(agent, inputs, { cwd, model, effort, schemaFile }), cwd))
-    } finally {
-      rmSync(temp, { recursive: true, force: true })
-    }
+      const line = codexCommandLine(agent, inputs, { cwd, model, effort, schemaFile, undeclaredTools: undeclaredTools(agent), foundSkills: skillsCodexFinds(cwd) })
+      return codexAnswer(agent, await runCommandLine(line, cwd))
+    })
   },
 }
 

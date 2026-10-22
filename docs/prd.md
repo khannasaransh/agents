@@ -220,10 +220,15 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - its Tools, inputs and outputs;
   - an optional output schema;
   - a timeout and a maximum number of turns.
-- Tools are small commands owned by the Agent. The Step allows exactly those commands, plus the Worker's built-in read and search tools, and lists them with their usage in the prompt. Tools exposed over MCP come later.
-- Skills reach the Worker without being written into the target folder:
-  - Claude Code loads them as a session-only plugin.
-  - Codex and Antigravity get the skill text in the prompt, until it's confirmed they can load skills from outside their working folder.
+- Tools are small commands owned by the Agent: executable files in its tools folder, each declared in its config with its usage. The Step allows exactly those commands, plus the Worker's built-in read and search tools, and lists them by full path with their usage in the prompt. Tools exposed over MCP come later.
+  - Claude Code allows each one by its path and denies any other command that isn't read-only.
+  - Codex's sandbox can't read or run another Agent's Tools, or the Agent's own undeclared ones. Codex's extra tools, such as ChatGPT apps, web search and image generation, are turned off.
+  - Codex has no list of allowed commands. Its shell runs any other command inside the sandbox, which can read anything, write only the Agent's write folders, and reach no network. Its subagent tools stay, since no setting found turns them off.
+  - On Codex a Tool runs inside that sandbox too; on Claude Code it runs outside any sandbox. So a Tool must need no more than the sandbox allows.
+  - A skill can't allow itself commands through its own settings. Every Tool is declared in the config.
+- Skills are the folders in the Agent's skills folder, each holding a SKILL.md. They reach the Worker without being written into the target folder, and the Worker gets no others:
+  - Claude Code loads a copy of them as a session-only plugin. Restricted mode already leaves out Saransh's skills and the Repo's; Claude Code's own bundled skills remain.
+  - Codex and Antigravity get the skill text in the prompt, with each skill's folder for its other files, until it's confirmed they can load skills from outside their working folder. Codex's own skills, Saransh's and the Repo's are turned off.
 - Subagents: the slot exists, but none ship in v1. When one is added, it is handed to the Worker's own subagent feature, so the parent Agent decides when to call it. Such an Agent can run only on Workers that support this.
 - Memory is Markdown notes per Agent, and for the Reviewer one file per Repo. It is read at the start of a call. The Agent proposes edits in its output, and Save state applies them.
 
@@ -272,7 +277,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 ## Testing Decisions
 
 - **One test boundary: the Step command.** A test prepares a Run folder and state as inputs, runs one Step with the fake Worker standing in for the real ones, and checks only the files the Step wrote and its exit code. Tests never reach into a Step's internals.
-- **Real Workers behind stand-in CLIs.** Some behavior only a real Worker has: reading its CLI's output, falling back, and ending a CLI at its timeout. It is tested through the Step on a Run that isn't a dry run, with stand-in `codex` and `claude` executables first on PATH. The stand-ins answer the way the real CLIs do and record what they were called with, since that is the Worker's outer boundary. No test starts a real CLI.
+- **Real Workers behind stand-in CLIs.** Some behavior only a real Worker has: reading its CLI's output, falling back, and ending a CLI at its timeout. It is tested through the Step on a Run that isn't a dry run, with stand-in `codex` and `claude` executables first on PATH. The stand-ins answer the way the real CLIs do and record what they were called with, and what the folder they run in and their plugin folder hold, since that is the Worker's outer boundary. No test starts a real CLI.
 - **Using real git, never the network.** Steps that touch git (Fetch, Review's worktree, Docs' branch handling, Save state) run against temporary git repos created by the test, including a local "remote" to fetch from.
 - **Behavior covered:**
   - Fetch: never changes the working tree or the checked-out branch; records baselines on the first Run; reports one failing Repo without failing the others.
@@ -307,7 +312,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 - **Open decision, To-dos:** what counts as a To-do, beyond PRD links to download by hand. The PM Agent's schema reserves the field, and its rules are settled before the PM Agent ships.
 - **Waiting on Saransh, Discord:** the bot, its installation on the company server by someone with Manage Server, and the list of channels. The Discord Step is skipped until then.
-- **Unconfirmed:** whether Codex and Antigravity can load skills from outside their working folder. If they can, the inlined skill text goes away.
+- **Unconfirmed:** whether Codex and Antigravity can load skills from outside their working folder. Codex finds skills only in fixed folders: its own home, Saransh's `~/.agents/skills`, `/etc/codex/skills`, and `.agents/skills` in the folders from where it runs up. A temporary Codex home is untried. If either can, its inlined skill text goes away.
 - **Antigravity headless bugs:**
   - print mode ignores its permission allowlist (antigravity-cli #548);
   - it can report success while a command it started is still running (#1044).

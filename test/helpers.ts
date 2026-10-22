@@ -3,7 +3,7 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { createServer, type RequestListener } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FetchResult } from '../steps/fetch.ts'
 import type { CannedAnswer } from '../src/workers/fake.ts'
@@ -74,12 +74,20 @@ export interface WorkerCliCall {
   pid: number
   /** The child process a hanging stand-in started. */
   childPid?: number
+  /** What `git status` listed in the folder it ran in, as it started: files added or changed there. */
+  cwdChanges?: string
+  /** The folder it was given as --plugin-dir, and the files in it, by path within it. */
+  pluginDir?: string
+  pluginFiles?: Record<string, string>
 }
 
 const workerClis = ['codex', 'claude'] as const
 
 export interface Workspace {
   dataDir: string
+  /** Saransh's home and Codex's home, as the CLI sees them: empty folders, unless a test writes there. */
+  homeDir: string
+  codexHomeDir: string
   addRepo(name: string, options?: { team?: string; branch?: string }): TestRepo
   /** Adds a Repo whose remote doesn't exist, so its fetch fails. */
   addBrokenRepo(name: string, options?: { team?: string }): RepoEntry
@@ -107,7 +115,10 @@ export interface Workspace {
   setWorkerCli(command: (typeof workerClis)[number], behavior: WorkerCliBehavior): void
   /** The calls the stand-in for a Worker's CLI received, oldest first. */
   workerCliCalls(command: (typeof workerClis)[number]): WorkerCliCall[]
-  /** Writes an Agent folder. From then on the CLI uses the workspace's Agents, not this repo's. */
+  /**
+   * Writes an Agent folder, by path within it. A script (a file starting with #!) is made executable,
+   * as a Tool is. From then on the CLI uses the workspace's Agents, not this repo's.
+   */
   writeAgent(name: string, files: Record<string, string>): void
   agents(...args: string[]): Promise<CliResult>
   /** Starts the CLI without waiting for it, in its own process group so a test can kill it and its Steps. */
@@ -130,13 +141,17 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
   const envFile = join(root, '.env')
   const agentsDir = join(root, 'agents')
   const binDir = join(root, 'bin')
+  const homeDir = join(root, 'home')
+  const codexHomeDir = join(root, 'codex-home')
   const entries: RepoEntry[] = []
   let ownAgents = false
-  mkdirSync(binDir)
+  for (const folder of [binDir, homeDir, codexHomeDir]) mkdirSync(folder)
   for (const command of workerClis) writeWorkerCliStandIn(binDir, command)
 
   const ws: Workspace = {
     dataDir,
+    homeDir,
+    codexHomeDir,
 
     addRepo(name, { team = 'flutter', branch = 'main' } = {}) {
       const remote = join(root, 'remotes', `${name}.git`)
@@ -246,7 +261,11 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
     writeAgent(name, files) {
       mkdirSync(join(agentsDir, name), { recursive: true })
-      for (const [file, content] of Object.entries(files)) writeFileSync(join(agentsDir, name, file), content)
+      for (const [file, content] of Object.entries(files)) {
+        const path = join(agentsDir, name, file)
+        mkdirSync(dirname(path), { recursive: true })
+        writeFileSync(path, content, { mode: content.startsWith('#!') ? 0o755 : 0o644 })
+      }
       ownAgents = true
     },
 
@@ -256,7 +275,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
     start(...args) {
       const child = spawn(process.execPath, [cli, ...args], {
-        env: { ...gitEnv, PATH: `${binDir}:${process.env.PATH}`, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, AGENTS_ENV_FILE: envFile, AGENTS_FAKE_ANSWERS: cannedAnswersFile, ...(ownAgents && { AGENTS_AGENTS_DIR: agentsDir }), ...env },
+        env: { ...gitEnv, HOME: homeDir, CODEX_HOME: codexHomeDir, PATH: `${binDir}:${process.env.PATH}`, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, AGENTS_ENV_FILE: envFile, AGENTS_FAKE_ANSWERS: cannedAnswersFile, ...(ownAgents && { AGENTS_AGENTS_DIR: agentsDir }), ...env },
         detached: true,
       })
       let stdout = ''
@@ -307,8 +326,9 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 }
 
 /**
- * Writes an executable standing in for a Worker's CLI. It records each call, then answers as
- * <command>.json beside it says, or fails when there is none.
+ * Writes an executable standing in for a Worker's CLI. It records each call, with what the folder
+ * it runs in and its plugin folder hold as it starts, then answers as <command>.json beside it
+ * says, or fails when there is none.
  */
 function writeWorkerCliStandIn(binDir: string, command: string) {
   const file = join(binDir, command)
@@ -317,12 +337,24 @@ function writeWorkerCliStandIn(binDir: string, command: string) {
   writeFileSync(
     file,
     `#!${process.execPath}
-const { appendFileSync, existsSync, readFileSync } = require('node:fs')
-const { spawn } = require('node:child_process')
+const { appendFileSync, existsSync, readFileSync, readdirSync, statSync } = require('node:fs')
+const { execFileSync, spawn } = require('node:child_process')
+const { join, relative } = require('node:path')
+const filesIn = (folder) => readdirSync(folder).flatMap((entry) => {
+  const path = join(folder, entry)
+  return statSync(path).isDirectory() ? filesIn(path) : [path]
+})
 const behavior = existsSync(${behaviorFile})
   ? JSON.parse(readFileSync(${behaviorFile}, 'utf8'))
   : { stderr: '${command} stand-in: this test expects no ${command} call', exitCode: 1 }
 const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid }
+try {
+  call.cwdChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' })
+} catch {}
+if (call.args.includes('--plugin-dir')) {
+  call.pluginDir = call.args[call.args.indexOf('--plugin-dir') + 1]
+  call.pluginFiles = Object.fromEntries(filesIn(call.pluginDir).map((file) => [relative(call.pluginDir, file), readFileSync(file, 'utf8')]))
+}
 if (behavior.hang) call.childPid = spawn('sleep', ['60'], { stdio: 'ignore' }).pid
 appendFileSync(${callsFile}, JSON.stringify(call) + '\\n')
 if (behavior.hang) setTimeout(() => {}, 30_000)
