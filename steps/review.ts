@@ -74,7 +74,8 @@ await runAsStep(async ({ runId, runFolder, force }) => {
       const repo = repos.get(fetched.repo)
       if (!repo) throw new Error(`${fetched.repo} is no longer in the Repo list`)
       const inputs = { repo: range.repo, branch: range.branch, from: range.from, to: range.to, commits: fetched.commits }
-      const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun }))) as ReviewerAnswer
+      const log = (line: string) => console.log(`${range.repo}: ${line}`)
+      const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun, log }))) as ReviewerAnswer
       result = { ...range, status: 'reviewed', summary: answer.summary, findings: answer.findings.map((f) => markAuthor(f, fetched.commits)) }
       console.log(`${range.repo}: reviewed, ${result.findings.length} findings`)
     } catch (error) {

@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type RequestListener } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
@@ -57,6 +57,27 @@ export interface RunRecordShape {
   steps: { name: string; status: string; startedAt?: string; endedAt?: string; log: string }[]
 }
 
+/** How the stand-in for a Worker's CLI answers each call. */
+export interface WorkerCliBehavior {
+  stdout?: string
+  stderr?: string
+  exitCode?: number
+  /** Start a child process, then answer nothing for 30s, as a stuck CLI would. */
+  hang?: boolean
+}
+
+/** A call the stand-in for a Worker's CLI received. */
+export interface WorkerCliCall {
+  args: string[]
+  stdin: string
+  cwd: string
+  pid: number
+  /** The child process a hanging stand-in started. */
+  childPid?: number
+}
+
+const workerClis = ['codex', 'claude'] as const
+
 export interface Workspace {
   dataDir: string
   addRepo(name: string, options?: { team?: string; branch?: string }): TestRepo
@@ -79,6 +100,13 @@ export interface Workspace {
   writeCannedAnswers(answers: Record<string, CannedAnswer[]>): void
   /** Writes the local env file. */
   writeEnvFile(text: string): void
+  /**
+   * Sets how the stand-in for a Worker's CLI answers. Every workspace puts stand-ins for the
+   * Worker CLIs first on PATH, failing every call until told otherwise, so no test starts a real CLI.
+   */
+  setWorkerCli(command: (typeof workerClis)[number], behavior: WorkerCliBehavior): void
+  /** The calls the stand-in for a Worker's CLI received, oldest first. */
+  workerCliCalls(command: (typeof workerClis)[number]): WorkerCliCall[]
   /** Writes an Agent folder. From then on the CLI uses the workspace's Agents, not this repo's. */
   writeAgent(name: string, files: Record<string, string>): void
   agents(...args: string[]): Promise<CliResult>
@@ -101,8 +129,11 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
   const cannedAnswersFile = join(root, 'fake-answers.json')
   const envFile = join(root, '.env')
   const agentsDir = join(root, 'agents')
+  const binDir = join(root, 'bin')
   const entries: RepoEntry[] = []
   let ownAgents = false
+  mkdirSync(binDir)
+  for (const command of workerClis) writeWorkerCliStandIn(binDir, command)
 
   const ws: Workspace = {
     dataDir,
@@ -200,6 +231,19 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       writeFileSync(envFile, text)
     },
 
+    setWorkerCli(command, behavior) {
+      writeFileSync(join(binDir, `${command}.json`), JSON.stringify(behavior))
+    },
+
+    workerCliCalls(command) {
+      const file = join(binDir, `${command}.calls.jsonl`)
+      if (!existsSync(file)) return []
+      return readFileSync(file, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
+    },
+
     writeAgent(name, files) {
       mkdirSync(join(agentsDir, name), { recursive: true })
       for (const [file, content] of Object.entries(files)) writeFileSync(join(agentsDir, name, file), content)
@@ -212,7 +256,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
     start(...args) {
       const child = spawn(process.execPath, [cli, ...args], {
-        env: { ...gitEnv, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, AGENTS_ENV_FILE: envFile, AGENTS_FAKE_ANSWERS: cannedAnswersFile, ...(ownAgents && { AGENTS_AGENTS_DIR: agentsDir }), ...env },
+        env: { ...gitEnv, PATH: `${binDir}:${process.env.PATH}`, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, AGENTS_ENV_FILE: envFile, AGENTS_FAKE_ANSWERS: cannedAnswersFile, ...(ownAgents && { AGENTS_AGENTS_DIR: agentsDir }), ...env },
         detached: true,
       })
       let stdout = ''
@@ -260,6 +304,36 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
     },
   }
   return ws
+}
+
+/**
+ * Writes an executable standing in for a Worker's CLI. It records each call, then answers as
+ * <command>.json beside it says, or fails when there is none.
+ */
+function writeWorkerCliStandIn(binDir: string, command: string) {
+  const file = join(binDir, command)
+  const behaviorFile = JSON.stringify(join(binDir, `${command}.json`))
+  const callsFile = JSON.stringify(join(binDir, `${command}.calls.jsonl`))
+  writeFileSync(
+    file,
+    `#!${process.execPath}
+const { appendFileSync, existsSync, readFileSync } = require('node:fs')
+const { spawn } = require('node:child_process')
+const behavior = existsSync(${behaviorFile})
+  ? JSON.parse(readFileSync(${behaviorFile}, 'utf8'))
+  : { stderr: '${command} stand-in: this test expects no ${command} call', exitCode: 1 }
+const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid }
+if (behavior.hang) call.childPid = spawn('sleep', ['60'], { stdio: 'ignore' }).pid
+appendFileSync(${callsFile}, JSON.stringify(call) + '\\n')
+if (behavior.hang) setTimeout(() => {}, 30_000)
+else {
+  process.stdout.write(behavior.stdout ?? '')
+  process.stderr.write(behavior.stderr ?? '')
+  process.exitCode = behavior.exitCode ?? 0
+}
+`,
+  )
+  chmodSync(file, 0o755)
 }
 
 /** A local HTTP server standing in for a remote, such as one that never answers. */

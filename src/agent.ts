@@ -8,12 +8,13 @@ export const workerNames = ['codex', 'claude-code', 'antigravity'] as const
 export type WorkerName = (typeof workerNames)[number]
 
 const efforts = ['low', 'medium', 'high'] as const
+export type Effort = (typeof efforts)[number]
 
 /** A Worker to run an Agent on, with the model and reasoning effort to ask it for. */
 export interface WorkerChoice {
   name: WorkerName
   model: string
-  effort: (typeof efforts)[number]
+  effort: Effort
 }
 
 /** An Agent's config module (config.ts in its folder) exports one of these as its default. */

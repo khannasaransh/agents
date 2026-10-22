@@ -272,6 +272,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 ## Testing Decisions
 
 - **One test boundary: the Step command.** A test prepares a Run folder and state as inputs, runs one Step with the fake Worker standing in for the real ones, and checks only the files the Step wrote and its exit code. Tests never reach into a Step's internals.
+- **Real Workers behind stand-in CLIs.** Some behavior only a real Worker has: reading its CLI's output, falling back, and ending a CLI at its timeout. It is tested through the Step on a Run that isn't a dry run, with stand-in `codex` and `claude` executables first on PATH. The stand-ins answer the way the real CLIs do and record what they were called with, since that is the Worker's outer boundary. No test starts a real CLI.
 - **Using real git, never the network.** Steps that touch git (Fetch, Review's worktree, Docs' branch handling, Save state) run against temporary git repos created by the test, including a local "remote" to fetch from.
 - **Behavior covered:**
   - Fetch: never changes the working tree or the checked-out branch; records baselines on the first Run; reports one failing Repo without failing the others.

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readdirSync, writeFileSync } from 'node:fs'
+import { readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import reviewer from '../agents/reviewer/config.ts'
@@ -18,6 +18,16 @@ function prepareRun(fetched: [TestRepo, string | null][], { dryRun = true } = {}
   ws.writeRepoList()
   ws.prepareRun(runId, { dryRun })
   for (const [repo, from] of fetched) ws.writeFetchResult(runId, repo, from)
+}
+
+/** Whether a process is still running, as opposed to ended or never started. */
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 const review = (...args: string[]) => ws.agents('step', 'review', '--run', runId, ...args)
@@ -184,12 +194,99 @@ test('re-running the Review Step keeps finished reviews, retries failed ones, an
   assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Second.')
 })
 
-test('a Run that is not a dry run never takes answers from the fake Worker', async () => {
+/** What `codex exec --json` prints when its final answer is `answer`, after riding out a dropped connection. */
+const codexAnswering = (answer: unknown) => ({
+  stdout: [
+    { type: 'thread.started', thread_id: 'thread-1' },
+    { type: 'turn.started' },
+    { type: 'item.completed', item: { id: 'item_0', type: 'agent_message', text: 'Reading the commits.' } },
+    // An error Codex recovers from by itself.
+    { type: 'error', message: 'Reconnecting... 1/5' },
+    { type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: JSON.stringify(answer) } },
+    { type: 'turn.completed', usage: { input_tokens: 1200, output_tokens: 80 } },
+  ]
+    .map((event) => JSON.stringify(event))
+    .join('\n'),
+})
+
+/** What `claude --print --output-format json` prints when its schema-checked answer is `answer`. */
+const claudeCodeAnswering = (answer: unknown) => ({
+  stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 4, result: JSON.stringify(answer), structured_output: answer }),
+})
+
+test('a Run that is not a dry run reviews each changed Repo on Codex, in its worktree, with the commits in the prompt', async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
-  repo.pushCommit('Change')
+  const to = repo.pushCommit('Add paywall')
+  const finding = { severity: 'high', file: 'lib/paywall.dart', line: 42, commit: to, author: 'Test Author', summary: 'Price shows before it loads' }
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.', findings: [finding] }))
   ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Fake.', findings: [] } }] })
+  prepareRun([[repo, from]], { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  const crux = ws.reviewResult(runId, 'crux_flutter')
+  assert.equal(crux.summary, 'Adds a paywall.')
+  assert.deepEqual(crux.findings, [{ ...finding, bySaransh: false }])
+  const [call, ...more] = ws.workerCliCalls('codex')
+  assert.deepEqual(more, [])
+  assert.ok(call.cwd.startsWith(realpathSync(join(ws.dataDir, 'worktrees'))), call.cwd)
+  assert.ok(call.stdin.includes(to), call.stdin)
+  assert.deepEqual(ws.workerCliCalls('claude'), [])
+})
+
+test('a review that fails on Codex, such as on a quota limit, is retried once on Claude Code, and both attempts are logged in the Run', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Add paywall')
+  const quotaLimit = { type: 'turn.failed', error: { message: "You've hit your usage limit. Try again at 4:12 PM." } }
+  ws.setWorkerCli('codex', { stdout: `${JSON.stringify({ type: 'turn.started' })}\n${JSON.stringify(quotaLimit)}\n`, exitCode: 1 })
+  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  prepareRun([[repo, from]], { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
+  assert.equal(ws.workerCliCalls('codex').length, 1)
+  assert.equal(ws.workerCliCalls('claude').length, 1)
+  assert.match(
+    ws.readRunFile(runId, 'logs', 'review.log'),
+    /crux_flutter: reviewer failed on codex \(gpt-6-astra, high\) after \d+s: You've hit your usage limit\. Try again at 4:12 PM\.; retrying once on claude-code \(opus, high\)\ncrux_flutter: reviewer answered on claude-code \(opus, high\) in \d+s/,
+  )
+})
+
+test("a Codex call that runs past the Agent's timeout is ended, with the command it started, and retried on Claude Code", { timeout: 20_000 }, async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Add paywall')
+  ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...reviewer, timeoutSeconds: 1 })}\n`, 'instructions.md': '# Reviewer\n' })
+  ws.setWorkerCli('codex', { hang: true })
+  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  prepareRun([[repo, from]], { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
+  assert.match(ws.readRunFile(runId, 'logs', 'review.log'), /reviewer failed on codex \(gpt-6-astra, high\) after 1s: timed out after 1s; retrying once on claude-code/)
+  const [{ pid, childPid }] = ws.workerCliCalls('codex')
+  for (const id of [pid, childPid!]) assert.ok(!isRunning(id), `process ${id} is still running`)
+})
+
+test('a review fails, naming both failures, when Codex answers in the wrong shape and Claude Code fails too', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  const to = repo.pushCommit('Add paywall')
+  const finding = { severity: 'urgent', file: 'lib/paywall.dart', line: 42, commit: to, author: 'Test Author', summary: 'Price shows before it loads' }
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.', findings: [finding] }))
+  const sessionLimit = { type: 'result', subtype: 'success', is_error: true, result: "You've hit your session limit · resets 3:45pm" }
+  ws.setWorkerCli('claude', { stdout: JSON.stringify(sessionLimit), exitCode: 1 })
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -197,7 +294,10 @@ test('a Run that is not a dry run never takes answers from the fake Worker', asy
   assert.notEqual(result.status, 0)
   const crux = ws.reviewResult(runId, 'crux_flutter')
   assert.equal(crux.status, 'failed')
-  assert.match(crux.error, /codex Worker/)
+  assert.match(
+    crux.error,
+    /^codex failed: The reviewer Agent's answer doesn't match its output schema: answer\.findings\[0\]\.severity must be one of critical, high, medium, low \(got "urgent"\); then claude-code failed: You've hit your session limit · resets 3:45pm$/,
+  )
 })
 
 test("a review fails when the Step doesn't pass every input the Reviewer's config declares", async () => {
