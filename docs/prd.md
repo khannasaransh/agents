@@ -162,7 +162,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 - A Step is safe to re-run: it skips work whose output already exists unless forced.
 - Each Run keeps a record of the Pipeline, each Step's status, start and end times, and the path of its log.
 - A Run is succeeded, partial (some Steps failed or were skipped) or failed (the Run couldn't start or record itself).
-- A lock stops a second Run from starting while one is active.
+- A lock stops a second Run from starting while one is active. If a Run's process dies, the next Run first stops every Step and Worker process it left running, and records the dead Run as failed.
 - A Run's folder name starts with its local start date (year-month-day) followed by hour and minute. Run data is never deleted automatically.
 
 ### Daily Pipeline Steps
@@ -190,7 +190,8 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - **Never:** it doesn't use Discord messages as wiki sources, doesn't document a Repo for the first time, and doesn't push or merge.
    - **Wiki rules:** it follows them throughout. It reads code only at pinned commits, leaves pages as drafts, and runs the wiki's stamp, region and check tools until the check reports no errors. It commits under Saransh's git identity with trailers naming the Agent and the Run.
    - **Output:** the pages changed, the PRDs processed, and undocumented Repos with large changes, for the Brief.
-6. **Brief** (command): renders the Brief as Markdown in the Run folder, grouped by Team. Sections:
+6. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run.
+7. **Brief** (command): the last Step, so its Run health covers every other Step. It renders the Brief as Markdown in the Run folder, grouped by Team. Sections:
    - per Repo, one line on what changed;
    - findings by severity, with Saransh's own first;
    - Discord highlights;
@@ -200,8 +201,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - the number of Repos reviewed;
    - Run health.
 
-   It runs even when earlier Steps failed. There is no notification.
-7. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run.
+   It runs even when earlier Steps failed. A Repo's review is shown only when it covers exactly the commits Fetch found in the Run; otherwise the Brief says the commits have no review. There is no notification.
 
 ### Agents
 

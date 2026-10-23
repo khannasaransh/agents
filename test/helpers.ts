@@ -130,8 +130,11 @@ export interface Workspace {
    */
   writeAgent(name: string, files: Record<string, string>): void
   agents(...args: string[]): Promise<CliResult>
-  /** Starts the CLI without waiting for it, in its own process group so a test can kill it and its Steps. */
-  start(...args: string[]): { killAll(): void; result: Promise<CliResult> }
+  /**
+   * Starts the CLI without waiting for it, in its own process group so a test can kill it and its
+   * Steps, or kill the CLI alone and leave its Steps running.
+   */
+  start(...args: string[]): { killAll(): void; killCliOnly(): void; result: Promise<CliResult> }
   runIds(): string[]
   readRun(id: string): RunRecordShape
   readRunFile(id: string, ...path: string[]): string
@@ -205,7 +208,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       writeFileSync(repoListFile, `export default ${JSON.stringify(list, null, 2)}\n`)
     },
 
-    prepareRun(id, { steps = ['fetch', 'review', 'brief', 'save-state'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
+    prepareRun(id, { steps = ['fetch', 'review', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
       ws.writeRunFile(id, 'run.json', {
         id,
         pipeline: 'daily',
@@ -292,7 +295,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       child.stdout.on('data', (d) => (stdout += d))
       child.stderr.on('data', (d) => (stderr += d))
       const result = new Promise<CliResult>((resolve) => child.on('close', (status) => resolve({ status, stdout, stderr })))
-      return { killAll: () => process.kill(-child.pid!, 'SIGKILL'), result }
+      return { killAll: () => process.kill(-child.pid!, 'SIGKILL'), killCliOnly: () => process.kill(child.pid!, 'SIGKILL'), result }
     },
 
     runIds() {

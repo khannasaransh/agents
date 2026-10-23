@@ -44,7 +44,18 @@ test("the Brief lists each Repo's new commits grouped by Team, in Team order", a
   assert.ok(flutterAt >= 0 && flutterAt < backendAt && backendAt < frontendAt, text)
   assert.equal(
     text.slice(flutterAt, backendAt).trim(),
-    ['## flutter', '', '### crux_flutter', '', '2 new commits on main:', '', '- `5555555` Fix paywall copy (Asha)', '- `4444444` Add paywall (Asha)'].join('\n'),
+    [
+      '## flutter',
+      '',
+      '### crux_flutter',
+      '',
+      '2 new commits on main:',
+      '',
+      '- `5555555` Fix paywall copy (Asha)',
+      '- `4444444` Add paywall (Asha)',
+      '',
+      'No review of these commits in this Run.',
+    ].join('\n'),
   )
   assert.match(text.slice(backendAt, frontendAt), /1 new commit on master:\n\n- `2222222` Cache headlines \(Asha\)/)
   assert.match(text.slice(frontendAt), /Unchanged: inpix-panel/)
@@ -138,6 +149,34 @@ test("the Brief says when a Repo's review failed, and its Run health names the R
   assert.match(repos, /### crux_flutter[\s\S]*Review failed: Quota limit reached\n/)
   assert.match(health, /- review: failed/)
   assert.match(health, /Repos whose review failed:\n\n- crux_flutter \(flutter\): Quota limit reached\n/)
+})
+
+test('the Brief shows no review for commits it does not cover, such as after Fetch was re-run and found more', async () => {
+  const older = { ...range, to: sha(2) }
+  prepareRun([changed], {
+    steps: [{ name: 'fetch', status: 'succeeded' }, { name: 'review', status: 'succeeded' }, { name: 'brief', status: 'pending' }],
+    reviews: [{ ...older, status: 'reviewed', summary: 'Adds a paywall.', findings: [] }],
+  })
+
+  const text = await brief()
+
+  assert.match(text, /- `2222222` Add paywall \(Asha\)\n\nNo review of these commits in this Run\.\n/)
+  assert.doesNotMatch(text, /Review: Adds a paywall|No findings/)
+})
+
+test("a review that failed on other commits is not reported as this Run's failure", async () => {
+  prepareRun([changed], { reviews: [{ ...range, from: sha(9), status: 'failed', error: 'Quota limit reached' }] })
+
+  const text = await brief()
+
+  assert.match(text, /No review of these commits in this Run\./)
+  assert.doesNotMatch(text, /Quota limit reached/)
+})
+
+test('the Brief says when a changed Repo has no review at all', async () => {
+  prepareRun([changed])
+
+  assert.match(await brief(), /- `2222222` Add paywall \(Asha\)\n\nNo review of these commits in this Run\.\n/)
 })
 
 test("a dry run's Brief says its reviews came from the fake Worker", async () => {

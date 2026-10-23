@@ -18,7 +18,7 @@ const firstLine = (text: string) => text.split('\n')[0]
 const byPriority = (a: Finding, b: Finding) => Number(b.bySaransh) - Number(a.bySaransh) || severities.indexOf(a.severity) - severities.indexOf(b.severity)
 
 function reviewLines(review: ReviewResult | undefined): string[] {
-  if (!review) return []
+  if (!review) return ['No review of these commits in this Run.', '']
   if (review.status === 'failed') return [`Review failed: ${firstLine(review.error)}`, '']
   const lines = [`Review: ${review.summary}`, '']
   if (!review.findings.length) lines.push('No findings.')
@@ -76,7 +76,11 @@ await runAsStep(({ runId, runFolder, force }) => {
     console.log('Brief already written in this Run, skipping')
     return
   }
-  const reviews = new Map(readJsonFiles<ReviewResult>(join(runFolder, 'review')).map((r) => [r.repo, r]))
-  writeFileSync(out, render(readRun(runId), readJsonFiles<FetchResult>(join(runFolder, 'fetch')), reviews))
+  const results = readJsonFiles<FetchResult>(join(runFolder, 'fetch'))
+  // A review of other commits, such as one from before Fetch was re-run, says nothing about these.
+  const covers = (review: ReviewResult) =>
+    results.some((r) => r.repo === review.repo && r.status === 'new-commits' && r.previous === review.from && r.head === review.to)
+  const reviews = new Map(readJsonFiles<ReviewResult>(join(runFolder, 'review')).filter(covers).map((r) => [r.repo, r]))
+  writeFileSync(out, render(readRun(runId), results, reviews))
   console.log(`Wrote ${out}`)
 })

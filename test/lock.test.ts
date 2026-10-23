@@ -1,11 +1,15 @@
 import assert from 'node:assert/strict'
+import { spawnSync } from 'node:child_process'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { hangingRemote, makeWorkspace, until, type Workspace } from './helpers.ts'
 
 let ws: Workspace
-let remote: Awaited<ReturnType<typeof hangingRemote>>
+let remote: Awaited<ReturnType<typeof hangingRemote>> | undefined
 afterEach(() => {
-  remote.close()
+  remote?.close()
+  remote = undefined
   ws.cleanup()
 })
 
@@ -15,6 +19,16 @@ async function slowWorkspace(seconds: number) {
   ws = makeWorkspace({ AGENTS_FETCH_TIMEOUT_SECONDS: String(seconds) })
   const slow = ws.addRepo('slow')
   ws.writeRepoList([{ ...slow.entry, remote: remote.url }])
+}
+
+/** Whether a process is still running, as opposed to ended or never started. */
+function isRunning(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
 }
 
 test('a second Run refuses to start while one is active, and can start once it ends', async () => {
@@ -57,4 +71,41 @@ test('a Run that died without ending does not block the next Run, and is recorde
 
   assert.equal(ws.runIds().length, 2)
   assert.equal(ws.readRun(crashedId).status, 'failed')
+})
+
+test('when only the runner of a Run dies, the next Run first stops the Step and Worker it left running, so neither writes into it later', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  ws.writeRepoList()
+  await ws.agents('run', 'daily', '--dry-run')
+  repo.pushCommit('Add paywall')
+  ws.setWorkerCli('codex', { hang: true })
+  const abandoned = ws.start('run', 'daily')
+  await until(() => ws.workerCliCalls('codex').length === 1)
+  const [, abandonedId] = ws.runIds()
+  const [worker] = ws.workerCliCalls('codex')
+  abandoned.killCliOnly()
+  await abandoned.result
+
+  const next = await ws.agents('run', 'daily', '--dry-run')
+
+  assert.equal(next.status, 0, next.stderr)
+  assert.ok(!isRunning(worker.pid), "the abandoned review's Worker was stopped")
+  assert.ok(!isRunning(worker.childPid!), 'and so was what it started')
+  await new Promise((resolve) => setTimeout(resolve, 500))
+  assert.deepEqual(ws.runFiles(abandonedId, 'review'), [])
+  assert.equal(ws.readRun(abandonedId).status, 'failed')
+})
+
+test('of two Runs starting together after a Run died holding the lock, exactly one starts', async () => {
+  await slowWorkspace(2)
+  mkdirSync(ws.dataDir, { recursive: true })
+  writeFileSync(join(ws.dataDir, 'run.lock'), `${spawnSync('true').pid}\n`)
+
+  const results = await Promise.all([ws.start('run', 'daily'), ws.start('run', 'daily')].map((run) => run.result))
+
+  assert.equal(ws.runIds().length, 1)
+  const refused = results.filter((r) => r.status === 1)
+  assert.equal(refused.length, 1, results.map((r) => r.stderr).join('\n'))
+  assert.match(refused[0].stderr, /A Run is already active/)
 })

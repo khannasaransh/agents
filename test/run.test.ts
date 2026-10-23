@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { makeWorkspace, type Workspace } from './helpers.ts'
@@ -28,8 +28,8 @@ test('agents run daily creates a Run named by local start date and time that run
     [
       ['fetch', 'succeeded'],
       ['review', 'succeeded'],
-      ['brief', 'succeeded'],
       ['save-state', 'succeeded'],
+      ['brief', 'succeeded'],
     ],
   )
   for (const step of run.steps) {
@@ -37,6 +37,23 @@ test('agents run daily creates a Run named by local start date and time that run
     assert.ok(existsSync(join(ws.dataDir, 'runs', id, step.log)), `${step.name} log exists`)
   }
   assert.ok(existsSync(join(ws.dataDir, 'runs', id, 'brief.md')))
+  assert.match(ws.readRunFile(id, 'brief.md'), /## Run health[\s\S]*No Step failed or was skipped/)
+  assert.deepEqual(readdirSync(join(ws.dataDir, 'processes')), [], 'every process the Run started is recorded as ended')
+})
+
+test("a Run whose Save state fails says so in its Brief", async () => {
+  ws = makeWorkspace()
+  ws.addRepo('crux_flutter')
+  ws.writeRepoList()
+  // Save state writes the state file through a temporary file, which can't be written over a folder.
+  mkdirSync(join(ws.dataDir, 'state', 'repos.json.tmp'), { recursive: true })
+
+  const result = await ws.agents('run', 'daily')
+
+  assert.equal(result.status, 2)
+  const [id] = ws.runIds()
+  assert.equal(ws.readRun(id).steps.find((s) => s.name === 'save-state')!.status, 'failed')
+  assert.match(ws.readRunFile(id, 'brief.md'), /## Run health[\s\S]*- save-state: failed\. Log: logs\/save-state\.log/)
 })
 
 test('a Run whose Fetch fails still writes its Brief and ends partial', async () => {
@@ -56,8 +73,8 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
     [
       ['fetch', 'failed'],
       ['review', 'succeeded'],
-      ['brief', 'succeeded'],
       ['save-state', 'succeeded'],
+      ['brief', 'succeeded'],
     ],
   )
   assert.match(ws.readRunFile(id, 'brief.md'), /## Run health[\s\S]*fetch: failed/)

@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { acquireLock } from './lock.ts'
 import { agentsRoot, runDir } from './paths.ts'
+import { recordProcess, stopRecordedProcesses } from './processes.ts'
 import { createRun, finalStatus, readRun, writeRun, type RunRecord, type StepRecord } from './run.ts'
 
 /** A Pipeline definition: the Steps it runs, in order. */
@@ -65,15 +66,20 @@ async function runStep(runId: string, name: string, { force = false } = {}): Pro
   mkdirSync(dirname(logFile), { recursive: true })
   const log = openSync(logFile, 'a')
   writeSync(log, `--- ${name} started ${step.startedAt}${force ? ' (forced)' : ''}\n`)
+  const args = [script, '--run', runId, ...(force ? ['--force'] : [])]
+  const record = recordProcess({ group: false })
+  const child = spawn(process.execPath, args, { stdio: ['ignore', log, log, record.fd] })
+  record.started(child.pid)
   const exitCode = await new Promise<number | null>((resolve) => {
-    const args = [script, '--run', runId, ...(force ? ['--force'] : [])]
-    const child = spawn(process.execPath, args, { stdio: ['ignore', log, log] })
     child.on('error', (error) => {
       writeSync(log, `Could not start Step: ${error.message}\n`)
       resolve(null)
     })
     child.on('close', resolve)
   })
+  record.ended()
+  // A Step that died can leave what it started running.
+  if (child.pid !== undefined) stopRecordedProcesses({ owner: child.pid })
 
   step.status = exitCode === 0 ? 'succeeded' : 'failed'
   step.endedAt = new Date().toISOString()

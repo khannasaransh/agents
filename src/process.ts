@@ -1,4 +1,6 @@
-import { spawn } from 'node:child_process'
+import { spawn, type ChildProcessByStdio } from 'node:child_process'
+import type { Readable, Writable } from 'node:stream'
+import { recordProcess } from './processes.ts'
 
 /** How a process ended. */
 export interface ProcessResult {
@@ -27,8 +29,11 @@ export function runProcess(
   return new Promise((resolve, reject) => {
     const fullEnv = { ...process.env, ...env }
     for (const [name, value] of Object.entries(env)) if (value === undefined) delete fullEnv[name]
-    // Its own process group, so a timeout reaches everything the command started.
-    const child = spawn(command, args, { cwd, env: fullEnv, detached: true })
+    // Its own process group, so a timeout reaches everything the command started. It is recorded,
+    // so that if this process dies, the next Run stops it.
+    const record = recordProcess({ group: true })
+    const child = spawn(command, args, { cwd, env: fullEnv, detached: true, stdio: ['pipe', 'pipe', 'pipe', record.fd] }) as ChildProcessByStdio<Writable, Readable, Readable>
+    record.started(child.pid)
     const signalAll = (signal: NodeJS.Signals) => {
       try {
         process.kill(-child.pid!, signal)
@@ -42,6 +47,7 @@ export function runProcess(
       clearTimeout(timer)
       clearTimeout(killTimer)
       if (timedOut) signalAll('SIGKILL')
+      record.ended()
       resolve({ code, stdout, stderr, timedOut })
     }
     child.stdout.on('data', (d) => (stdout += d))
@@ -62,6 +68,7 @@ export function runProcess(
     }, timeoutMs)
     child.on('error', (error) => {
       clearTimeout(timer)
+      record.ended()
       reject(error)
     })
     // Once the command exits, anything it left running is ended too, so a command it left in the
