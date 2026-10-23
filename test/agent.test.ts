@@ -27,6 +27,7 @@ test("the Review Step fails with a message naming what is wrong in the Reviewer'
     [{ ...reviewer, worker: { ...reviewer.worker, effort: 'max' } }, /config\.worker\.effort must be one of low, medium, high/],
     [{ ...reviewer, fallbackWorker: { ...reviewer.fallbackWorker, name: 'gemini' } }, /config\.fallbackWorker\.name must be one of codex, claude-code, antigravity/],
     [{ ...reviewer, fallbackWorker: reviewer.worker }, /config\.fallbackWorker must name a different Worker from config\.worker/],
+    [{ ...reviewer, worker: { name: 'antigravity', model: 'gemini-3.8-flash', effort: 'high' } }, /config\.worker can't be antigravity, which runs only as a fallbackWorker until its headless bugs are fixed/],
     [{ ...reviewer, permissions: 'everything' }, /config\.permissions must be "read-only" or \{ write: \[folders\] \}/],
     [{ ...reviewer, timeoutSeconds: 0 }, /config\.timeoutSeconds must be at least 1/],
     [{ ...reviewer, maxTurns: undefined }, /config\.maxTurns is missing/],

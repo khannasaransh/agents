@@ -106,6 +106,8 @@ export async function loadAgent(name: string): Promise<Agent> {
   const errors = schemaErrors(config, configSchema, 'config')
   if (!errors.length && config.fallbackWorker.name === config.worker.name)
     errors.push('config.fallbackWorker must name a different Worker from config.worker')
+  if (!errors.length && config.worker.name === 'antigravity')
+    errors.push("config.worker can't be antigravity, which runs only as a fallbackWorker until its headless bugs are fixed")
   if (errors.length) throw new Error(`Invalid config for the ${name} Agent in ${configFile}: ${errors.join('; ')}`)
 
   return { name, folder, config, instructions: readFileSync(instructionsFile, 'utf8'), tools: declaredTools(name, folder, config), skills: skillsIn(name, folder) }

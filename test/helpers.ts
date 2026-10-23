@@ -64,6 +64,10 @@ export interface WorkerCliBehavior {
   exitCode?: number
   /** Start a child process, then answer nothing for 30s, as a stuck CLI would. */
   hang?: boolean
+  /** Answer, but leave a child process running that holds the output open, as a command left in the background would. */
+  leaveRunning?: boolean
+  /** Wait this long before answering, as a CLI at work would. */
+  answerAfterMs?: number
 }
 
 /** A call the stand-in for a Worker's CLI received. */
@@ -72,8 +76,13 @@ export interface WorkerCliCall {
   stdin: string
   cwd: string
   pid: number
-  /** The child process a hanging stand-in started. */
+  /** The child process a hanging stand-in started, or one it left running. */
   childPid?: number
+  /** Its HOME, and the Antigravity settings file there as it answered, if any. */
+  home: string
+  antigravitySettings?: any
+  /** The file defining the Antigravity agent it was told to run as, with --agent. */
+  antigravityCustomAgent?: string
   /** What `git status` listed in the folder it ran in, as it started: files added or changed there. */
   cwdChanges?: string
   /** The folder it was given as --plugin-dir, and the files in it, by path within it. */
@@ -81,7 +90,7 @@ export interface WorkerCliCall {
   pluginFiles?: Record<string, string>
 }
 
-const workerClis = ['codex', 'claude'] as const
+const workerClis = ['codex', 'claude', 'agy'] as const
 
 export interface Workspace {
   dataDir: string
@@ -327,8 +336,8 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
 /**
  * Writes an executable standing in for a Worker's CLI. It records each call, with what the folder
- * it runs in and its plugin folder hold as it starts, then answers as <command>.json beside it
- * says, or fails when there is none.
+ * it runs in and its plugin folder hold as it starts and the settings in its home as it answers,
+ * then answers as <command>.json beside it says, or fails when there is none.
  */
 function writeWorkerCliStandIn(binDir: string, command: string) {
   const file = join(binDir, command)
@@ -347,7 +356,7 @@ const filesIn = (folder) => readdirSync(folder).flatMap((entry) => {
 const behavior = existsSync(${behaviorFile})
   ? JSON.parse(readFileSync(${behaviorFile}, 'utf8'))
   : { stderr: '${command} stand-in: this test expects no ${command} call', exitCode: 1 }
-const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid }
+const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid, home: process.env.HOME }
 try {
   call.cwdChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' })
 } catch {}
@@ -356,13 +365,29 @@ if (call.args.includes('--plugin-dir')) {
   call.pluginFiles = Object.fromEntries(filesIn(call.pluginDir).map((file) => [relative(call.pluginDir, file), readFileSync(file, 'utf8')]))
 }
 if (behavior.hang) call.childPid = spawn('sleep', ['60'], { stdio: 'ignore' }).pid
-appendFileSync(${callsFile}, JSON.stringify(call) + '\\n')
-if (behavior.hang) setTimeout(() => {}, 30_000)
-else {
-  process.stdout.write(behavior.stdout ?? '')
-  process.stderr.write(behavior.stderr ?? '')
-  process.exitCode = behavior.exitCode ?? 0
+if (behavior.leaveRunning) {
+  const child = spawn('sleep', ['60'], { stdio: ['ignore', 'inherit', 'inherit'] })
+  child.unref()
+  call.childPid = child.pid
 }
+// Antigravity rereads its settings during a call, so they are read as it answers.
+const settingsFile = join(call.home, '.gemini', 'antigravity-cli', 'settings.json')
+const agentFile = call.args.includes('--agent') && join(call.home, '.gemini', 'config', 'agents', call.args[call.args.indexOf('--agent') + 1] + '.md')
+const record = () => {
+  if (existsSync(settingsFile)) call.antigravitySettings = JSON.parse(readFileSync(settingsFile, 'utf8'))
+  if (agentFile && existsSync(agentFile)) call.antigravityCustomAgent = readFileSync(agentFile, 'utf8')
+  appendFileSync(${callsFile}, JSON.stringify(call) + '\\n')
+}
+if (behavior.hang) {
+  record()
+  setTimeout(() => {}, 30_000)
+} else
+  setTimeout(() => {
+    record()
+    process.stdout.write(behavior.stdout ?? '')
+    process.stderr.write(behavior.stderr ?? '')
+    process.exitCode = behavior.exitCode ?? 0
+  }, behavior.answerAfterMs ?? 0)
 `,
   )
   chmodSync(file, 0o755)

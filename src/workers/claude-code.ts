@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import type { Agent } from '../agent.ts'
 import type { ProcessResult } from '../process.ts'
 import type { CallOptions, Inputs, Worker } from '../worker.ts'
-import { agentPrompt, lastLine, runCommandLine, withTempFolder, writeFolders, type CommandLine } from './cli.ts'
+import { agentPrompt, jsonResult, runCommandLine, withTempFolder, writeFolders, type CommandLine } from './cli.ts'
 
 interface ClaudeCodeOptions extends CallOptions {
   /** Where the Agent's skills are laid out as a plugin for the session. */
@@ -88,13 +88,9 @@ interface ClaudeCodeResult {
 }
 
 /** Claude Code's answer: the schema-checked one when the Agent has an output schema. Throws Claude Code's own error when the call failed. */
-function claudeCodeAnswer(agent: Agent, { code, stdout, stderr }: ProcessResult): unknown {
-  let result: ClaudeCodeResult
-  try {
-    result = JSON.parse(stdout)
-  } catch {
-    throw new Error(lastLine(stderr) || lastLine(stdout) || `claude exited with ${code}`)
-  }
+function claudeCodeAnswer(agent: Agent, ended: ProcessResult): unknown {
+  const { code } = ended
+  const result = jsonResult<ClaudeCodeResult>('claude', ended)
   if (result.is_error || result.subtype !== 'success' || code !== 0) {
     throw new Error(result.subtype === 'error_max_turns' ? `stopped at its limit of ${agent.config.maxTurns} turns` : result.result || result.subtype)
   }

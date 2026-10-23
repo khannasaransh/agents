@@ -224,11 +224,13 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - Claude Code allows each one by its path and denies any other command that isn't read-only.
   - Codex's sandbox can't read or run another Agent's Tools, or the Agent's own undeclared ones. Codex's extra tools, such as ChatGPT apps, web search and image generation, are turned off.
   - Codex has no list of allowed commands. Its shell runs any other command inside the sandbox, which can read anything, write only the Agent's write folders, and reach no network. Its subagent tools stay, since no setting found turns them off.
-  - On Codex a Tool runs inside that sandbox too; on Claude Code it runs outside any sandbox. So a Tool must need no more than the sandbox allows.
+  - Antigravity runs any command inside its sandbox and none outside it. Its sandbox reads only the folder the call runs in, that folder's git data, the Agent's Tools and its skills. It writes only the Agent's write folders, not even the folder it runs in, and reaches no network. No rule allows a command, since print mode lets the model run any command a rule allows outside the sandbox. Each call runs as a custom agent with only the tools to read files, run commands, write files when the Agent may, and finish, so its other tools, such as web search and subagents, are gone.
+  - On Codex and Antigravity a Tool runs inside the sandbox too; on Claude Code it runs outside any sandbox. So a Tool must need no more than the sandbox allows.
   - A skill can't allow itself commands through its own settings. Every Tool is declared in the config.
 - Skills are the folders in the Agent's skills folder, each holding a SKILL.md. They reach the Worker without being written into the target folder, and the Worker gets no others:
   - Claude Code loads a copy of them as a session-only plugin. Restricted mode already leaves out Saransh's skills and the Repo's; Claude Code's own bundled skills remain.
   - Codex and Antigravity get the skill text in the prompt, with each skill's folder for its other files, until it's confirmed they can load skills from outside their working folder. Codex's own skills, Saransh's and the Repo's are turned off.
+  - On Antigravity, that custom agent takes on no skills, rules, plugins or MCP servers: not Antigravity's own, not Saransh's and not the Repo's.
 - Subagents: the slot exists, but none ship in v1. When one is added, it is handed to the Worker's own subagent feature, so the parent Agent decides when to call it. Such an Agent can run only on Workers that support this.
 - Memory is Markdown notes per Agent, and for the Reviewer one file per Repo. It is read at the start of a call. The Agent proposes edits in its output, and Save state applies them.
 
@@ -239,10 +241,17 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - builds its CLI's command line;
   - requests JSON output and, where the Agent has a schema, the CLI's schema-checked final answer;
   - maps the Agent's permissions onto the CLI's sandbox or allowlist;
-  - enforces the timeout by ending the process;
+  - enforces the timeout by ending the process, and ends whatever the CLI left running once it exits;
   - parses the result.
 - If a call fails, times out or hits a quota limit, it is retried once on the fallback Worker. Both attempts are logged.
 - Claude Code runs on Saransh's logged-in subscription, so it is never run in the minimal mode that ignores that login.
+- Antigravity is only a fallback Worker. Config validation rejects it as an Agent's main Worker until its headless bugs are fixed.
+  - Its rules and tools can only come from files, so it runs on the Pipeline's own Antigravity home in the data area, which Saransh logs in to once. His own Antigravity config never reaches a call.
+  - Each call writes its custom agent into that home, with the rules of every call running at that moment, so calls running at once can read each other's git data. Calls run at once only within one Step, so they are the same Agent's. Two Steps started by hand at the same time would overwrite each other's rules, so a call could lose access it needs or gain the other's.
+  - Its prompt goes in `--print`, since print mode doesn't read stdin. On macOS, a prompt over about 1 MB fails the call.
+  - It ends a call at the first thing it refuses and still reports success. Such a call fails, naming what was refused, and the prompt tells the Agent to stay inside the sandbox.
+  - Run as a custom agent, it adds its finish tool's fields to the answer, and the Worker drops them.
+  - Its model is named without an effort, such as `gemini-3.8-flash`, since the effort is passed on its own. Its Claude models take no effort, so an Agent can't use them on Antigravity.
 - Nothing runs with permission checks disabled.
 
 ### Repo list and Teams
@@ -266,7 +275,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - It creates the Team folders and clones each selected Repo onto its production branch, with an optional Team filter.
   - It installs the Workers' config held in this repo: Claude Code settings, status line and plugins; Codex config; Antigravity config.
   - It checks that the tools are present: git, Node, and the three Worker CLIs.
-  - It prints a checklist of the manual steps: SDKs and IDEs, secrets and env files, and folders that aren't Repos.
+  - It prints a checklist of the manual steps: SDKs and IDEs, secrets and env files, folders that aren't Repos, and logging in once to the Pipeline's Antigravity home.
 - The Pipeline itself runs only on the Mac for now.
 
 ### Secrets, identity and data
@@ -277,7 +286,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 ## Testing Decisions
 
 - **One test boundary: the Step command.** A test prepares a Run folder and state as inputs, runs one Step with the fake Worker standing in for the real ones, and checks only the files the Step wrote and its exit code. Tests never reach into a Step's internals.
-- **Real Workers behind stand-in CLIs.** Some behavior only a real Worker has: reading its CLI's output, falling back, and ending a CLI at its timeout. It is tested through the Step on a Run that isn't a dry run, with stand-in `codex` and `claude` executables first on PATH. The stand-ins answer the way the real CLIs do and record what they were called with, and what the folder they run in and their plugin folder hold, since that is the Worker's outer boundary. No test starts a real CLI.
+- **Real Workers behind stand-in CLIs.** Some behavior only a real Worker has: reading its CLI's output, falling back, and ending a CLI at its timeout. It is tested through the Step on a Run that isn't a dry run, with stand-in `codex`, `claude` and `agy` executables first on PATH. The stand-ins answer the way the real CLIs do and record what they were called with, what the folder they run in and their plugin folder hold, and the settings in their home, since that is the Worker's outer boundary. No test starts a real CLI.
 - **Using real git, never the network.** Steps that touch git (Fetch, Review's worktree, Docs' branch handling, Save state) run against temporary git repos created by the test, including a local "remote" to fetch from.
 - **Behavior covered:**
   - Fetch: never changes the working tree or the checked-out branch; records baselines on the first Run; reports one failing Repo without failing the others.
@@ -312,14 +321,15 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 - **Open decision, To-dos:** what counts as a To-do, beyond PRD links to download by hand. The PM Agent's schema reserves the field, and its rules are settled before the PM Agent ships.
 - **Waiting on Saransh, Discord:** the bot, its installation on the company server by someone with Manage Server, and the list of channels. The Discord Step is skipped until then.
-- **Unconfirmed:** whether Codex and Antigravity can load skills from outside their working folder. Codex finds skills only in fixed folders: its own home, Saransh's `~/.agents/skills`, `/etc/codex/skills`, and `.agents/skills` in the folders from where it runs up. A temporary Codex home is untried. If either can, its inlined skill text goes away.
-- **Antigravity headless bugs:**
-  - print mode ignores its permission allowlist (antigravity-cli #548);
-  - it can report success while a command it started is still running (#1044).
+- **Unconfirmed:** whether Codex and Antigravity can load skills from outside their working folder. Codex finds skills only in fixed folders: its own home, Saransh's `~/.agents/skills`, `/etc/codex/skills`, and `.agents/skills` in the folders from where it runs up. A temporary Codex home is untried. Antigravity's custom agent could name the Agent's skill folders, now that it lives in the Pipeline's own Antigravity home; that is untried too. If either can, its inlined skill text goes away.
+- **Antigravity headless bugs**, as checked on agy 1.4.4:
+  - print mode ignores command rules that name a command, such as `command(git log)`, but honours `command(*)` and `regex:` rules. It also lets the model run any command such a rule allows outside the sandbox (antigravity-cli #548). The Worker writes no command rule, so commands run only in the sandbox;
+  - it ends a call at the first thing it refuses and still reports success (#794);
+  - it can report success while a command it started is still running (#1044). The Worker ends whatever it left running in its process group once it exits; a command that starts its own process group would escape.
 
-  A piped test run on this Mac returned clean JSON in 10 seconds. It stays a fallback until these are fixed.
+  A live fallback review on this Mac took about three minutes on `gemini-3.8-flash`. It stays a fallback until these are fixed.
 - **Billing:** every Run draws on Saransh's plans. Claude Code headless calls count against plan limits, and Max and Team plans also get a monthly API credit. Codex has 5-hour and weekly limits. Antigravity's quota refreshes every 5 hours up to a weekly cap. The Brief's review count is the cost signal.
-- **Versions:** codex-cli 0.154.0 and agy 1.1.27 are installed, while 0.163.0 and 1.4.4 are current. Setup should flag outdated Workers.
+- **Versions:** codex-cli 0.154.0 and agy 1.4.4 are installed, while 0.163.0 and 1.4.5 are current. agy updates itself. Setup should flag outdated Workers.
 - **Defaults chosen while writing this PRD, not discussed:**
   - the Discord window runs from the last successful Discord Step, so Monday's Run covers the weekend;
   - the first Run records baselines instead of reviewing history;

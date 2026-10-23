@@ -1,5 +1,6 @@
 import type { Agent, Effort, WorkerChoice, WorkerName } from './agent.ts'
 import { schemaErrors } from './schema.ts'
+import { antigravityWorker } from './workers/antigravity.ts'
 import { claudeCodeWorker } from './workers/claude-code.ts'
 import { codexWorker } from './workers/codex.ts'
 import { fakeWorker } from './workers/fake.ts'
@@ -21,7 +22,7 @@ export interface Worker {
   call(agent: Agent, inputs: Inputs, options: CallOptions): Promise<unknown>
 }
 
-const workers: Partial<Record<WorkerName, Worker>> = { codex: codexWorker, 'claude-code': claudeCodeWorker }
+const workers: Record<WorkerName, Worker> = { codex: codexWorker, 'claude-code': claudeCodeWorker, antigravity: antigravityWorker }
 
 /**
  * Calls an Agent on its Worker, or on the fake Worker in a dry run, and returns its answer. A call
@@ -46,9 +47,7 @@ export async function callAgent(
     const started = Date.now()
     const took = () => `${Math.round((Date.now() - started) / 1000)}s`
     try {
-      const worker = workers[choice.name]
-      if (!worker) throw new Error(`the ${choice.name} Worker isn't built yet`)
-      const answer = checkedAnswer(agent, await worker.call(agent, inputs, { cwd, model: choice.model, effort: choice.effort }))
+      const answer = checkedAnswer(agent, await workers[choice.name].call(agent, inputs, { cwd, model: choice.model, effort: choice.effort }))
       log(`${agent.name} answered on ${described(choice)} in ${took()}`)
       return answer
     } catch (error) {

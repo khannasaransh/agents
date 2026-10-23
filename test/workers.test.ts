@@ -4,7 +4,9 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import reviewer from '../agents/reviewer/config.ts'
 import type { Agent, AgentConfig, Skill, Tool } from '../src/agent.ts'
+import { antigravityCustomAgent, antigravityCommandLine, antigravityPermissions } from '../src/workers/antigravity.ts'
 import { claudeCodeCommandLine } from '../src/workers/claude-code.ts'
+import type { CommandLine } from '../src/workers/cli.ts'
 import { codexCommandLine } from '../src/workers/codex.ts'
 
 const cwd = '/data/worktrees/crux_flutter-x1Yz'
@@ -39,9 +41,14 @@ const inputs = {
 }
 const codexOptions = { cwd, model: 'gpt-6-astra', effort: 'high' as const, schemaFile: '/tmp/x/output-schema.json', undeclaredTools: [commit, blame, secret], foundSkills }
 const claudeCodeOptions = { cwd, model: 'opus', effort: 'high', pluginDir: '/tmp/y/plugin' } as const
+const antigravityHome = '/agents-data/antigravity-home'
+const antigravityOptions = { cwd, model: 'gemini-3.8-flash', effort: 'high', home: antigravityHome } as const
 
 /** The values that follow each use of `flag`. */
 const valuesOf = (args: string[], flag: string) => args.flatMap((arg, i) => (arg === flag ? [args[i + 1]] : []))
+
+/** The prompt a command line gives its CLI: on stdin, or in Antigravity's --print option. */
+const promptOf = ({ args, stdin }: CommandLine) => stdin || args.find((arg) => arg.startsWith('--print='))!.slice('--print='.length)
 
 /** The permission profile a Codex command line sets up. */
 const profileOf = (args: string[]) => valuesOf(args, '--config').find((value) => value.startsWith('permissions.agent='))
@@ -165,13 +172,74 @@ test("the Codex Worker gives the Agent its skills as text in the prompt, with th
   assert.ok(stdin.includes(`### checklist\n\nIts folder: \`${checklist.folder}\`\n\n${checklist.text.trim()}\n\n## Inputs`), stdin)
 })
 
-test("both Workers give the Agent its instructions, its Tools with their usage, each input with what it holds, and what to hand back, on stdin", () => {
+test("the Antigravity Worker runs an Agent through print mode in its sandbox, on the Pipeline's own Antigravity home rather than Saransh's, and asks for a schema-checked JSON answer", () => {
+  const line = antigravityCommandLine(agent(), inputs, antigravityOptions)
+
+  assert.equal(line.command, 'agy')
+  assert.deepEqual(line.args, [
+    '--output-format',
+    'json',
+    '--json-schema',
+    JSON.stringify(reviewer.outputSchema),
+    '--model',
+    'gemini-3.8-flash',
+    '--effort',
+    'high',
+    '--agent',
+    'pipeline-reviewer',
+    '--sandbox',
+    '--disable-slash-commands',
+    `--print=${promptOf(line)}`,
+  ])
+  assert.equal(line.stdin, '')
+  assert.deepEqual(line.env, { HOME: antigravityHome, AGY_ADC_AUTH: undefined })
+  assert.equal(line.timeoutSeconds, 900)
+})
+
+test("the Antigravity Worker runs an Agent as a custom agent with only the tools to read files, run commands, write files when it may, and finish, which takes on none of Antigravity's or the Repo's skills, rules or plugins", () => {
+  assert.deepEqual(antigravityCustomAgent(agent()), {
+    name: 'pipeline-reviewer',
+    definition: "---\nname: pipeline-reviewer\ndescription: The reviewer Agent of Saransh's Pipeline.\ntools: [read_file, run_command, finish]\ninheritCustomizations: false\n---\n\nFollow the prompt.\n",
+  })
+  assert.match(antigravityCustomAgent(agent(writer)).definition, /\ntools: \[read_file, run_command, write_file, edit_file, finish\]\n/)
+})
+
+// The git data of the worktree the call runs in, kept in its clone.
+const gitDir = '/Users/saransh/flutter/crux_flutter/.git'
+
+test("the Antigravity Worker's sandbox reads only the folder a read-only Agent runs in, its git data, the Tools the Agent declares and its skills, and it writes nothing, runs no other Tool and reaches no network", () => {
+  const permissions = antigravityPermissions(agent(reviewer, { tools: [blameTool], skills: [checklist] }), { cwd, gitDir, undeclaredTools: [commit, secret] })
+
+  assert.deepEqual(permissions, {
+    allow: [`read_file(${gitDir})`, `read_file(${blame})`, `read_file(${checklist.folder})`],
+    deny: [`read_file(${commit})`, `read_file(${secret})`, 'write_file(*)', 'read_url(*)', 'execute_url(*)', 'mcp(*)'],
+  })
+})
+
+test('the Antigravity Worker lets an Agent write its named folders, by their full paths, and asks for no schema when the Agent has none', () => {
+  const { allow, deny } = antigravityPermissions(agent(writer), { cwd, undeclaredTools: [] })
+  const { args } = antigravityCommandLine(agent(writer), inputs, antigravityOptions)
+
+  assert.deepEqual(allow, [`write_file(${cwd}/wiki)`, 'write_file(/Users/saransh/notes)'])
+  assert.ok(!deny.includes('write_file(*)'))
+  assert.ok(!args.includes('--json-schema'))
+})
+
+test("the Antigravity Worker gives the Agent its skills as text in the prompt, with the folder each one's other files are in, and tells it to stay inside the sandbox", () => {
+  const prompt = promptOf(antigravityCommandLine(agent(reviewer, { skills: [checklist] }), inputs, antigravityOptions))
+
+  assert.ok(prompt.includes(`### checklist\n\nIts folder: \`${checklist.folder}\`\n\n${checklist.text.trim()}\n\n## Inputs`), prompt)
+  assert.match(prompt, /\n## Limits\n\nYour commands run in a sandbox .*never ask to run a command outside the sandbox.*a refusal ends your call\.\n/)
+})
+
+test("every Worker gives the Agent its instructions, its Tools with their usage, each input with what it holds, and what to hand back", () => {
   const lines = [
     codexCommandLine(agent(reviewer, { tools: [blameTool] }), inputs, { ...codexOptions, undeclaredTools: [commit, secret] }),
     claudeCodeCommandLine(agent(reviewer, { tools: [blameTool] }), inputs, claudeCodeOptions),
+    antigravityCommandLine(agent(reviewer, { tools: [blameTool] }), inputs, antigravityOptions),
   ]
 
-  for (const { stdin } of lines) {
+  for (const stdin of lines.map(promptOf)) {
     assert.ok(stdin.startsWith('# Reviewer\n\nReview the commits.\n'), stdin)
     assert.ok(stdin.includes(`## Tools\n\nBeyond reading and searching, these are the only commands you can run. Run each by its full path.\n\n- \`${blame}\`: ${blameTool.usage}\n`), stdin)
     assert.ok(stdin.includes(`### repo: ${reviewer.inputs.repo}\n\n\`\`\`\ncrux_flutter\n\`\`\``), stdin)

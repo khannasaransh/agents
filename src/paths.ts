@@ -26,6 +26,11 @@ export function stateDir(): string {
   return join(dataDir(), 'state')
 }
 
+/** The Pipeline's own Antigravity home, which Saransh logs in to once, so his own Antigravity config stays out of its calls. */
+export function antigravityHomeDir(): string {
+  return join(dataDir(), 'antigravity-home')
+}
+
 /** Where Agents get temporary worktrees of the Repos they work on. */
 export function worktreesDir(): string {
   return join(dataDir(), 'worktrees')

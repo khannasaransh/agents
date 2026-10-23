@@ -15,8 +15,9 @@ const graceMs = 5000
 /**
  * Runs a command in `cwd`, with `stdin` as its input, and resolves with how it ended. Once
  * `timeoutMs` passes, it asks the command and everything it started to stop, then kills whatever
- * is left a few seconds later. Rejects only when the command can't start. An `env` value of
- * undefined removes that variable.
+ * is left a few seconds later. Whatever the command started is killed as soon as the command
+ * exits, timed out or not. Rejects only when the command can't start. An `env` value of undefined
+ * removes that variable.
  */
 export function runProcess(
   command: string,
@@ -63,6 +64,9 @@ export function runProcess(
       clearTimeout(timer)
       reject(error)
     })
+    // Once the command exits, anything it left running is ended too, so a command it left in the
+    // background can't hold its output open or outlive it.
+    child.on('exit', () => signalAll('SIGKILL'))
     child.on('close', finish)
   })
 }

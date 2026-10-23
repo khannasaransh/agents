@@ -11,7 +11,7 @@ import type { Inputs } from '../worker.ts'
 export interface CommandLine {
   command: string
   args: string[]
-  /** The prompt, written to the CLI's stdin. */
+  /** What is written to the CLI's stdin: the prompt, unless the CLI takes it as an argument. */
   stdin: string
   /** Changes to the CLI's environment. An undefined value removes that variable. */
   env: Record<string, string | undefined>
@@ -22,10 +22,12 @@ export interface CommandLine {
 /**
  * The prompt for an Agent call: its instructions, its Tools with their usage, each input with what
  * it holds, and what to hand back. With `inlineSkills`, its skills are written out too, for a Worker
- * that can't be given them any other way.
+ * that can't be given them any other way. With `limits`, it is told what its Worker refuses, for
+ * a Worker that ends a call at the first refusal.
  */
-export function agentPrompt(agent: Agent, inputs: Inputs, { inlineSkills = false } = {}): string {
+export function agentPrompt(agent: Agent, inputs: Inputs, { inlineSkills = false, limits = '' } = {}): string {
   const { inputs: declared, outputs } = agent.config
+  const limitSection = limits ? ['## Limits', limits] : []
   const tools = agent.tools.length
     ? ['## Tools', 'Beyond reading and searching, these are the only commands you can run. Run each by its full path.', agent.tools.map((tool) => `- \`${tool.path}\`: ${tool.usage}`).join('\n')]
     : []
@@ -43,7 +45,7 @@ export function agentPrompt(agent: Agent, inputs: Inputs, { inlineSkills = false
     return `### ${name}: ${holds}\n\n${block}`
   })
   const outputLines = Object.entries(outputs).map(([name, holds]) => `- **${name}:** ${holds}`)
-  return [agent.instructions.trim(), ...tools, ...skills, '## Inputs', ...inputSections, '## What to hand back', outputLines.join('\n')].join('\n\n') + '\n'
+  return [agent.instructions.trim(), ...limitSection, ...tools, ...skills, '## Inputs', ...inputSections, '## What to hand back', outputLines.join('\n')].join('\n\n') + '\n'
 }
 
 /** The folders an Agent may write, resolved against the folder it runs in; none when it is read-only. */
@@ -68,6 +70,15 @@ export async function runCommandLine(line: CommandLine, cwd: string): Promise<Pr
   const ended = await runProcess(line.command, line.args, { cwd, env, stdin, timeoutMs: timeoutSeconds * 1000 })
   if (ended.timedOut) throw new Error(`timed out after ${timeoutSeconds}s`)
   return ended
+}
+
+/** The JSON result a CLI printed. Throws what it said instead when it printed none. */
+export function jsonResult<T>(command: string, { code, stdout, stderr }: ProcessResult): T {
+  try {
+    return JSON.parse(stdout)
+  } catch {
+    throw new Error(lastLine(stderr) || lastLine(stdout) || `${command} exited with ${code}`)
+  }
 }
 
 /** The last non-empty line a CLI wrote, which is usually its error. */

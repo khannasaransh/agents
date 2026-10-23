@@ -379,6 +379,151 @@ test("Codex can't read or run a Tool the Agent doesn't declare, and gets no skil
   ])
 })
 
+/** A Reviewer that falls back to Antigravity. */
+const onAntigravity = { ...reviewer, fallbackWorker: { name: 'antigravity', model: 'gemini-3.8-flash', effort: 'high' } }
+
+/**
+ * What `agy --print --output-format json` prints when its schema-checked answer is `answer`. Run as
+ * a custom agent, it adds its finish tool's fields to the answer.
+ */
+const antigravityAnswering = (answer: object) => ({
+  stdout: JSON.stringify({
+    conversation_id: 'conversation-1',
+    status: 'SUCCESS',
+    response: `{"toolAction":"Finishing task","toolSummary":"Finish task"}\n${JSON.stringify(answer)}\n`,
+    duration_seconds: 12.7,
+    num_turns: 4,
+    structured_output: { ...answer, toolAction: 'Finishing task', toolSummary: 'Finish task' },
+    usage: { input_tokens: 24393, output_tokens: 440, thinking_tokens: 261, cache_read_tokens: 0, total_tokens: 24833 },
+  }),
+})
+
+const codexQuotaLimit = { stdout: JSON.stringify({ type: 'turn.failed', error: { message: "You've hit your usage limit." } }), exitCode: 1 }
+
+/** The prompt an Antigravity call was given. */
+const antigravityPrompt = ({ args }: { args: string[] }) => args.find((arg) => arg.startsWith('--print='))!.slice('--print='.length)
+
+test("a review can fall back to Antigravity, which runs on the Pipeline's own Antigravity home with only the Agent's permissions, and changes nothing in the Repo", async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Add paywall', { files: { 'lib/paywall.dart': 'class Paywall {}\n' } })
+  const usage = 'blame <file> <line>: prints the commit that last changed that line'
+  const skill = '---\nname: checklist\ndescription: What to check in a Flutter change.\n---\n\nCheck every `await` for a missing `mounted` check.\n'
+  ws.writeAgent('reviewer', {
+    'config.ts': `export default ${JSON.stringify({ ...onAntigravity, tools: { blame: usage } })}\n`,
+    'instructions.md': '# Reviewer\n',
+    'tools/blame': '#!/bin/sh\n',
+    'tools/secret': '#!/bin/sh\n',
+    'skills/checklist/SKILL.md': skill,
+  })
+  // Settings Antigravity saved in its home, such as at login, are kept; permissions left there are not.
+  const home = join(ws.dataDir, 'antigravity-home')
+  const settingsFile = join(home, '.gemini', 'antigravity-cli', 'settings.json')
+  mkdirSync(join(settingsFile, '..'), { recursive: true })
+  writeFileSync(settingsFile, JSON.stringify({ themeMode: 'dark', permissions: { allow: ['command(*)'] } }))
+  ws.setWorkerCli('codex', codexQuotaLimit)
+  ws.setWorkerCli('agy', antigravityAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  prepareRun([[repo, from]], { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
+  assert.match(ws.readRunFile(runId, 'logs', 'review.log'), /retrying once on antigravity \(gemini-3\.8-flash, high\)\ncrux_flutter: reviewer answered on antigravity/)
+  const [call, ...more] = ws.workerCliCalls('agy')
+  assert.deepEqual(more, [])
+  assert.equal(call.home, home)
+  assert.equal(call.cwdChanges, '')
+  const { themeMode, toolPermission, permissions } = call.antigravitySettings
+  assert.equal(themeMode, 'dark')
+  // Commands run only inside the sandbox, so no rule allows one.
+  assert.equal(toolPermission, 'proceed-in-sandbox')
+  assert.ok(![...permissions.allow, ...permissions.deny].some((rule: string) => rule.startsWith('command(')), permissions.allow.join('\n'))
+  const readable = permissions.allow.map((rule: string) => rule.replace(/^read_file\((.*)\)$/, '$1').replace(/^.*\/(clones|agents)\//, ''))
+  assert.deepEqual(readable, ['crux_flutter/.git', 'reviewer/tools/blame', 'reviewer/skills/checklist'])
+  assert.ok(permissions.deny.some((rule: string) => /^read_file\(\/.*\/reviewer\/tools\/secret\)$/.test(rule)), permissions.deny.join('\n'))
+  assert.ok(permissions.deny.includes('write_file(*)'), permissions.deny.join('\n'))
+  // It runs as an agent with only the tools to read, run commands and finish, which takes on no skills, rules or plugins.
+  const agentName = call.args[call.args.indexOf('--agent') + 1]
+  assert.equal(agentName, 'pipeline-reviewer')
+  assert.match(call.antigravityCustomAgent!, /^---\nname: pipeline-reviewer\n.*\ntools: \[read_file, run_command, finish\]\ninheritCustomizations: false\n---\n/s)
+  const prompt = antigravityPrompt(call)
+  assert.match(prompt, new RegExp(`- \`/[^\`]+/reviewer/tools/blame\`: ${usage}\n`))
+  assert.ok(prompt.includes(skill.trim()), prompt)
+})
+
+test("Antigravity calls running at once keep each other's rules, so each can still read its own Repo's git data", async () => {
+  ws = makeWorkspace()
+  const repos = [ws.addRepo('crux_flutter'), ws.addRepo('inpix-panel', { team: 'frontend' })]
+  const fetched = repos.map((repo): [TestRepo, string] => [repo, lastFetched(repo)])
+  for (const repo of repos) repo.pushCommit('Change')
+  ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify(onAntigravity)}\n`, 'instructions.md': '# Reviewer\n' })
+  ws.setWorkerCli('codex', codexQuotaLimit)
+  // Each call is still running when the other starts.
+  ws.setWorkerCli('agy', { ...antigravityAnswering({ summary: 'Fine.', findings: [] }), answerAfterMs: 1500 })
+  prepareRun(fetched, { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  const calls = ws.workerCliCalls('agy')
+  assert.equal(calls.length, 2)
+  for (const { antigravitySettings } of calls) {
+    const readable = antigravitySettings.permissions.allow.map((rule: string) => rule.replace(/^.*\/clones\//, ''))
+    assert.deepEqual(readable.sort(), ['crux_flutter/.git)', 'inpix-panel/.git)'])
+  }
+})
+
+test('an Antigravity call that answers while a command it started is still running ends that command, without waiting for it', { timeout: 20_000 }, async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Add paywall')
+  ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...onAntigravity, timeoutSeconds: 5 })}\n`, 'instructions.md': '# Reviewer\n' })
+  ws.setWorkerCli('codex', codexQuotaLimit)
+  ws.setWorkerCli('agy', { ...antigravityAnswering({ summary: 'Adds a paywall.', findings: [] }), leaveRunning: true })
+  prepareRun([[repo, from]], { dryRun: false })
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
+  const [{ childPid }] = ws.workerCliCalls('agy')
+  assert.ok(!isRunning(childPid!), `process ${childPid} is still running`)
+})
+
+test("an Antigravity call fails, saying why, when it was refused something it tried, isn't logged in or runs past the Agent's timeout", { timeout: 30_000 }, async () => {
+  const cases: [object, RegExp, object?][] = [
+    [
+      // Antigravity ends a call at the first thing it refuses, and still reports success.
+      { stdout: JSON.stringify({ conversation_id: 'c', status: 'SUCCESS', response: '', num_turns: 1, denied_actions: [{ action: 'command', display_name: 'RunCommand' }] }) },
+      /then antigravity failed: it stopped when it was refused command$/,
+    ],
+    [
+      { stdout: JSON.stringify({ conversation_id: '', status: 'ERROR', response: '', error: 'authentication failed or timed out', num_turns: 0 }), exitCode: 1 },
+      /then antigravity failed: authentication failed or timed out; log in once with HOME=\/.*\/antigravity-home agy$/,
+    ],
+    [{ hang: true }, /then antigravity failed: timed out after 1s$/, { timeoutSeconds: 1 }],
+  ]
+  for (const [behavior, message, config] of cases) {
+    ws?.cleanup()
+    ws = makeWorkspace()
+    const repo = ws.addRepo('crux_flutter')
+    const from = lastFetched(repo)
+    repo.pushCommit('Add paywall')
+    ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...onAntigravity, ...config })}\n`, 'instructions.md': '# Reviewer\n' })
+    ws.setWorkerCli('codex', codexQuotaLimit)
+    ws.setWorkerCli('agy', behavior)
+    prepareRun([[repo, from]], { dryRun: false })
+
+    const result = await review()
+
+    assert.notEqual(result.status, 0)
+    assert.match(ws.reviewResult(runId, 'crux_flutter').error, message)
+  }
+})
+
 test("a review fails when the Step doesn't pass every input the Reviewer's config declares", async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
