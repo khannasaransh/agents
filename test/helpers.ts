@@ -115,6 +115,11 @@ export interface Workspace {
   writeMemory(agent: string, name: string, text: string): void
   /** An Agent's Memory file in the data area, as Saransh would open it; null when there is none. */
   readMemory(agent: string, name: string): string | null
+  /** Drops a file into the PRD inbox, as Saransh would by hand. */
+  writePrdInboxFile(name: string, content: string): void
+  /** The files in the PRD inbox, by name, or none when it doesn't exist. */
+  prdInboxFiles(): string[]
+  readPrdInboxFile(name: string): string
   /**
    * Fetches a Repo's clone and writes what Fetch records for it in a Run, as a Step's input: the
    * commits since `from`, or a first-Run baseline when `from` is null.
@@ -259,6 +264,20 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
     readMemory(agent, name) {
       const file = join(dataDir, 'memory', agent, `${name}.md`)
       return existsSync(file) ? readFileSync(file, 'utf8') : null
+    },
+
+    writePrdInboxFile(name, content) {
+      mkdirSync(join(dataDir, 'prd-inbox'), { recursive: true })
+      writeFileSync(join(dataDir, 'prd-inbox', name), content)
+    },
+
+    prdInboxFiles() {
+      const inbox = join(dataDir, 'prd-inbox')
+      return existsSync(inbox) ? readdirSync(inbox).sort() : []
+    },
+
+    readPrdInboxFile(name) {
+      return readFileSync(join(dataDir, 'prd-inbox', name), 'utf8')
     },
 
     writeFetchResult(id, { entry }, from) {
@@ -447,7 +466,7 @@ export async function hangingRemote(giveUpAfterMs = 10_000): Promise<{ url: stri
   return remote
 }
 
-/** A response recorded from Discord's REST API. */
+/** A response recorded from Discord's REST API, or a file from its CDN when the body is a Buffer. */
 export interface RecordedResponse {
   status?: number
   headers?: Record<string, string>
@@ -476,8 +495,9 @@ export async function replayDiscord(recording: Record<string, RecordedResponse |
     requests.push({ method: req.method!, path: url.pathname, query: Object.fromEntries(url.searchParams), authorization: req.headers.authorization, at: Date.now() })
     const queue = queues.get(url.pathname)
     const response = queue ? (queue.length > 1 ? queue.shift()! : queue[0]) : { status: 404, body: { message: 'Unknown Channel', code: 10003 } }
-    res.writeHead(response.status ?? 200, { 'content-type': 'application/json', ...response.headers })
-    res.end(JSON.stringify(response.body))
+    const file = Buffer.isBuffer(response.body)
+    res.writeHead(response.status ?? 200, { 'content-type': file ? 'application/octet-stream' : 'application/json', ...response.headers })
+    res.end(file ? (response.body as Buffer) : JSON.stringify(response.body))
   })
   return { url: new URL(server.url).origin, requests, close: server.close }
 }

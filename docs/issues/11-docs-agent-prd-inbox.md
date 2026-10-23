@@ -8,8 +8,8 @@
 
 - [ ] The Docs Agent takes every file in the PRD inbox each Run.
 - [ ] For each file it decides whether it is a PRD and which Codebase it belongs to, copies it into that Codebase's PRD sources on the docs branch, and writes the PRD page with the wiki's PRD skill.
-- [ ] A PRD that came from Discord cites the Discord message link in its page's sources.
-- [ ] Processed files move to a done area and files that aren't PRDs to a skipped area, so the inbox shows only what's waiting.
+- [ ] A PRD that came from Discord cites the Discord message link in its page's sources: the inbox's `sources.json` has it, by file name (see ticket 09).
+- [ ] Processed files move to a done area and files that aren't PRDs to a skipped area, so the inbox shows only what's waiting. Their `sources.json` entries stay, with where the file went, so the Discord Step never saves them again.
 - [ ] PRD pages follow the same wiki rules, commit trailers and check gate as ticket 10.
 - [ ] The Brief lists the PRDs processed and the files skipped.
 - [ ] Step tests cover a PRD, a file that isn't a PRD, and an empty inbox.

@@ -179,8 +179,12 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - It covers messages from where the last successful read ended to when this one began, or the last 24 hours on the first Run. It records the new read time itself, only on success and never in a dry run. A forced re-read covers the Run's window again.
    - A bot sees only its own DMs, never Saransh's, and can't list them, so a DM with the bot is read only when its channel ID is in the channel list. `DISCORD_READ_DMS` (on by default) decides whether it is read; when it's off, such a channel fails the Step before any of its messages are read.
    - It writes the messages to the Run folder and flags mentions of Saransh.
-   - It saves attached PRD-type files (Word, PDF, Markdown) into the PRD inbox.
-   - It records links it can't download, such as Google Docs, as To-do candidates.
+   - It saves attached PRD-type files (Word, PDF, Markdown), in channels, threads and DMs with the bot, into the PRD inbox, downloading them from Discord's CDN without the bot token.
+     - The inbox's `sources.json` records, by file name in the inbox, the Discord message link and attachment ID of each file it saved. Files Saransh drops in by hand have no entry.
+     - An attachment already in `sources.json` isn't saved again. The Docs Agent keeps an entry when it moves the file out of the inbox, so a re-read never brings back a handled file.
+     - A file whose name is taken in the inbox is saved as `name (2).ext`, and so on, so nothing there is overwritten.
+     - A dry run saves nothing into the inbox; each message in the Run folder still lists its PRD files.
+   - It records, on each message, links it can't download because they need a login, as To-do candidates for the PM Agent: Google Docs and Drive, Notion, Confluence (`atlassian.net`), SharePoint and OneDrive, and Dropbox, with their subdomains.
    - It is skipped, not failed, while the bot isn't configured.
 4. **PM** (Agent): runs on Claude Code, with Codex as its fallback. It has no Repo to read, so it runs read-only in the Run folder.
    - Input: the reviews that cover the commits Fetch found, commit summaries, the Discord messages read in the Run (null when Discord wasn't read), the Run's health so far (the earlier Steps that didn't succeed and the Repos that failed to fetch), and its Memory of open items.

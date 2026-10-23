@@ -9,7 +9,7 @@ export function agentsDir(): string {
   return process.env.AGENTS_AGENTS_DIR ?? join(agentsRoot, 'agents')
 }
 
-/** The git-ignored data area: Runs, state, Memory, and later the PRD inbox. */
+/** The git-ignored data area: Runs, state, Memory and the PRD inbox. */
 export function dataDir(): string {
   return process.env.AGENTS_DATA_DIR ?? join(agentsRoot, 'data')
 }
@@ -29,6 +29,11 @@ export function stateDir(): string {
 /** Every Agent's Memory, a folder per Agent. Saransh may edit it by hand; nothing deletes it. */
 export function memoryDir(): string {
   return join(dataDir(), 'memory')
+}
+
+/** Where PRD files wait for the Docs Agent, whether the Discord Step saved them or Saransh dropped them in by hand. */
+export function prdInboxDir(): string {
+  return join(dataDir(), 'prd-inbox')
 }
 
 /** The Pipeline's own Antigravity home, which Saransh logs in to once, so his own Antigravity config stays out of its calls. */

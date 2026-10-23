@@ -4,10 +4,13 @@ import { makeWorkspace, replayDiscord, type RecordedResponse, type Workspace } f
 
 let ws: Workspace
 let api: Awaited<ReturnType<typeof replayDiscord>> | undefined
+let cdn: Awaited<ReturnType<typeof replayDiscord>> | undefined
 afterEach(() => {
   ws.cleanup()
   api?.close()
+  cdn?.close()
   api = undefined
+  cdn = undefined
 })
 
 const runId = '2026-10-22-0530'
@@ -35,8 +38,35 @@ const channel = (id: string, name: string) => ({
   flags: 0,
 })
 
+/** A file to attach to a message: its name as Discord gives it, its type and what it holds. */
+interface Upload {
+  filename: string
+  contentType: string
+  content: string
+}
+
+/**
+ * Starts the stand-in for Discord's file CDN serving these files, and gives each as Discord lists it
+ * among a message's attachments, at a signed CDN URL.
+ */
+async function uploaded(channelId: string, ...files: Upload[]) {
+  const withIds = files.map((f, n) => ({ ...f, id: String(1400000000000000001n + BigInt(n)) }))
+  const path = (f: (typeof withIds)[number]) => `/attachments/${channelId}/${f.id}/${f.filename}`
+  cdn = await replayDiscord(Object.fromEntries(withIds.map((f) => [path(f), { body: Buffer.from(f.content) }])))
+  return withIds.map((f) => ({
+    id: f.id,
+    filename: f.filename,
+    size: f.content.length,
+    url: `${cdn!.url}${path(f)}?ex=6720a0f0&is=671f4f70&hm=3f9a0c`,
+    proxy_url: `https://media.discordapp.net${path(f)}?ex=6720a0f0&is=671f4f70&hm=3f9a0c`,
+    content_type: f.contentType,
+  }))
+}
+
+type Attachment = Awaited<ReturnType<typeof uploaded>>[number]
+
 /** A message, as GET /channels/{id}/messages answers, its ID made from its time as Discord's are. */
-const message = (channelId: string, time: string, author: typeof saransh, content: string, mentions: (typeof saransh)[] = []) => ({
+const message = (channelId: string, time: string, author: typeof saransh, content: string, mentions: (typeof saransh)[] = [], attachments: Attachment[] = []) => ({
   type: 0,
   id: snowflake(time),
   channel_id: channelId,
@@ -48,7 +78,7 @@ const message = (channelId: string, time: string, author: typeof saransh, conten
   mention_everyone: false,
   mentions,
   mention_roles: [],
-  attachments: [],
+  attachments,
   embeds: [],
   pinned: false,
   components: [],
@@ -149,6 +179,8 @@ test('the Discord Step reads a watched channel since the last successful read as
       link: `https://discord.com/channels/${guildId}/${payments.id}/${ask.id}`,
       mentionsSaransh: true,
       fromSaransh: false,
+      prdFiles: [],
+      prdLinks: [],
     },
     {
       id: reply.id,
@@ -161,6 +193,8 @@ test('the Discord Step reads a watched channel since the last successful read as
       link: `https://discord.com/channels/${guildId}/${payments.id}/${reply.id}`,
       mentionsSaransh: false,
       fromSaransh: true,
+      prdFiles: [],
+      prdLinks: [],
     },
   ])
   assert.deepEqual(ws.readDiscordState(), { lastRead: read.until })
@@ -304,6 +338,8 @@ test('a DM with the bot among the configured channels is read by default, with n
       link: `https://discord.com/channels/@me/${dm.id}/${ask.id}`,
       mentionsSaransh: false,
       fromSaransh: false,
+      prdFiles: [],
+      prdLinks: [],
     },
   ])
   const asked = api!.requests.map((r) => r.path)
@@ -389,4 +425,134 @@ test('on the first Run the Discord Step covers the last 24 hours', async () => {
   assert.ok(earliest <= since && since <= latest, since)
   const messagesRequest = api!.requests.find((r) => r.path === `/channels/${payments.id}/messages`)
   assert.equal(messagesRequest?.query.after, snowflake(since))
+})
+
+test('a PDF attached in a watched channel is saved into the PRD inbox, with the link of the message it came from', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const [pdf] = await uploaded(payments.id, { filename: 'Paywall_PRD.pdf', contentType: 'application/pdf', content: '%PDF-1.7\nThe paywall PRD' })
+  const post = message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'PRD for the paywall', [], [pdf])
+  await workspaceWithDiscord(watched(payments, [post]))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.prdInboxFiles(), ['Paywall_PRD.pdf', 'sources.json'])
+  assert.equal(ws.readPrdInboxFile('Paywall_PRD.pdf'), '%PDF-1.7\nThe paywall PRD')
+  assert.deepEqual(JSON.parse(ws.readPrdInboxFile('sources.json')), {
+    'Paywall_PRD.pdf': { message: `https://discord.com/channels/${guildId}/${payments.id}/${post.id}`, attachment: pdf.id },
+  })
+  assert.ok(cdn!.requests.length && cdn!.requests.every((r) => r.authorization === undefined), 'the bot token never goes to the CDN')
+})
+
+test('only Word, PDF and Markdown attachments go into the PRD inbox', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const files = await uploaded(
+    payments.id,
+    { filename: 'Refunds.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', content: 'PK refunds' },
+    { filename: 'Old_checkout.doc', contentType: 'application/msword', content: 'old checkout' },
+    { filename: 'Wallet.PDF', contentType: 'application/pdf', content: '%PDF-1.4 wallet' },
+    { filename: 'onboarding.md', contentType: 'text/markdown; charset=utf-8', content: '# Onboarding' },
+    { filename: 'screenshot.png', contentType: 'image/png', content: 'PNG' },
+    { filename: 'designs.zip', contentType: 'application/zip', content: 'PK designs' },
+  )
+  await workspaceWithDiscord(watched(payments, [message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'Specs and designs', [], files)]))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.prdInboxFiles(), ['Old_checkout.doc', 'Refunds.docx', 'Wallet.PDF', 'onboarding.md', 'sources.json'])
+  assert.ok(!cdn!.requests.some((r) => /\.(png|zip)$/.test(r.path)), 'other files are never downloaded')
+})
+
+test('a file already in the PRD inbox from an earlier Run is not saved again', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const [pdf] = await uploaded(payments.id, { filename: 'Paywall_PRD.pdf', contentType: 'application/pdf', content: '%PDF-1.7\nThe paywall PRD' })
+  await workspaceWithDiscord(watched(payments, [message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'PRD for the paywall', [], [pdf])]))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+  await discord()
+  const sources = ws.readPrdInboxFile('sources.json')
+  // As after an earlier Run whose read failed once the file was saved, so the read time stayed.
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+  ws.prepareRun('2026-10-23-0530')
+
+  const result = await ws.agents('step', 'discord', '--run', '2026-10-23-0530')
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.prdInboxFiles(), ['Paywall_PRD.pdf', 'sources.json'])
+  assert.equal(ws.readPrdInboxFile('sources.json'), sources)
+  assert.equal(cdn!.requests.length, 1)
+})
+
+test('a file Saransh dropped into the PRD inbox by hand is kept, and a different one from Discord with the same name gets a numbered name', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const [pdf] = await uploaded(payments.id, { filename: 'Paywall_PRD.pdf', contentType: 'application/pdf', content: '%PDF-1.7\nThe paywall PRD, v2' })
+  const post = message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'Updated paywall PRD', [], [pdf])
+  await workspaceWithDiscord(watched(payments, [post]))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+  ws.writePrdInboxFile('Paywall_PRD.pdf', '%PDF-1.7\nThe paywall PRD, downloaded by hand')
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.prdInboxFiles(), ['Paywall_PRD (2).pdf', 'Paywall_PRD.pdf', 'sources.json'])
+  assert.equal(ws.readPrdInboxFile('Paywall_PRD.pdf'), '%PDF-1.7\nThe paywall PRD, downloaded by hand')
+  assert.equal(ws.readPrdInboxFile('Paywall_PRD (2).pdf'), '%PDF-1.7\nThe paywall PRD, v2')
+  assert.deepEqual(JSON.parse(ws.readPrdInboxFile('sources.json')), {
+    'Paywall_PRD (2).pdf': { message: `https://discord.com/channels/${guildId}/${payments.id}/${post.id}`, attachment: pdf.id },
+  })
+})
+
+test('links to documents that need a login, such as Google Docs, are recorded with the message they came from, for the To-dos', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const launch = thread('1200000000000000001', payments.id, 'Paywall launch')
+  const docs = message(
+    payments.id,
+    '2026-10-21T09:15:00.000Z',
+    priya,
+    'PRD: https://docs.google.com/document/d/1AbC/edit?usp=sharing and the sheet <https://drive.google.com/file/d/9XyZ/view>, code at https://github.com/NewsInShorts/payments/pull/12',
+  )
+  const wiki = message(launch.id, '2026-10-21T10:00:00.000Z', priya, 'Specs: https://inshorts.atlassian.net/wiki/spaces/PAY/pages/42, https://inshorts.notion.site/Wallet-3f2e and https://inshorts.sharepoint.com/:w:/s/pay/Refunds.')
+  const lookalike = message(payments.id, '2026-10-21T11:00:00.000Z', priya, 'Not a doc: https://docs.google.com.example.net/document/d/1AbC')
+  await workspaceWithDiscord(watched(payments, [docs, lookalike], { active: [[launch, [wiki]]] }))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(
+    readMessages().messages.map((m: any) => [m.link, m.prdLinks]),
+    [
+      [`https://discord.com/channels/${guildId}/${payments.id}/${docs.id}`, ['https://docs.google.com/document/d/1AbC/edit?usp=sharing', 'https://drive.google.com/file/d/9XyZ/view']],
+      [
+        `https://discord.com/channels/${guildId}/${launch.id}/${wiki.id}`,
+        ['https://inshorts.atlassian.net/wiki/spaces/PAY/pages/42', 'https://inshorts.notion.site/Wallet-3f2e', 'https://inshorts.sharepoint.com/:w:/s/pay/Refunds'],
+      ],
+      [`https://discord.com/channels/${guildId}/${payments.id}/${lookalike.id}`, []],
+    ],
+  )
+  assert.deepEqual(ws.prdInboxFiles(), [])
+})
+
+test('a dry run lists the PRD files attached in discord.json but saves nothing into the PRD inbox', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const [pdf, png] = await uploaded(
+    payments.id,
+    { filename: 'Paywall_PRD.pdf', contentType: 'application/pdf', content: '%PDF-1.7\nThe paywall PRD' },
+    { filename: 'screenshot.png', contentType: 'image/png', content: 'PNG' },
+  )
+  await workspaceWithDiscord(watched(payments, [message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'PRD for the paywall', [], [pdf, png])]))
+  ws.prepareRun(runId, { dryRun: true })
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(
+    readMessages().messages.map((m: any) => m.prdFiles),
+    [['Paywall_PRD.pdf']],
+  )
+  assert.deepEqual(ws.prdInboxFiles(), [])
+  assert.equal(cdn!.requests.length, 0)
 })
