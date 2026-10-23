@@ -53,8 +53,15 @@ export function settleProposal(proposal: MemoryProposal, decision: MemoryDecisio
   const before = readMemory(agent, name)
   if (decision !== 'rejected') writeText(memoryFile(agent, name), proposal.memory)
   const after = readMemory(agent, name)
-  writeJson(join(runDir(proposal.run), 'memory', agent, `${name}.json`), { agent, name, decision, decidedAt: new Date().toISOString(), before, after })
+  writeJson(decisionFile(proposal), { agent, name, decision, decidedAt: new Date().toISOString(), before, after })
 }
+
+/** Whether the Run that proposed this change has recorded what became of it. */
+export function isSettled(proposal: MemoryProposal): boolean {
+  return existsSync(decisionFile(proposal))
+}
+
+const decisionFile = ({ run, agent, name }: MemoryProposal) => join(runDir(run), 'memory', agent, `${name}.json`)
 
 /** Saransh's decision on the proposal waiting for this Memory file, which then stops waiting. */
 export function decideProposal(agent: string, name: string, decision: 'accepted' | 'rejected'): MemoryProposal {

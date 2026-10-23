@@ -135,6 +135,44 @@ test('the Brief lists the Memory changes waiting for Saransh, before its Run hea
   assert.doesNotMatch(brief, /reviewer inpix-panel/)
 })
 
+/** Prepares a Run whose PM Agent proposed `memory`, then runs its Save state. */
+async function saveStateAfterPm(memory: string | null, { dryRun = false } = {}) {
+  ws.writeRepoList([])
+  ws.prepareRun(runId, { dryRun })
+  ws.writeRunFile(runId, 'pm.json', { status: 'answered', repoLines: [], highlights: [], todos: [], memory })
+  const result = await saveState()
+  assert.equal(result.status, 0, result.stderr)
+}
+
+const oldOpenItems = '- 2026-10-21: the inpix-panel login bug is still open.\n'
+const newOpenItems = '- 2026-10-21: the inpix-panel login bug is still open.\n- 2026-10-22: download the payments revamp PRD.\n'
+
+test("Save state applies the PM Agent's proposed Memory and records the change in the Run, once however often it is re-run", async () => {
+  ws = makeWorkspace()
+  ws.writeMemory('pm', 'notes', oldOpenItems)
+
+  await saveStateAfterPm(newOpenItems)
+
+  assert.equal(ws.readMemory('pm', 'notes'), newOpenItems)
+  const { decidedAt, ...change } = JSON.parse(ws.readRunFile(runId, 'memory', 'pm', 'notes.json'))
+  assert.deepEqual(change, { agent: 'pm', name: 'notes', decision: 'applied', before: oldOpenItems, after: newOpenItems })
+
+  const rerun = await saveState()
+
+  assert.equal(rerun.status, 0, rerun.stderr)
+  assert.equal(JSON.parse(ws.readRunFile(runId, 'memory', 'pm', 'notes.json')).before, oldOpenItems)
+})
+
+test("a dry run's PM Memory came from the fake Worker, so Save state never applies it", async () => {
+  ws = makeWorkspace()
+  ws.writeMemory('pm', 'notes', oldOpenItems)
+
+  await saveStateAfterPm(newOpenItems, { dryRun: true })
+
+  assert.equal(ws.readMemory('pm', 'notes'), oldOpenItems)
+  assert.deepEqual(ws.runFiles(runId, 'memory'), [])
+})
+
 test('accepting a proposal makes it the Memory the next Run reads, and records the change in the Run that proposed it', async () => {
   ws = makeWorkspace()
   ws.writeMemory('reviewer', 'crux_flutter', oldMemory)

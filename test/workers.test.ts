@@ -89,6 +89,7 @@ test('the Codex Worker runs a read-only Agent through codex exec with only its b
     `skills.config=[${foundSkills.map((file) => `{path="${file}",enabled=false}`).join(',')}]`,
     '--cd',
     cwd,
+    '--skip-git-repo-check',
     '--json',
     '--output-schema',
     '/tmp/x/output-schema.json',

@@ -180,9 +180,9 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - It saves attached PRD-type files (Word, PDF, Markdown) into the PRD inbox.
    - It records links it can't download, such as Google Docs, as To-do candidates.
    - It is skipped, not failed, while the bot isn't configured.
-4. **PM** (Agent): runs on Claude Code.
-   - Input: review outputs, commit summaries, Discord messages, the Run's health so far, and its Memory.
-   - Output, checked against a schema: a line per Repo, Discord highlights, and To-dos.
+4. **PM** (Agent): runs on Claude Code, with Codex as its fallback. It has no Repo to read, so it runs read-only in the Run folder.
+   - Input: the reviews that cover the commits Fetch found, commit summaries, Discord messages (null until the Discord Step exists), the Run's health so far (the earlier Steps that didn't succeed and the Repos that failed to fetch), and its Memory of open items.
+   - Output, checked against a schema and written to the Run folder as `pm.json`: a line per Repo, Discord highlights, To-dos, and its proposed Memory. A failed call is recorded there too, and the Step fails.
    - The rules for what counts as a To-do are open (see Further Notes). The candidates are Discord requests aimed at Saransh with no reply from him, findings on his commits, wiki drafts waiting for him, and PRD links he has to download.
 5. **Docs** (Agent): runs on Claude Code in its own worktree of the wiki, on a single rolling docs branch.
    - **Branch:** it continues an unmerged branch, starts fresh from the wiki's main line once the branch has been merged, and merges main in first if main has moved. On a conflict it stops and reports.
@@ -192,17 +192,16 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - **Wiki rules:** it follows them throughout. It reads code only at pinned commits, leaves pages as drafts, and runs the wiki's stamp, region and check tools until the check reports no errors. It commits under Saransh's git identity with trailers naming the Agent and the Run.
    - **Output:** the pages changed, the PRDs processed, and undocumented Repos with large changes, for the Brief.
 6. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run. For an Agent whose config says its Memory changes wait for review, it queues them for Saransh instead (see Agents).
-7. **Brief** (command): the last Step, so its Run health covers every other Step. It renders the Brief as Markdown in the Run folder, grouped by Team. Sections:
-   - per Repo, one line on what changed;
-   - findings by severity, with Saransh's own first;
-   - Discord highlights;
+7. **Brief** (command): the last Step, so its Run health covers every other Step. It renders the Brief as Markdown in the Run folder. Sections, in order:
    - To-dos;
+   - Discord highlights;
+   - by Team, per Repo: one line on what changed, its new commits, and its findings by severity, with Saransh's own first;
    - wiki drafts and the docs branch waiting for review;
    - undocumented Repos with large changes;
-   - the number of Repos reviewed;
-   - Run health.
+   - Memory changes waiting for Saransh;
+   - Run health, with the number of Repos reviewed.
 
-   It runs even when earlier Steps failed. A Repo's review is shown only when it covers exactly the commits Fetch found in the Run; otherwise the Brief says the commits have no review. There is no notification.
+   It runs even when earlier Steps failed. When the PM output is missing, because the PM Agent failed or hasn't run, the Brief says so at the top and is written from the reviews and Run health alone. A Repo's review is shown only when it covers exactly the commits Fetch found in the Run; otherwise the Brief says the commits have no review. There is no notification.
 
 ### Agents
 
@@ -234,7 +233,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - Codex and Antigravity get the skill text in the prompt, with each skill's folder for its other files, until it's confirmed they can load skills from outside their working folder. Codex's own skills, Saransh's and the Repo's are turned off.
   - On Antigravity, that custom agent takes on no skills, rules, plugins or MCP servers: not Antigravity's own, not Saransh's and not the Repo's.
 - Subagents: the slot exists, but none ship in v1. When one is added, it is handed to the Worker's own subagent feature, so the parent Agent decides when to call it. Such an Agent can run only on Workers that support this.
-- Memory is Markdown notes per Agent, and for the Reviewer one file per Repo, in the data area's `memory/<agent>/<name>.md`. Saransh may edit a file by hand, and nothing deletes one. It is read fresh at the start of a call.
+- Memory is Markdown notes per Agent, in the data area's `memory/<agent>/<name>.md`: for the Reviewer one file per Repo, and for the PM Agent one file of open items, `memory/pm/notes.md`. Saransh may edit a file by hand, and nothing deletes one. It is read fresh at the start of a call.
   - The Agent proposes edits in its output: the whole new file, or null for no change.
   - By default Save state applies them (`memoryChanges: 'apply'` in the Agent's config) and records each in the Run that proposed it, with the Memory before and after.
   - With `memoryChanges: 'review'`, Save state queues them instead, a newer proposal for a file replacing an older one still waiting. `agents memory` shows each as a diff against the Memory Saransh has now, and `agents memory accept|reject <agent> <name>` settles it, recorded the same way. The Brief lists those still waiting.
@@ -251,6 +250,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - parses the result.
 - If a call fails, times out or hits a quota limit, it is retried once on the fallback Worker. Both attempts are logged.
 - Claude Code runs on Saransh's logged-in subscription, so it is never run in the minimal mode that ignores that login.
+- Codex skips its check that it runs inside a git repo, since an Agent with no Repo, such as the PM, runs in its Run folder.
 - Antigravity is only a fallback Worker. Config validation rejects it as an Agent's main Worker until its headless bugs are fixed.
   - Its rules and tools can only come from files, so it runs on the Pipeline's own Antigravity home in the data area, which Saransh logs in to once. His own Antigravity config never reaches a call.
   - Each call writes its custom agent into that home, with the rules of every call running at that moment, so calls running at once can read each other's git data. Calls run at once only within one Step, so they are the same Agent's. Two Steps started by hand at the same time would overwrite each other's rules, so a call could lose access it needs or gain the other's.
@@ -297,11 +297,12 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 - **Behavior covered:**
   - Fetch: never changes the working tree or the checked-out branch; records baselines on the first Run; reports one failing Repo without failing the others.
   - Review: runs only for Repos with new commits; removes its worktree even when the call fails.
-  - Save state: advances state only for successful reviews; applies Memory edits, or queues them when the Agent's config asks for review.
+  - Save state: advances state only for successful reviews; applies the Reviewer's and the PM Agent's Memory edits, or queues them when the Agent's config asks for review.
   - Memory: Review gives the Worker the current Memory; accepting or rejecting a queued edit changes the Memory accordingly and records the decision in the Run.
   - Discord: is skipped cleanly without configuration; routes attachments to the PRD inbox. It is tested against recorded API responses.
   - Docs: continues, restarts or merges the rolling branch correctly; stops on conflict; moves PRD inbox files.
-  - Brief: is written, with Run health, when earlier Steps failed.
+  - PM: gets the Run's reviews, commits, health and Memory on Claude Code; records a failure after its fallback fails too.
+  - Brief: is written, with Run health, when earlier Steps failed; is complete with the PM output; says the PM output is missing after a PM failure; says when no Discord messages were read.
   - Re-runs: skip completed work unless forced.
   - Lock: blocks a second Run.
 - **Whole-Pipeline test:** the dry run (`agents run daily --dry-run`) covers the Pipeline end to end, including Step order and a partial Run.

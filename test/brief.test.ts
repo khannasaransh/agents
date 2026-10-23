@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 import type { FetchResult } from '../steps/fetch.ts'
+import type { PmResult } from '../steps/pm.ts'
 import type { Finding, ReviewResult } from '../steps/review.ts'
 import { makeWorkspace, type Workspace } from './helpers.ts'
 
@@ -12,13 +13,19 @@ const sha = (n: number) => String(n).repeat(40)
 
 function prepareRun(
   results: FetchResult[],
-  { steps = [{ name: 'fetch', status: 'succeeded' }, { name: 'brief', status: 'pending' }], reviews = [] as ReviewResult[], dryRun = false } = {},
+  {
+    steps = [{ name: 'fetch', status: 'succeeded' }, { name: 'brief', status: 'pending' }],
+    reviews = [] as ReviewResult[],
+    pm = undefined as PmResult | undefined,
+    dryRun = false,
+  } = {},
 ) {
   ws = makeWorkspace()
   ws.writeRepoList([])
   ws.prepareRun(runId, { steps, dryRun })
   for (const result of results) ws.writeRunFile(runId, `fetch/${result.repo}.json`, result)
   for (const result of reviews) ws.writeRunFile(runId, `review/${result.repo}.json`, result)
+  if (pm) ws.writeRunFile(runId, 'pm.json', pm)
 }
 
 async function brief(): Promise<string> {
@@ -183,4 +190,85 @@ test("a dry run's Brief says its reviews came from the fake Worker", async () =>
   prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Answered by the fake Worker.', findings: [], memory: null }], dryRun: true })
 
   assert.match(await brief(), /^# Brief 2026-10-22-0530\n\nDry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done\./)
+})
+
+const pmAnswered = (answer: Partial<Extract<PmResult, { status: 'answered' }>> = {}): PmResult => ({
+  status: 'answered',
+  repoLines: [{ repo: 'crux_flutter', line: 'A paywall now guards premium stories, and its price can show before it loads.' }],
+  highlights: ['Priya asked in #payments whether the paywall ships this week.'],
+  todos: ['Fix the paywall price that shows before it loads (your commit 3333333).', 'Download the Google Doc PRD for the payments revamp.'],
+  memory: null,
+  ...answer,
+})
+
+test("a full Brief opens with the PM Agent's To-dos and highlights, gives each changed Repo its line, and counts the Repos reviewed", async () => {
+  const unchanged: FetchResult = { repo: 'news-read-go', team: 'backend', branch: 'master', previous: sha(5), status: 'unchanged', head: sha(5), commits: [] }
+  const failing: FetchResult = { ...changed, repo: 'inpix-panel', team: 'frontend' }
+  prepareRun([changed, unchanged, failing], {
+    reviews: [
+      { ...range, status: 'reviewed', summary: 'Adds a paywall.', findings: [finding('high', 'Price shows before it loads', true)], memory: null },
+      { ...range, repo: 'inpix-panel', team: 'frontend', status: 'failed', error: 'Quota limit reached' },
+    ],
+    pm: pmAnswered(),
+  })
+
+  const text = await brief()
+
+  assert.equal(
+    text.slice(0, text.indexOf('2 new commits on main:')),
+    [
+      '# Brief 2026-10-22-0530',
+      '',
+      '## To-dos',
+      '',
+      '- Fix the paywall price that shows before it loads (your commit 3333333).',
+      '- Download the Google Doc PRD for the payments revamp.',
+      '',
+      '## Discord highlights',
+      '',
+      '- Priya asked in #payments whether the paywall ships this week.',
+      '',
+      '## flutter',
+      '',
+      '### crux_flutter',
+      '',
+      'A paywall now guards premium stories, and its price can show before it loads.',
+      '',
+      '',
+    ].join('\n'),
+  )
+  assert.match(text, /- \*\*high\*\* `lib\/paywall\.dart:42` in `3333333` by Saransh \(yours\): Price shows before it loads/)
+  assert.match(text.split('## Run health')[1], /\nRepos reviewed: 1\.\n/)
+})
+
+test('a Brief with no Discord input says no Discord messages were read, and one with no To-dos says nothing is waiting', async () => {
+  prepareRun([changed], { pm: pmAnswered({ highlights: [], todos: [] }) })
+
+  assert.match(
+    await brief(),
+    /^# Brief 2026-10-22-0530\n\n## To-dos\n\nNothing is waiting on you\.\n\n## Discord highlights\n\nNo Discord messages were read in this Run\.\n\n## flutter\n/,
+  )
+})
+
+test('when the PM Agent failed, the Brief says its output is missing and why, and still shows the reviews and Run health', async () => {
+  prepareRun([changed], {
+    steps: [{ name: 'fetch', status: 'succeeded' }, { name: 'review', status: 'succeeded' }, { name: 'pm', status: 'failed' }, { name: 'brief', status: 'pending' }],
+    reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall.', findings: [finding('high', 'Price shows before it loads', true)], memory: null }],
+    pm: { status: 'failed', error: 'claude-code failed: Session limit reached\nmore detail' },
+  })
+
+  const text = await brief()
+
+  assert.match(
+    text,
+    /^# Brief 2026-10-22-0530\n\nThe PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo\. The PM Agent failed: claude-code failed: Session limit reached\n\n## flutter\n/,
+  )
+  assert.match(text, /Review: Adds a paywall\.\n\n- \*\*high\*\* `lib\/paywall\.dart:42`/)
+  assert.match(text.split('## Run health')[1], /- pm: failed\. Log: logs\/pm\.log/)
+})
+
+test('a Brief written before the PM Agent answered says its output is missing', async () => {
+  prepareRun([changed])
+
+  assert.match(await brief(), /^# Brief 2026-10-22-0530\n\nThe PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo\.\n\n## flutter\n/)
 })

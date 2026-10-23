@@ -7,10 +7,16 @@ import { makeWorkspace, type Workspace } from './helpers.ts'
 let ws: Workspace
 afterEach(() => ws.cleanup())
 
+/** `claude --print` answering as a PM Agent with nothing to report. */
+const claudeCodeAnsweringPm = {
+  stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null } }),
+}
+
 test('agents run daily creates a Run named by local start date and time that runs its Steps in order', async () => {
   ws = makeWorkspace()
   ws.addRepo('crux_flutter')
   ws.writeRepoList()
+  ws.setWorkerCli('claude', claudeCodeAnsweringPm)
 
   const result = await ws.agents('run', 'daily')
 
@@ -28,6 +34,7 @@ test('agents run daily creates a Run named by local start date and time that run
     [
       ['fetch', 'succeeded'],
       ['review', 'succeeded'],
+      ['pm', 'succeeded'],
       ['save-state', 'succeeded'],
       ['brief', 'succeeded'],
     ],
@@ -37,7 +44,7 @@ test('agents run daily creates a Run named by local start date and time that run
     assert.ok(existsSync(join(ws.dataDir, 'runs', id, step.log)), `${step.name} log exists`)
   }
   assert.ok(existsSync(join(ws.dataDir, 'runs', id, 'brief.md')))
-  assert.match(ws.readRunFile(id, 'brief.md'), /## Run health[\s\S]*No Step failed or was skipped/)
+  assert.match(ws.readRunFile(id, 'brief.md'), /## To-dos\n\n- Check the baselines\.\n[\s\S]*## Run health[\s\S]*No Step failed or was skipped/)
   assert.deepEqual(readdirSync(join(ws.dataDir, 'processes')), [], 'every process the Run started is recorded as ended')
 })
 
@@ -61,6 +68,7 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
   ws.addBrokenRepo('gone')
   ws.addRepo('crux_flutter')
   ws.writeRepoList()
+  ws.setWorkerCli('claude', claudeCodeAnsweringPm)
 
   const result = await ws.agents('run', 'daily')
 
@@ -73,6 +81,7 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
     [
       ['fetch', 'failed'],
       ['review', 'succeeded'],
+      ['pm', 'succeeded'],
       ['save-state', 'succeeded'],
       ['brief', 'succeeded'],
     ],
@@ -110,7 +119,8 @@ test('agents run daily --dry-run reviews new commits on the fake Worker, and lea
   assert.equal(run.dryRun, true)
   assert.equal(run.status, 'succeeded')
   assert.deepEqual(ws.reviewResult(id, 'crux_flutter').findings, [])
-  assert.match(ws.readRunFile(id, 'brief.md'), /### crux_flutter[\s\S]*Review: Answered by the fake Worker\.\n\nNo findings\./)
+  assert.match(ws.readRunFile(id, 'brief.md'), /## To-dos\n\nNothing is waiting on you\.\n[\s\S]*### crux_flutter[\s\S]*Review: Answered by the fake Worker\.\n\nNo findings\./)
+  assert.deepEqual(ws.workerCliCalls('claude'), [])
   assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: baseline } })
 })
 
