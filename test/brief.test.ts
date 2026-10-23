@@ -114,7 +114,7 @@ const finding = (severity: Finding['severity'], summary: string, bySaransh = fal
 
 test("the Brief shows each changed Repo's review, with findings by severity and Saransh's own first", async () => {
   const findings = [finding('low', 'Unused import'), finding('medium', 'Copy is cut off', true), finding('critical', 'Paywall can be skipped'), finding('high', 'Price shows before it loads', true)]
-  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall and fixes its copy.', findings }] })
+  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall and fixes its copy.', findings, memory: null }] })
 
   const text = await brief()
 
@@ -133,7 +133,7 @@ test("the Brief shows each changed Repo's review, with findings by severity and 
 })
 
 test('the Brief says when a review found nothing', async () => {
-  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall.', findings: [] }] })
+  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall.', findings: [], memory: null }] })
 
   assert.match(await brief(), /Review: Adds a paywall\.\n\nNo findings\./)
 })
@@ -155,7 +155,7 @@ test('the Brief shows no review for commits it does not cover, such as after Fet
   const older = { ...range, to: sha(2) }
   prepareRun([changed], {
     steps: [{ name: 'fetch', status: 'succeeded' }, { name: 'review', status: 'succeeded' }, { name: 'brief', status: 'pending' }],
-    reviews: [{ ...older, status: 'reviewed', summary: 'Adds a paywall.', findings: [] }],
+    reviews: [{ ...older, status: 'reviewed', summary: 'Adds a paywall.', findings: [], memory: null }],
   })
 
   const text = await brief()
@@ -180,7 +180,7 @@ test('the Brief says when a changed Repo has no review at all', async () => {
 })
 
 test("a dry run's Brief says its reviews came from the fake Worker", async () => {
-  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Answered by the fake Worker.', findings: [] }], dryRun: true })
+  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Answered by the fake Worker.', findings: [], memory: null }], dryRun: true })
 
   assert.match(await brief(), /^# Brief 2026-10-22-0530\n\nDry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done\./)
 })

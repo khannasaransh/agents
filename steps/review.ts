@@ -8,6 +8,7 @@ import { loadAgent } from '../src/agent.ts'
 import { saranshEmails } from '../src/env.ts'
 import { readJson, readJsonFiles, writeJson } from '../src/files.ts'
 import { withWorktree } from '../src/git.ts'
+import { readMemory } from '../src/memory.ts'
 import { loadRepos } from '../src/repos.ts'
 import { readRun } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
@@ -30,6 +31,7 @@ export interface Finding {
 interface ReviewerAnswer {
   summary: string
   findings: Omit<Finding, 'bySaransh'>[]
+  memory: string | null
 }
 
 interface ReviewedRange {
@@ -42,7 +44,13 @@ interface ReviewedRange {
 
 /** What Review writes for each Repo with new commits, as review/<name>.json in the Run folder. */
 export type ReviewResult =
-  | (ReviewedRange & { status: 'reviewed'; summary: string; findings: Finding[] })
+  | (ReviewedRange & {
+      status: 'reviewed'
+      summary: string
+      findings: Finding[]
+      /** The whole Memory of the Repo the Reviewer proposes, which Save state applies or queues; null to leave it as it is. */
+      memory: string | null
+    })
   | (ReviewedRange & { status: 'failed'; error: string })
 
 const reviewsAtOnce = 3
@@ -73,10 +81,12 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     try {
       const repo = repos.get(fetched.repo)
       if (!repo) throw new Error(`${fetched.repo} is no longer in the Repo list`)
-      const inputs = { repo: range.repo, branch: range.branch, from: range.from, to: range.to, commits: fetched.commits }
+      const memory = readMemory(reviewer.name, range.repo)
+      const inputs = { repo: range.repo, branch: range.branch, from: range.from, to: range.to, commits: fetched.commits, memory }
       const log = (line: string) => console.log(`${range.repo}: ${line}`)
       const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun, log }))) as ReviewerAnswer
-      result = { ...range, status: 'reviewed', summary: answer.summary, findings: answer.findings.map((f) => markAuthor(f, fetched.commits)) }
+      const findings = answer.findings.map((f) => markAuthor(f, fetched.commits))
+      result = { ...range, status: 'reviewed', summary: answer.summary, findings, memory: answer.memory }
       console.log(`${range.repo}: reviewed, ${result.findings.length} findings`)
     } catch (error) {
       result = { ...range, status: 'failed', error: error instanceof Error ? error.message : String(error) }

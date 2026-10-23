@@ -49,7 +49,7 @@ test('the Review Step reviews a Repo with new commits and records what the Revie
   const from = lastFetched(repo)
   const to = repo.pushCommit('Add paywall')
   const finding = { severity: 'high', file: 'lib/paywall.dart', line: 42, commit: to, author: 'Test Author', summary: 'Price shows before it loads' }
-  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Adds a paywall.', findings: [finding] } }] })
+  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Adds a paywall.', findings: [finding], memory: null } }] })
   prepareRun([[repo, from]])
 
   const result = await review()
@@ -64,7 +64,52 @@ test('the Review Step reviews a Repo with new commits and records what the Revie
     status: 'reviewed',
     summary: 'Adds a paywall.',
     findings: [{ ...finding, bySaransh: false }],
+    memory: null,
   })
+})
+
+test("each review gives the Reviewer that Repo's Memory as Saransh last left it, or none when the Repo has no Memory yet", async () => {
+  ws = makeWorkspace()
+  const repos = [ws.addRepo('crux_flutter'), ws.addRepo('inpix-panel', { team: 'frontend' })]
+  const fetched = repos.map((repo): [TestRepo, string] => [repo, lastFetched(repo)])
+  for (const repo of repos) repo.pushCommit('Change')
+  const memory = '# crux_flutter\n\n- Prices come from the payments service; never hard-code one.\n- Waved off: missing `mounted` checks in lib/legacy/.\n'
+  ws.writeMemory('reviewer', 'crux_flutter', memory)
+  ws.writeCannedAnswers({
+    reviewer: [
+      { when: { repo: 'crux_flutter', memory }, answer: { summary: 'Read its Memory.', findings: [], memory: null } },
+      { when: { repo: 'inpix-panel', memory: '' }, answer: { summary: 'Had no Memory.', findings: [], memory: null } },
+      { error: 'The Reviewer was given the wrong Memory' },
+    ],
+  })
+  prepareRun(fetched)
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Read its Memory.')
+  assert.equal(ws.reviewResult(runId, 'inpix-panel').summary, 'Had no Memory.')
+})
+
+test("a review records the Memory the Reviewer proposes for its Repo, or no proposal when it proposes none", async () => {
+  ws = makeWorkspace()
+  const repos = [ws.addRepo('crux_flutter'), ws.addRepo('inpix-panel', { team: 'frontend' })]
+  const fetched = repos.map((repo): [TestRepo, string] => [repo, lastFetched(repo)])
+  for (const repo of repos) repo.pushCommit('Change')
+  const proposed = '# crux_flutter\n\n- Feature flags live in lib/flags.dart.\n'
+  ws.writeCannedAnswers({
+    reviewer: [
+      { when: { repo: 'crux_flutter' }, answer: { summary: 'Adds a flag.', findings: [], memory: proposed } },
+      { answer: { summary: 'Fine.', findings: [], memory: null } },
+    ],
+  })
+  prepareRun(fetched)
+
+  const result = await review()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.reviewResult(runId, 'crux_flutter').memory, proposed)
+  assert.equal(ws.reviewResult(runId, 'inpix-panel').memory, null)
 })
 
 test('the Review Step makes no Reviewer call for unchanged Repos or first-Run baselines', async () => {
@@ -88,7 +133,7 @@ test('a failed review is recorded, the other Repos are still reviewed, and the S
   const repos = [ws.addRepo('crux_flutter'), ws.addRepo('inpix-panel', { team: 'frontend' })]
   const fetched = repos.map((repo): [TestRepo, string] => [repo, lastFetched(repo)])
   for (const repo of repos) repo.pushCommit('Change')
-  ws.writeCannedAnswers({ reviewer: [{ when: { repo: 'crux_flutter' }, error: 'Quota limit reached' }, { answer: { summary: 'Fine.', findings: [] } }] })
+  ws.writeCannedAnswers({ reviewer: [{ when: { repo: 'crux_flutter' }, error: 'Quota limit reached' }, { answer: { summary: 'Fine.', findings: [], memory: null } }] })
   prepareRun(fetched)
 
   const result = await review()
@@ -103,9 +148,9 @@ test('each review runs in a clean worktree of the production branch at the new h
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
-  repo.pushCommit('Add answer', { files: { 'answer.json': JSON.stringify({ summary: 'Read at the new head.', findings: [] }) } })
+  repo.pushCommit('Add answer', { files: { 'answer.json': JSON.stringify({ summary: 'Read at the new head.', findings: [], memory: null }) } })
   git(repo.folder, 'checkout', '-q', '-b', 'feature/wip')
-  writeFileSync(join(repo.folder, 'answer.json'), JSON.stringify({ summary: 'Read from the working copy.', findings: [] }))
+  writeFileSync(join(repo.folder, 'answer.json'), JSON.stringify({ summary: 'Read from the working copy.', findings: [], memory: null }))
   ws.writeCannedAnswers({ reviewer: [{ answerFrom: 'answer.json' }] })
   prepareRun([[repo, from]])
 
@@ -139,7 +184,7 @@ test("a Reviewer answer that doesn't match the findings schema fails that review
   const from = lastFetched(repo)
   const to = repo.pushCommit('Change')
   const finding = { severity: 'urgent', file: 'lib/main.dart', line: 3, commit: to, author: 'Test Author', summary: 'Crashes on start' }
-  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Changes startup.', findings: [finding] } }] })
+  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Changes startup.', findings: [finding], memory: null } }] })
   prepareRun([[repo, from]])
 
   const result = await review()
@@ -158,7 +203,7 @@ test("findings on Saransh's commits are marked, using his git author emails from
   const his = repo.pushCommit('Fix paywall copy', { author: 'Saransh <Saransh@Inshorts.example>' })
   ws.writeEnvFile('SARANSH_GIT_EMAILS=old@example.com, saransh@inshorts.example\n')
   const finding = (commit: string, summary: string) => ({ severity: 'medium', file: 'lib/paywall.dart', line: null, commit, author: 'Someone', summary })
-  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Adds a paywall.', findings: [finding(theirs, 'Theirs'), finding(his.slice(0, 7), 'His')] } }] })
+  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Adds a paywall.', findings: [finding(theirs, 'Theirs'), finding(his.slice(0, 7), 'His')], memory: null } }] })
   prepareRun([[repo, from]])
 
   await review()
@@ -178,10 +223,10 @@ test('re-running the Review Step keeps finished reviews, retries failed ones, an
   const repos = [ws.addRepo('crux_flutter'), ws.addRepo('inpix-panel', { team: 'frontend' })]
   const fetched = repos.map((repo): [TestRepo, string] => [repo, lastFetched(repo)])
   for (const repo of repos) repo.pushCommit('Change')
-  ws.writeCannedAnswers({ reviewer: [{ when: { repo: 'inpix-panel' }, error: 'Quota limit reached' }, { answer: { summary: 'First.', findings: [] } }] })
+  ws.writeCannedAnswers({ reviewer: [{ when: { repo: 'inpix-panel' }, error: 'Quota limit reached' }, { answer: { summary: 'First.', findings: [], memory: null } }] })
   prepareRun(fetched)
   await review()
-  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Second.', findings: [] } }] })
+  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Second.', findings: [], memory: null } }] })
 
   const rerun = await review()
 
@@ -220,8 +265,8 @@ test('a Run that is not a dry run reviews each changed Repo on Codex, in its wor
   const from = lastFetched(repo)
   const to = repo.pushCommit('Add paywall')
   const finding = { severity: 'high', file: 'lib/paywall.dart', line: 42, commit: to, author: 'Test Author', summary: 'Price shows before it loads' }
-  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.', findings: [finding] }))
-  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Fake.', findings: [] } }] })
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.', findings: [finding], memory: null }))
+  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Fake.', findings: [], memory: null } }] })
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -244,7 +289,7 @@ test('a review that fails on Codex, such as on a quota limit, is retried once on
   repo.pushCommit('Add paywall')
   const quotaLimit = { type: 'turn.failed', error: { message: "You've hit your usage limit. Try again at 4:12 PM." } }
   ws.setWorkerCli('codex', { stdout: `${JSON.stringify({ type: 'turn.started' })}\n${JSON.stringify(quotaLimit)}\n`, exitCode: 1 })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -266,7 +311,7 @@ test("a Codex call that runs past the Agent's timeout is ended, with the command
   repo.pushCommit('Add paywall')
   ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...reviewer, timeoutSeconds: 1 })}\n`, 'instructions.md': '# Reviewer\n' })
   ws.setWorkerCli('codex', { hang: true })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -284,7 +329,7 @@ test('a review fails, naming both failures, when Codex answers in the wrong shap
   const from = lastFetched(repo)
   const to = repo.pushCommit('Add paywall')
   const finding = { severity: 'urgent', file: 'lib/paywall.dart', line: 42, commit: to, author: 'Test Author', summary: 'Price shows before it loads' }
-  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.', findings: [finding] }))
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.', findings: [finding], memory: null }))
   const sessionLimit = { type: 'result', subtype: 'success', is_error: true, result: "You've hit your session limit · resets 3:45pm" }
   ws.setWorkerCli('claude', { stdout: JSON.stringify(sessionLimit), exitCode: 1 })
   prepareRun([[repo, from]], { dryRun: false })
@@ -316,7 +361,7 @@ test("an Agent's Tools and skills reach each Worker without a file being added o
   })
   // Codex answers in the wrong shape, so the review falls back to Claude Code and reaches both Workers.
   ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.' }))
-  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -357,7 +402,7 @@ test("Codex can't read or run a Tool the Agent doesn't declare, and gets no skil
     mkdirSync(folder, { recursive: true })
     writeFileSync(join(folder, 'SKILL.md'), found)
   }
-  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a house style.', findings: [] }))
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a house style.', findings: [], memory: null }))
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -423,7 +468,7 @@ test("a review can fall back to Antigravity, which runs on the Pipeline's own An
   mkdirSync(join(settingsFile, '..'), { recursive: true })
   writeFileSync(settingsFile, JSON.stringify({ themeMode: 'dark', permissions: { allow: ['command(*)'] } }))
   ws.setWorkerCli('codex', codexQuotaLimit)
-  ws.setWorkerCli('agy', antigravityAnswering({ summary: 'Adds a paywall.', findings: [] }))
+  ws.setWorkerCli('agy', antigravityAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -461,7 +506,7 @@ test("Antigravity calls running at once keep each other's rules, so each can sti
   ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify(onAntigravity)}\n`, 'instructions.md': '# Reviewer\n' })
   ws.setWorkerCli('codex', codexQuotaLimit)
   // Each call is still running when the other starts.
-  ws.setWorkerCli('agy', { ...antigravityAnswering({ summary: 'Fine.', findings: [] }), answerAfterMs: 1500 })
+  ws.setWorkerCli('agy', { ...antigravityAnswering({ summary: 'Fine.', findings: [], memory: null }), answerAfterMs: 1500 })
   prepareRun(fetched, { dryRun: false })
 
   const result = await review()
@@ -482,7 +527,7 @@ test('an Antigravity call that answers while a command it started is still runni
   repo.pushCommit('Add paywall')
   ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...onAntigravity, timeoutSeconds: 5 })}\n`, 'instructions.md': '# Reviewer\n' })
   ws.setWorkerCli('codex', codexQuotaLimit)
-  ws.setWorkerCli('agy', { ...antigravityAnswering({ summary: 'Adds a paywall.', findings: [] }), leaveRunning: true })
+  ws.setWorkerCli('agy', { ...antigravityAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }), leaveRunning: true })
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -529,13 +574,13 @@ test("a review fails when the Step doesn't pass every input the Reviewer's confi
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
   repo.pushCommit('Change')
-  const config = { ...reviewer, inputs: { ...reviewer.inputs, memory: "The Repo's Memory" } }
+  const config = { ...reviewer, inputs: { ...reviewer.inputs, styleGuide: "The Repo's style guide" } }
   ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify(config)}\n`, 'instructions.md': '# Reviewer\n' })
-  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Fine.', findings: [] } }] })
+  ws.writeCannedAnswers({ reviewer: [{ answer: { summary: 'Fine.', findings: [], memory: null } }] })
   prepareRun([[repo, from]])
 
   const result = await review()
 
   assert.notEqual(result.status, 0)
-  assert.match(ws.reviewResult(runId, 'crux_flutter').error, /The reviewer Agent was called without its memory input/)
+  assert.match(ws.reviewResult(runId, 'crux_flutter').error, /The reviewer Agent was called without its styleGuide input/)
 })

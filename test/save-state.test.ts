@@ -29,7 +29,7 @@ const changed = (repo: string, previous: string, head: string): FetchResult => (
   commits: [{ sha: head, author: 'Asha', email: 'asha@example.com', date: '2026-10-21T10:00:00+05:30', subject: 'Change' }],
 })
 
-const reviewed = (repo: string, from: string, to: string): ReviewResult => ({ repo, team: 'flutter', branch: 'main', from, to, status: 'reviewed', summary: 'Fine.', findings: [] })
+const reviewed = (repo: string, from: string, to: string): ReviewResult => ({ repo, team: 'flutter', branch: 'main', from, to, status: 'reviewed', summary: 'Fine.', findings: [], memory: null })
 
 async function saveState() {
   const result = await ws.agents('step', 'save-state', '--run', runId)

@@ -1,9 +1,10 @@
 // Brief: renders the day's Brief as Markdown in the Run folder from what earlier Steps wrote there,
-// grouped by Team: each Repo's new commits and review, then the Run's health. It runs even when
-// earlier Steps failed.
+// grouped by Team: each Repo's new commits and review, the Memory changes waiting for Saransh, then
+// the Run's health. It runs even when earlier Steps failed.
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJsonFiles } from '../src/files.ts'
+import { pendingProposals, type MemoryProposal } from '../src/memory.ts'
 import { teams } from '../src/repos.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
@@ -37,7 +38,19 @@ function failureLines(heading: string, results: (FetchResult | ReviewResult)[]):
   return ['', heading, '', ...failed.map((r) => `- ${r.repo} (${r.team}): ${firstLine(r.error)}`)]
 }
 
-function render(run: RunRecord, results: FetchResult[], reviews: Map<string, ReviewResult>): string {
+function proposalLines(proposals: MemoryProposal[]): string[] {
+  if (!proposals.length) return []
+  return [
+    '## Memory changes waiting for you',
+    '',
+    ...proposals.map((p) => `- ${p.agent} ${p.name}, proposed in Run ${p.run}`),
+    '',
+    'Review them with `agents memory`.',
+    '',
+  ]
+}
+
+function render(run: RunRecord, results: FetchResult[], reviews: Map<string, ReviewResult>, proposals: MemoryProposal[]): string {
   const lines = [`# Brief ${run.id}`, '']
   if (run.dryRun) lines.push('Dry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done.', '')
   if (!results.length) lines.push('No Repo was fetched in this Run.', '')
@@ -62,6 +75,7 @@ function render(run: RunRecord, results: FetchResult[], reviews: Map<string, Rev
     if (unchanged.length) lines.push(`Unchanged: ${unchanged.join(', ')}`, '')
   }
 
+  lines.push(...proposalLines(proposals))
   lines.push('## Run health', '', `Run ${run.id} of the ${run.pipeline} Pipeline.`, '')
   const notSucceeded = stepsNotSucceeded(run.steps).filter((s) => s.name !== 'brief')
   if (notSucceeded.length) for (const s of notSucceeded) lines.push(`- ${s.name}: ${s.status}. Log: ${s.log}`)
@@ -81,6 +95,6 @@ await runAsStep(({ runId, runFolder, force }) => {
   const covers = (review: ReviewResult) =>
     results.some((r) => r.repo === review.repo && r.status === 'new-commits' && r.previous === review.from && r.head === review.to)
   const reviews = new Map(readJsonFiles<ReviewResult>(join(runFolder, 'review')).filter(covers).map((r) => [r.repo, r]))
-  writeFileSync(out, render(readRun(runId), results, reviews))
+  writeFileSync(out, render(readRun(runId), results, reviews, pendingProposals()))
   console.log(`Wrote ${out}`)
 })

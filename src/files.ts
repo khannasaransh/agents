@@ -15,8 +15,12 @@ export function readJsonFiles<T>(folder: string): T[] {
 }
 
 /** Writes through a temporary file, so a reader never sees half a file. */
-export function writeJson(file: string, value: unknown): void {
+export function writeText(file: string, text: string): void {
   mkdirSync(dirname(file), { recursive: true })
-  writeFileSync(`${file}.tmp`, `${JSON.stringify(value, null, 2)}\n`)
+  writeFileSync(`${file}.tmp`, text)
   renameSync(`${file}.tmp`, file)
+}
+
+export function writeJson(file: string, value: unknown): void {
+  writeText(file, `${JSON.stringify(value, null, 2)}\n`)
 }

@@ -111,7 +111,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 64. As Saransh, I want every Agent call capped by a timeout and a maximum number of turns, so that a stuck Worker can't hold up the Run.
 65. As Saransh, I want an Agent to run only the Tools it declares, plus its Worker's built-in reading and searching, so that I know exactly what each Agent can do.
 66. As Saransh, I want an Agent's skills given to its Worker without copying anything into the Repo or wiki it works in, so that those folders stay untouched.
-67. As Saransh, I want Agents to propose Memory changes in their output, and the Step to apply them, so that every change to Memory is logged with its Run.
+67. As Saransh, I want Agents to propose Memory changes in their output, and the Step to apply them, or, for an Agent I set that way, to wait for me to accept or reject each one, so that every change to Memory is logged with its Run and I choose how much to trust each Agent with its own Memory.
 
 ### Setup on a new machine
 
@@ -151,6 +151,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 - A single `agents` command, linked as a bin, is the only entry point:
   - `agents run <pipeline>` starts a Run. `--dry-run` uses the fake Worker for every Agent Step.
   - `agents step <name> --run <id>` runs one Step inside an existing Run. `--force` redoes work whose output exists.
+  - `agents memory` lists the Memory changes waiting for Saransh's review; `agents memory accept|reject <agent> <name>` settles one.
   - `agents setup` prepares a machine. `--team` limits it to the named Teams.
   - `agents schedule install` writes the launchd entry from the Schedule definitions.
 
@@ -190,7 +191,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - **Never:** it doesn't use Discord messages as wiki sources, doesn't document a Repo for the first time, and doesn't push or merge.
    - **Wiki rules:** it follows them throughout. It reads code only at pinned commits, leaves pages as drafts, and runs the wiki's stamp, region and check tools until the check reports no errors. It commits under Saransh's git identity with trailers naming the Agent and the Run.
    - **Output:** the pages changed, the PRDs processed, and undocumented Repos with large changes, for the Brief.
-6. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run.
+6. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run. For an Agent whose config says its Memory changes wait for review, it queues them for Saransh instead (see Agents).
 7. **Brief** (command): the last Step, so its Run health covers every other Step. It renders the Brief as Markdown in the Run folder, grouped by Team. Sections:
    - per Repo, one line on what changed;
    - findings by severity, with Saransh's own first;
@@ -219,6 +220,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - its permissions, either read-only or the folders it may write;
   - its Tools, inputs and outputs;
   - an optional output schema;
+  - whether Save state applies its Memory changes (the default) or queues them for Saransh's review;
   - a timeout and a maximum number of turns.
 - Tools are small commands owned by the Agent: executable files in its tools folder, each declared in its config with its usage. The Step allows exactly those commands, plus the Worker's built-in read and search tools, and lists them by full path with their usage in the prompt. Tools exposed over MCP come later.
   - Claude Code allows each one by its path and denies any other command that isn't read-only.
@@ -232,7 +234,11 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - Codex and Antigravity get the skill text in the prompt, with each skill's folder for its other files, until it's confirmed they can load skills from outside their working folder. Codex's own skills, Saransh's and the Repo's are turned off.
   - On Antigravity, that custom agent takes on no skills, rules, plugins or MCP servers: not Antigravity's own, not Saransh's and not the Repo's.
 - Subagents: the slot exists, but none ship in v1. When one is added, it is handed to the Worker's own subagent feature, so the parent Agent decides when to call it. Such an Agent can run only on Workers that support this.
-- Memory is Markdown notes per Agent, and for the Reviewer one file per Repo. It is read at the start of a call. The Agent proposes edits in its output, and Save state applies them.
+- Memory is Markdown notes per Agent, and for the Reviewer one file per Repo, in the data area's `memory/<agent>/<name>.md`. Saransh may edit a file by hand, and nothing deletes one. It is read fresh at the start of a call.
+  - The Agent proposes edits in its output: the whole new file, or null for no change.
+  - By default Save state applies them (`memoryChanges: 'apply'` in the Agent's config) and records each in the Run that proposed it, with the Memory before and after.
+  - With `memoryChanges: 'review'`, Save state queues them instead, a newer proposal for a file replacing an older one still waiting. `agents memory` shows each as a diff against the Memory Saransh has now, and `agents memory accept|reject <agent> <name>` settles it, recorded the same way. The Brief lists those still waiting.
+  - A dry run's proposals came from the fake Worker, so they are never applied or queued.
 
 ### Workers
 
@@ -291,7 +297,8 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 - **Behavior covered:**
   - Fetch: never changes the working tree or the checked-out branch; records baselines on the first Run; reports one failing Repo without failing the others.
   - Review: runs only for Repos with new commits; removes its worktree even when the call fails.
-  - Save state: advances state only for successful reviews; applies Memory edits.
+  - Save state: advances state only for successful reviews; applies Memory edits, or queues them when the Agent's config asks for review.
+  - Memory: Review gives the Worker the current Memory; accepting or rejecting a queued edit changes the Memory accordingly and records the decision in the Run.
   - Discord: is skipped cleanly without configuration; routes attachments to the PRD inbox. It is tested against recorded API responses.
   - Docs: continues, restarts or merges the rolling branch correctly; stops on conflict; moves PRD inbox files.
   - Brief: is written, with Run health, when earlier Steps failed.

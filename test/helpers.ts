@@ -108,6 +108,10 @@ export interface Workspace {
   writeRunFile(id: string, path: string, content: unknown): void
   writeRepoState(state: Record<string, { lastReviewed: string }>): void
   readRepoState(): Record<string, { lastReviewed: string }>
+  /** Writes an Agent's Memory file in the data area, as Saransh would by hand. */
+  writeMemory(agent: string, name: string, text: string): void
+  /** An Agent's Memory file in the data area, as Saransh would open it; null when there is none. */
+  readMemory(agent: string, name: string): string | null
   /**
    * Fetches a Repo's clone and writes what Fetch records for it in a Run, as a Step's input: the
    * commits since `from`, or a first-Run baseline when `from` is null.
@@ -232,6 +236,16 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
     readRepoState() {
       return JSON.parse(readFileSync(join(dataDir, 'state', 'repos.json'), 'utf8'))
+    },
+
+    writeMemory(agent, name, text) {
+      mkdirSync(join(dataDir, 'memory', agent), { recursive: true })
+      writeFileSync(join(dataDir, 'memory', agent, `${name}.md`), text)
+    },
+
+    readMemory(agent, name) {
+      const file = join(dataDir, 'memory', agent, `${name}.md`)
+      return existsSync(file) ? readFileSync(file, 'utf8') : null
     },
 
     writeFetchResult(id, { entry }, from) {

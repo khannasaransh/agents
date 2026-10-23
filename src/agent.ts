@@ -32,6 +32,11 @@ export interface AgentConfig {
   tools?: Record<string, string>
   /** When set, the Agent's answer must match it. */
   outputSchema?: JsonSchema
+  /**
+   * What Save state does with the Memory the Agent proposes: apply it straight away (the default),
+   * or queue it for Saransh to accept or reject with `agents memory`.
+   */
+  memoryChanges?: 'apply' | 'review'
   timeoutSeconds: number
   maxTurns: number
 }
@@ -90,6 +95,7 @@ const configSchema: JsonSchema = {
     outputs: { type: 'object', additionalProperties: { type: 'string' } },
     tools: { type: 'object', additionalProperties: { type: 'string' } },
     outputSchema: { type: 'object' },
+    memoryChanges: { enum: ['apply', 'review'] },
     timeoutSeconds: { type: 'integer', minimum: 1 },
     maxTurns: { type: 'integer', minimum: 1 },
   },

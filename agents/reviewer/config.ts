@@ -30,20 +30,26 @@ const reviewer: AgentConfig = {
     from: 'The last reviewed commit',
     to: 'The new head of the production branch',
     commits: 'The commits in from..to, newest first, with sha, author, date and subject',
+    memory: 'Your Memory of this Repo: its conventions and the findings Saransh has waved off. Empty when you have none yet',
   },
   outputs: {
     summary: 'A short summary of what the commits change',
     findings: 'The problems the commits introduce, worst first',
+    memory: 'The whole of your Memory of this Repo as you propose it, or null to leave it as it is',
   },
   outputSchema: {
     type: 'object',
     additionalProperties: false,
-    required: ['summary', 'findings'],
+    required: ['summary', 'findings', 'memory'],
     properties: {
       summary: { type: 'string' },
       findings: { type: 'array', items: finding },
+      // Null first, so the fake Worker's smallest answer proposes no Memory.
+      memory: { type: ['null', 'string'] },
     },
   },
+  // 'review' instead queues each change for Saransh to accept or reject with `agents memory`.
+  memoryChanges: 'apply',
   timeoutSeconds: 900,
   maxTurns: 40,
 }
