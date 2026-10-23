@@ -28,12 +28,13 @@ test('agents run daily creates a Run named by local start date and time that run
 
   const run = ws.readRun(id)
   assert.equal(run.pipeline, 'daily')
-  assert.equal(run.status, 'succeeded')
+  assert.equal(run.status, 'succeeded', 'Discord, not set up yet, is skipped without counting against the Run')
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
       ['fetch', 'succeeded'],
       ['review', 'succeeded'],
+      ['discord', 'skipped'],
       ['pm', 'succeeded'],
       ['save-state', 'succeeded'],
       ['brief', 'succeeded'],
@@ -44,7 +45,7 @@ test('agents run daily creates a Run named by local start date and time that run
     assert.ok(existsSync(join(ws.dataDir, 'runs', id, step.log)), `${step.name} log exists`)
   }
   assert.ok(existsSync(join(ws.dataDir, 'runs', id, 'brief.md')))
-  assert.match(ws.readRunFile(id, 'brief.md'), /## To-dos\n\n- Check the baselines\.\n[\s\S]*## Run health[\s\S]*No Step failed or was skipped/)
+  assert.match(ws.readRunFile(id, 'brief.md'), /## To-dos\n\n- Check the baselines\.\n[\s\S]*## Run health[\s\S]*\n- discord: skipped\. Log: logs\/discord\.log\n/)
   assert.deepEqual(readdirSync(join(ws.dataDir, 'processes')), [], 'every process the Run started is recorded as ended')
 })
 
@@ -81,6 +82,7 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
     [
       ['fetch', 'failed'],
       ['review', 'succeeded'],
+      ['discord', 'skipped'],
       ['pm', 'succeeded'],
       ['save-state', 'succeeded'],
       ['brief', 'succeeded'],

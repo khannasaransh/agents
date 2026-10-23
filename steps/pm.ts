@@ -9,6 +9,7 @@ import { readRun } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
 import { callAgent } from '../src/worker.ts'
 import { pmMemory } from '../agents/pm/config.ts'
+import type { DiscordRead } from './discord.ts'
 import type { FetchResult } from './fetch.ts'
 import type { ReviewResult } from './review.ts'
 
@@ -50,7 +51,9 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     steps: earlier.filter((s) => s.status !== 'succeeded').map(({ name, status }) => ({ name, status })),
     failedToFetch: results.flatMap((r) => (r.status === 'failed' ? [{ repo: r.repo, team: r.team, error: r.error }] : [])),
   }
-  const inputs = { reviews, commits, discord: null, runHealth, memory: readMemory(pm.name, pmMemory) }
+  const discordFile = join(runFolder, 'discord.json')
+  const discord = existsSync(discordFile) ? readJson<DiscordRead>(discordFile).messages : null
+  const inputs = { reviews, commits, discord, runHealth, memory: readMemory(pm.name, pmMemory) }
   try {
     const answer = (await callAgent(pm, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false })) as PmAnswer
     writeJson(out, { status: 'answered', ...answer } satisfies PmResult)

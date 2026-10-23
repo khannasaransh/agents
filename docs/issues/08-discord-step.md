@@ -4,13 +4,15 @@
 
 **Blocked by:** 01: Run skeleton: fetch and list new commits
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The local, git-ignored env file holds the bot token, the channel list and Saransh's Discord user ID.
-- [ ] Without that configuration the Discord Step is recorded as skipped, not failed, and the Run is otherwise unaffected.
-- [ ] The Step reads the configured channels and their threads over Discord's REST API with a bot token, waiting out rate limits.
-- [ ] It covers messages since the last successful Discord read, or the last 24 hours on the first Run, and records the new read time only on success.
-- [ ] Messages are written to the Run folder with mentions of Saransh flagged.
-- [ ] It never reads DMs or uses Saransh's own account.
-- [ ] The Brief has a Discord section listing messages that mention Saransh, and the PM Agent receives the messages as input when it exists.
-- [ ] Step tests run against recorded API responses, never the network.
+- [x] The local, git-ignored env file holds the bot token, the channel list and Saransh's Discord user ID.
+- [x] Without that configuration the Discord Step is recorded as skipped, not failed, and the Run is otherwise unaffected.
+- [x] The Step reads the configured channels and their threads over Discord's REST API with a bot token, waiting out rate limits.
+- [x] It covers messages since the last successful Discord read, or the last 24 hours on the first Run, and records the new read time only on success.
+- [x] Messages are written to the Run folder with mentions of Saransh flagged.
+- [x] It never uses Saransh's own account, so it never sees his DMs. DMs with the bot are read and shown in the Brief unless `DISCORD_READ_DMS=false`.
+- [x] The Brief has a Discord section listing messages that mention Saransh, and the PM Agent receives the messages as input when it exists.
+- [x] Step tests run against recorded API responses, never the network.
+
+Still waiting on Saransh: the bot itself, its installation on the company server by someone with Manage Server, the Message Content intent, and the list of channels.

@@ -1,8 +1,8 @@
 // Brief: renders the day's Brief as Markdown in the Run folder from what earlier Steps wrote there:
-// the PM Agent's To-dos and Discord highlights, then by Team each Repo's line from the PM Agent, its
-// new commits and review, then the Memory changes waiting for Saransh and the Run's health with the
-// number of Repos reviewed. It runs even when earlier Steps failed, and says when the PM output is
-// missing.
+// the PM Agent's To-dos and Discord highlights, the Discord messages that mention Saransh and the
+// DMs with the bot, then by Team each Repo's line from the PM Agent, its new commits and review,
+// then the Memory changes waiting for Saransh and the Run's health with the number of Repos
+// reviewed. It runs even when earlier Steps failed, and says when the PM output is missing.
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, readJsonFiles } from '../src/files.ts'
@@ -10,6 +10,7 @@ import { pendingProposals, type MemoryProposal } from '../src/memory.ts'
 import { teams } from '../src/repos.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
+import type { DiscordMessage, DiscordRead } from './discord.ts'
 import type { FetchResult } from './fetch.ts'
 import type { PmResult } from './pm.ts'
 import { severities } from '../agents/reviewer/config.ts'
@@ -53,7 +54,9 @@ function proposalLines(proposals: MemoryProposal[]): string[] {
   ]
 }
 
-function pmLines(pm: PmResult | null): string[] {
+const noDiscord = 'No Discord messages were read in this Run.'
+
+function pmLines(pm: PmResult | null, discord: DiscordRead | null): string[] {
   if (pm?.status !== 'answered') {
     const why = pm?.status === 'failed' ? ` The PM Agent failed: ${firstLine(pm.error)}` : ''
     return [`The PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo.${why}`, '']
@@ -66,16 +69,37 @@ function pmLines(pm: PmResult | null): string[] {
     '',
     '## Discord highlights',
     '',
-    // Until there is a Discord Step, the PM Agent is never given Discord messages.
-    ...listed(pm.highlights, 'No Discord messages were read in this Run.'),
+    ...listed(pm.highlights, discord ? 'Nothing on Discord stood out.' : noDiscord),
     '',
   ]
 }
 
-function render(run: RunRecord, results: FetchResult[], reviews: Map<string, ReviewResult>, pm: PmResult | null, proposals: MemoryProposal[]): string {
+/** Every message that mentions Saransh or was sent in a DM with the bot, from the Discord Step itself, so they show even without the PM output. */
+function mentionLines(discord: DiscordRead | null): string[] {
+  if (!discord) return []
+  const forYou = discord.messages.filter((m) => m.mentionsSaransh || m.dm)
+  const where = (m: DiscordMessage) => (m.dm ? `DM with ${m.channel}` : `#${m.channel}${m.thread ? ` › ${m.thread}` : ''}`)
+  return [
+    '## Mentions of you and DMs on Discord',
+    '',
+    ...(forYou.length
+      ? forYou.map((m) => `- [${where(m)}](${m.link}) ${m.author}: ${firstLine(m.content)}`)
+      : [`None of the ${discord.messages.length} messages read mention you, and none came in a DM.`]),
+    '',
+  ]
+}
+
+function render(
+  run: RunRecord,
+  results: FetchResult[],
+  reviews: Map<string, ReviewResult>,
+  pm: PmResult | null,
+  discord: DiscordRead | null,
+  proposals: MemoryProposal[],
+): string {
   const lines = [`# Brief ${run.id}`, '']
   if (run.dryRun) lines.push('Dry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done.', '')
-  lines.push(...pmLines(pm))
+  lines.push(...pmLines(pm, discord), ...mentionLines(discord))
   const repoLines = new Map(pm?.status === 'answered' ? pm.repoLines.map((r) => [r.repo, r.line]) : [])
   if (!results.length) lines.push('No Repo was fetched in this Run.', '')
 
@@ -125,6 +149,8 @@ await runAsStep(({ runId, runFolder, force }) => {
   const reviews = new Map(readJsonFiles<ReviewResult>(join(runFolder, 'review')).filter(covers).map((r) => [r.repo, r]))
   const pmFile = join(runFolder, 'pm.json')
   const pm = existsSync(pmFile) ? readJson<PmResult>(pmFile) : null
-  writeFileSync(out, render(readRun(runId), results, reviews, pm, pendingProposals()))
+  const discordFile = join(runFolder, 'discord.json')
+  const discord = existsSync(discordFile) ? readJson<DiscordRead>(discordFile) : null
+  writeFileSync(out, render(readRun(runId), results, reviews, pm, discord, pendingProposals()))
   console.log(`Wrote ${out}`)
 })

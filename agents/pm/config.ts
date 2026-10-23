@@ -10,7 +10,8 @@ const pm: AgentConfig = {
   inputs: {
     reviews: "This Run's reviews, one per Repo with new commits: its summary and findings, or why it failed",
     commits: 'The new commits on each Repo with any, newest first, with sha, author and subject',
-    discord: "The Discord messages read in this Run; null when Discord wasn't read",
+    discord:
+      "The Discord messages read in this Run, oldest first, each with its channel, thread, author, time, content and link, whether it came in a DM with the bot, and whether it mentions Saransh or is his own; null when Discord wasn't read",
     runHealth: "The Steps before you that didn't succeed, and the Repos that failed to fetch",
     memory: 'Your Memory: the open items you carried from earlier Runs. Empty when you have none yet',
   },

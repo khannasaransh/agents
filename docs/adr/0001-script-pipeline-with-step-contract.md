@@ -1,6 +1,6 @@
 # The Pipeline is a plain script with a Step contract
 
-The daily Pipeline is plain TypeScript run by launchd, not an agent and not a workflow engine. Its steps are fixed, so code runs them in order and calls a Worker only at the Steps that need judgment: reviewing commits, writing the PM output, and updating the wiki. Every Step is a standalone command that reads its inputs from the Run folder, writes its outputs there, exits non-zero on failure and is safe to re-run, so Dagu can replace the Pipeline file later without any Step being rewritten.
+The daily Pipeline is plain TypeScript run by launchd, not an agent and not a workflow engine. Its steps are fixed, so code runs them in order and calls a Worker only at the Steps that need judgment: reviewing commits, writing the PM output, and updating the wiki. Every Step is a standalone command that reads its inputs from the Run folder, writes its outputs there, exits non-zero on failure (78 when it skips itself, such as Discord before the bot is set up) and is safe to re-run, so Dagu can replace the Pipeline file later without any Step being rewritten.
 
 ## Considered Options
 

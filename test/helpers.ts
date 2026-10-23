@@ -108,6 +108,9 @@ export interface Workspace {
   writeRunFile(id: string, path: string, content: unknown): void
   writeRepoState(state: Record<string, { lastReviewed: string }>): void
   readRepoState(): Record<string, { lastReviewed: string }>
+  writeDiscordState(state: { lastRead: string }): void
+  /** The Discord state, or null when there is none. */
+  readDiscordState(): { lastRead: string } | null
   /** Writes an Agent's Memory file in the data area, as Saransh would by hand. */
   writeMemory(agent: string, name: string, text: string): void
   /** An Agent's Memory file in the data area, as Saransh would open it; null when there is none. */
@@ -212,7 +215,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       writeFileSync(repoListFile, `export default ${JSON.stringify(list, null, 2)}\n`)
     },
 
-    prepareRun(id, { steps = ['fetch', 'review', 'pm', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
+    prepareRun(id, { steps = ['fetch', 'review', 'discord', 'pm', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
       ws.writeRunFile(id, 'run.json', {
         id,
         pipeline: 'daily',
@@ -236,6 +239,16 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
     readRepoState() {
       return JSON.parse(readFileSync(join(dataDir, 'state', 'repos.json'), 'utf8'))
+    },
+
+    writeDiscordState(state) {
+      mkdirSync(join(dataDir, 'state'), { recursive: true })
+      writeFileSync(join(dataDir, 'state', 'discord.json'), JSON.stringify(state))
+    },
+
+    readDiscordState() {
+      const file = join(dataDir, 'state', 'discord.json')
+      return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null
     },
 
     writeMemory(agent, name, text) {
@@ -432,6 +445,41 @@ export async function hangingRemote(giveUpAfterMs = 10_000): Promise<{ url: stri
   const remote = await serve(() => {})
   setTimeout(() => remote.close(), giveUpAfterMs).unref()
   return remote
+}
+
+/** A response recorded from Discord's REST API. */
+export interface RecordedResponse {
+  status?: number
+  headers?: Record<string, string>
+  body: unknown
+}
+
+/** A request the stand-in for Discord's REST API received. */
+export interface DiscordRequest {
+  method: string
+  path: string
+  query: Record<string, string>
+  authorization?: string
+  /** When it arrived, in milliseconds since the epoch. */
+  at: number
+}
+
+/**
+ * A local server standing in for Discord's REST API, replaying recorded responses by path: each in
+ * turn, the last one repeating. Any other path answers 404, as Discord does for an unknown channel.
+ */
+export async function replayDiscord(recording: Record<string, RecordedResponse | RecordedResponse[]>): Promise<{ url: string; requests: DiscordRequest[]; close(): void }> {
+  const queues = new Map(Object.entries(recording).map(([path, responses]) => [path, [responses].flat()]))
+  const requests: DiscordRequest[] = []
+  const server = await serve((req, res) => {
+    const url = new URL(req.url!, 'http://discord.test')
+    requests.push({ method: req.method!, path: url.pathname, query: Object.fromEntries(url.searchParams), authorization: req.headers.authorization, at: Date.now() })
+    const queue = queues.get(url.pathname)
+    const response = queue ? (queue.length > 1 ? queue.shift()! : queue[0]) : { status: 404, body: { message: 'Unknown Channel', code: 10003 } }
+    res.writeHead(response.status ?? 200, { 'content-type': 'application/json', ...response.headers })
+    res.end(JSON.stringify(response.body))
+  })
+  return { url: new URL(server.url).origin, requests, close: server.close }
 }
 
 export async function until(condition: () => boolean, timeoutMs = 5000): Promise<void> {

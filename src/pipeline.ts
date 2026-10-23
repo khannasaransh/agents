@@ -6,6 +6,7 @@ import { acquireLock } from './lock.ts'
 import { agentsRoot, runDir } from './paths.ts'
 import { recordProcess, stopRecordedProcesses } from './processes.ts'
 import { createRun, finalStatus, readRun, writeRun, type RunRecord, type StepRecord } from './run.ts'
+import { skippedExitCode } from './step.ts'
 
 /** A Pipeline definition: the Steps it runs, in order. */
 export interface Pipeline {
@@ -81,7 +82,7 @@ async function runStep(runId: string, name: string, { force = false } = {}): Pro
   // A Step that died can leave what it started running.
   if (child.pid !== undefined) stopRecordedProcesses({ owner: child.pid })
 
-  step.status = exitCode === 0 ? 'succeeded' : 'failed'
+  step.status = exitCode === 0 ? 'succeeded' : exitCode === skippedExitCode ? 'skipped' : 'failed'
   step.endedAt = new Date().toISOString()
   writeSync(log, `--- ${name} ${step.status} ${step.endedAt} (exit ${exitCode})\n`)
   closeSync(log)

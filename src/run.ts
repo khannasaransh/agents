@@ -5,7 +5,7 @@ import { runDir, runsDir } from './paths.ts'
 
 export type StepStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'skipped'
 
-/** Partial: some Steps failed or were skipped. Failed: the Run couldn't start or record itself. */
+/** Partial: some Steps failed or never finished. Failed: the Run couldn't start or record itself. */
 export type RunStatus = 'running' | 'succeeded' | 'partial' | 'failed'
 
 export interface StepRecord {
@@ -82,9 +82,9 @@ export function stepsNotSucceeded(steps: StepRecord[]): StepRecord[] {
   return steps.filter((s) => s.status !== 'succeeded')
 }
 
-/** The status a finished Run ends with, given its Steps. */
+/** The status a finished Run ends with, given its Steps. A Step that skipped itself, such as Discord before it is set up, doesn't count against it. */
 export function finalStatus(steps: StepRecord[]): RunStatus {
-  return stepsNotSucceeded(steps).length ? 'partial' : 'succeeded'
+  return stepsNotSucceeded(steps).some((s) => s.status !== 'skipped') ? 'partial' : 'succeeded'
 }
 
 function localStamp(d: Date): string {

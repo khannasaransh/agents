@@ -35,7 +35,7 @@ async function main(argv: string[]): Promise<number> {
       if (!name || !values.run) return fail(usage)
       const step = await runSingleStep(values.run, name, { force: values.force })
       console.log(`Step ${name} ${step.status}. Log: ${join(runDir(values.run), step.log)}`)
-      return step.status === 'succeeded' ? 0 : 1
+      return step.status === 'failed' ? 1 : 0
     }
     case 'memory': {
       const [action, agent, name, ...extra] = rest

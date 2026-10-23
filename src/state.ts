@@ -18,3 +18,19 @@ export function readRepoState(): Record<string, RepoState> {
 export function writeRepoState(state: Record<string, RepoState>): void {
   writeJson(repoStateFile(), state)
 }
+
+/** What the Pipeline remembers about Discord between Runs. */
+export interface DiscordState {
+  /** Where the last successful Discord read ended, so the next one starts there. */
+  lastRead: string
+}
+
+const discordStateFile = () => join(stateDir(), 'discord.json')
+
+export function readDiscordState(): DiscordState | null {
+  return existsSync(discordStateFile()) ? readJson(discordStateFile()) : null
+}
+
+export function writeDiscordState(state: DiscordState): void {
+  writeJson(discordStateFile(), state)
+}

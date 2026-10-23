@@ -73,7 +73,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 35. As Saransh, I want PRD links I have to download by hand (such as Google Docs) to show up as To-dos, so that I know exactly what to fetch.
 36. As Saransh, I want to drop PRD files I downloaded into the PRD inbox, so that they go through the same path as Discord attachments.
 37. As Saransh, I want processed PRD files moved out of the inbox, and files that aren't PRDs set aside, so that the inbox shows only what's still waiting.
-38. As Saransh, I want the bot never to read DMs or use my own account, so that nothing breaks Discord's terms or risks my account.
+38. As Saransh, I want the Pipeline never to use my own account or read my own DMs, so that nothing breaks Discord's terms or risks my account. DMs people send to the bot are read, and appear in the Brief, unless I turn that off.
 
 ### PM Agent and the Brief
 
@@ -138,7 +138,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 ### Language and shape
 
 - TypeScript run directly by Node 25's built-in type stripping. There is no build step and, at first, no npm dependencies.
-- The Pipeline is plain code, not an agent and not a workflow engine (ADR 0001). It declares an ordered list of Steps. The Discord Step runs alongside the reviews; everything else runs in order.
+- The Pipeline is plain code, not an agent and not a workflow engine (ADR 0001). It declares an ordered list of Steps and runs them one at a time. The Discord Step could later run alongside the reviews; for now it runs after them.
 - The repo holds:
   - the Agents, one folder each;
   - the Pipeline definitions;
@@ -159,10 +159,10 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 - Every Step is a standalone command that takes a Run id.
 - A Step reads its inputs only from the Run folder and from state, writes its outputs only to the Run folder, and passes nothing in memory.
-- A Step exits zero on success and non-zero on failure.
+- A Step exits zero on success, 78 when it skips itself (such as Discord before the bot is set up), and any other non-zero code on failure.
 - A Step is safe to re-run: it skips work whose output already exists unless forced.
 - Each Run keeps a record of the Pipeline, each Step's status, start and end times, and the path of its log.
-- A Run is succeeded, partial (some Steps failed or were skipped) or failed (the Run couldn't start or record itself).
+- A Run is succeeded, partial (some Steps failed or never finished) or failed (the Run couldn't start or record itself). A Step that skipped itself doesn't count against the Run, though the Brief's Run health still lists it.
 - A lock stops a second Run from starting while one is active. If a Run's process dies, the next Run first stops every Step and Worker process it left running, and records the dead Run as failed.
 - A Run's folder name starts with its local start date (year-month-day) followed by hour and minute. Run data is never deleted automatically.
 
@@ -174,14 +174,16 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - The Reviewer runs on Codex in read-only mode, with Claude Code as its fallback.
    - Input: the commit range and the Repo's Memory.
    - Output, checked against a schema: a list of findings (severity, file, line, commit, author, summary, whether Saransh authored it) plus a short summary of what changed.
-3. **Discord** (command, alongside Review): it reads the configured channels and their threads through a read-only bot over Discord's REST API.
-   - It covers messages since the last successful Discord Step, or the last 24 hours on the first Run.
+3. **Discord** (command, after Review): it reads the configured channels and their threads through a read-only bot over Discord's REST API, waiting out rate limits.
+   - Threads are the channel's active threads and its public threads archived since the last read.
+   - It covers messages from where the last successful read ended to when this one began, or the last 24 hours on the first Run. It records the new read time itself, only on success and never in a dry run. A forced re-read covers the Run's window again.
+   - A bot sees only its own DMs, never Saransh's, and can't list them, so a DM with the bot is read only when its channel ID is in the channel list. `DISCORD_READ_DMS` (on by default) decides whether it is read; when it's off, such a channel fails the Step before any of its messages are read.
    - It writes the messages to the Run folder and flags mentions of Saransh.
    - It saves attached PRD-type files (Word, PDF, Markdown) into the PRD inbox.
    - It records links it can't download, such as Google Docs, as To-do candidates.
    - It is skipped, not failed, while the bot isn't configured.
 4. **PM** (Agent): runs on Claude Code, with Codex as its fallback. It has no Repo to read, so it runs read-only in the Run folder.
-   - Input: the reviews that cover the commits Fetch found, commit summaries, Discord messages (null until the Discord Step exists), the Run's health so far (the earlier Steps that didn't succeed and the Repos that failed to fetch), and its Memory of open items.
+   - Input: the reviews that cover the commits Fetch found, commit summaries, the Discord messages read in the Run (null when Discord wasn't read), the Run's health so far (the earlier Steps that didn't succeed and the Repos that failed to fetch), and its Memory of open items.
    - Output, checked against a schema and written to the Run folder as `pm.json`: a line per Repo, Discord highlights, To-dos, and its proposed Memory. A failed call is recorded there too, and the Step fails.
    - The rules for what counts as a To-do are open (see Further Notes). The candidates are Discord requests aimed at Saransh with no reply from him, findings on his commits, wiki drafts waiting for him, and PRD links he has to download.
 5. **Docs** (Agent): runs on Claude Code in its own worktree of the wiki, on a single rolling docs branch.
@@ -195,6 +197,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 7. **Brief** (command): the last Step, so its Run health covers every other Step. It renders the Brief as Markdown in the Run folder. Sections, in order:
    - To-dos;
    - Discord highlights;
+   - the Discord messages that mention Saransh and the DMs with the bot, straight from the Discord Step, so they show even without the PM output;
    - by Team, per Repo: one line on what changed, its new commits, and its findings by severity, with Saransh's own first;
    - wiki drafts and the docs branch waiting for review;
    - undocumented Repos with large changes;
@@ -299,7 +302,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - Review: runs only for Repos with new commits; removes its worktree even when the call fails.
   - Save state: advances state only for successful reviews; applies the Reviewer's and the PM Agent's Memory edits, or queues them when the Agent's config asks for review.
   - Memory: Review gives the Worker the current Memory; accepting or rejecting a queued edit changes the Memory accordingly and records the decision in the Run.
-  - Discord: is skipped cleanly without configuration; routes attachments to the PRD inbox. It is tested against recorded API responses.
+  - Discord: is skipped cleanly without configuration; reads channels and threads within its window, page by page, waiting out rate limits; reads a DM with the bot, or refuses it when DMs are turned off; advances the read time only on a real, successful read; routes attachments to the PRD inbox. It is tested against a local server replaying recorded API responses.
   - Docs: continues, restarts or merges the rolling branch correctly; stops on conflict; moves PRD inbox files.
   - PM: gets the Run's reviews, commits, health and Memory on Claude Code; records a failure after its fallback fails too.
   - Brief: is written, with Run health, when earlier Steps failed; is complete with the PM output; says the PM output is missing after a PM failure; says when no Discord messages were read.
@@ -317,7 +320,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 - Pulling Repos, or reviewing working copies or branches other than production.
 - Commenting on GitHub PRs, reviewing open PRs, or anything that needs the GitHub CLI.
 - Posting the Brief anywhere, and notifications of any kind.
-- Reading Discord DMs, using Saransh's own Discord account, or using Discord content as a wiki source.
+- Reading Saransh's own Discord DMs, using his own Discord account, or using Discord content as a wiki source.
 - Downloading Google Docs or other links that need a login.
 - First-time documentation of a Repo, and pushing or merging the docs branch.
 - Personal repos, repos without a remote, SDK clones, and autopay-android.
@@ -339,7 +342,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 - **Billing:** every Run draws on Saransh's plans. Claude Code headless calls count against plan limits, and Max and Team plans also get a monthly API credit. Codex has 5-hour and weekly limits. Antigravity's quota refreshes every 5 hours up to a weekly cap. The Brief's review count is the cost signal.
 - **Versions:** codex-cli 0.154.0 and agy 1.4.4 are installed, while 0.163.0 and 1.4.5 are current. agy updates itself. Setup should flag outdated Workers.
 - **Defaults chosen while writing this PRD, not discussed:**
-  - the Discord window runs from the last successful Discord Step, so Monday's Run covers the weekend;
+  - the Discord window runs from the last successful Discord read, so Monday's Run covers the weekend;
   - the first Run records baselines instead of reviewing history;
   - reviews run a few at a time.
 - **Build order:**
