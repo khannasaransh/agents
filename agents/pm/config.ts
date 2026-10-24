@@ -8,10 +8,11 @@ const pm: AgentConfig = {
   fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'medium' },
   permissions: 'read-only',
   inputs: {
-    reviews: "This Run's reviews, one per Repo with new commits: its summary and findings, or why it failed",
-    commits: 'The new commits on each Repo with any, newest first, with sha, author and subject',
+    reviews:
+      "The reviews of this Run, and of earlier Runs whose PM failed, oldest Run first, one per Repo with new commits in that Run: its summary and findings, or why it failed",
+    commits: 'The new commits on each Repo with any, in this Run and in earlier Runs whose PM failed, oldest Run first, each newest first, with sha, author and subject',
     discord:
-      "The Discord messages read in this Run, oldest first, each with its channel, thread, author, time, content and link, whether it came in a DM with the bot, and whether it mentions Saransh or is his own; null when Discord wasn't read",
+      "The Discord messages read in this Run and in earlier Runs whose PM failed, oldest first, each with its channel, thread, author, time, content and link, whether it came in a DM with the bot, and whether it mentions Saransh or is his own; null when Discord wasn't read",
     runHealth: "The Steps before you that didn't succeed, and the Repos that failed to fetch",
     memory: 'Your Memory: the open items you carried from earlier Runs. Empty when you have none yet',
   },

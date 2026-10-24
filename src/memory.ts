@@ -23,14 +23,35 @@ export interface MemoryProposal {
   run: string
   /** The whole Memory file as proposed. */
   memory: string
+  /**
+   * The Memory the Agent read, which the proposal builds on. Once the Memory has changed since, by
+   * Saransh or by another Run, applying the proposal would undo that change. A proposal from before
+   * proposals recorded it has none.
+   */
+  base?: string
 }
+
+/** Whether the Memory is still as the Agent read it when it made this proposal. */
+export function buildsOnCurrent({ agent, name, base }: MemoryProposal): boolean {
+  return base === undefined || readMemory(agent, name) === base
+}
+
+/** Orders Run IDs by when they started, `2026-10-22-0530-10` after `2026-10-22-0530-9`. */
+export const byRunStart = (a: string, b: string) => a.localeCompare(b, 'en', { numeric: true })
 
 const proposalsDir = () => join(stateDir(), 'memory-proposals')
 const proposalFile = (agent: string, name: string) => join(proposalsDir(), agent, `${name}.json`)
 
-/** Queues a proposal for Saransh, replacing any older one for the same Memory file. */
-export function queueProposal(proposal: MemoryProposal): void {
-  writeJson(proposalFile(proposal.agent, proposal.name), proposal)
+/**
+ * Queues a proposal for Saransh, replacing one from the same or an earlier Run for the same Memory
+ * file. Returns false, queuing nothing, when one from a later Run waits already, so re-running an
+ * older Run's Save state never replaces a newer proposal.
+ */
+export function queueProposal(proposal: MemoryProposal): boolean {
+  const file = proposalFile(proposal.agent, proposal.name)
+  if (existsSync(file) && byRunStart(readJson<MemoryProposal>(file).run, proposal.run) > 0) return false
+  writeJson(file, proposal)
+  return true
 }
 
 /** Every proposal waiting for Saransh, by Agent and then name. */
@@ -46,30 +67,41 @@ export type MemoryDecision = 'applied' | 'accepted' | 'rejected'
 
 /**
  * Makes the proposal the Memory the next Run reads, unless it was rejected, and records the
- * decision in the Run that proposed it, with the Memory before and after.
+ * decision in the Run that proposed it, with the Memory proposed, before and after.
  */
 export function settleProposal(proposal: MemoryProposal, decision: MemoryDecision): void {
   const { agent, name } = proposal
   const before = readMemory(agent, name)
   if (decision !== 'rejected') writeText(memoryFile(agent, name), proposal.memory)
   const after = readMemory(agent, name)
-  writeJson(decisionFile(proposal), { agent, name, decision, decidedAt: new Date().toISOString(), before, after })
+  writeJson(decisionFile(proposal), { agent, name, decision, decidedAt: new Date().toISOString(), proposed: proposal.memory, before, after })
 }
 
-/** Whether the Run that proposed this change has recorded what became of it. */
+/**
+ * Whether the Run that proposed this change has recorded what became of it. A different proposal
+ * for the same Memory in that Run, such as a forced re-run's, is a new one, waiting for a decision.
+ * A decision from before decisions recorded what they settled counts for any proposal.
+ */
 export function isSettled(proposal: MemoryProposal): boolean {
-  return existsSync(decisionFile(proposal))
+  if (!existsSync(decisionFile(proposal))) return false
+  const { proposed } = readJson<{ proposed?: string }>(decisionFile(proposal))
+  return proposed === undefined || proposed === proposal.memory
 }
 
 const decisionFile = ({ run, agent, name }: MemoryProposal) => join(runDir(run), 'memory', agent, `${name}.json`)
 
-/** Saransh's decision on the proposal waiting for this Memory file, which then stops waiting. */
+/**
+ * Saransh's decision on the proposal waiting for this Memory file, which then stops waiting. Call it
+ * holding the Run lock, so no Save state queues a proposal meanwhile; and a proposal that replaced
+ * this one all the same still waits.
+ */
 export function decideProposal(agent: string, name: string, decision: 'accepted' | 'rejected'): MemoryProposal {
   const file = proposalFile(agent, name)
   if (!existsSync(file)) throw new Error(`No Memory change for ${agent} ${name} is waiting for you`)
-  const proposal = readJson<MemoryProposal>(file)
+  const text = readFileSync(file, 'utf8')
+  const proposal: MemoryProposal = JSON.parse(text)
   settleProposal(proposal, decision)
-  rmSync(file)
+  if (existsSync(file) && readFileSync(file, 'utf8') === text) rmSync(file)
   return proposal
 }
 

@@ -46,12 +46,15 @@ export function freeName(folder: string, filename: string): string {
 /**
  * Moves waiting files out of the inbox into done/ or skipped/, under a free name there. Each keeps
  * its sources.json entry, under its new path, so the Discord Step never saves its attachment again.
+ * A file named twice, or no longer waiting, is moved once or not at all, so finishing an earlier
+ * Run's moves is safe. sources.json is written after each move, so it never names a file that isn't
+ * where it says.
  */
 export function moveOut(files: { file: string; area: HandledArea }[]): void {
-  if (!files.length) return
   const sources = readInboxSources()
-  let rekeyed = false
+  const waiting = new Set(waitingFiles())
   for (const { file, area } of files) {
+    if (!waiting.delete(file)) continue
     const folder = join(prdInboxDir(), area)
     mkdirSync(folder, { recursive: true })
     const moved = `${area}/${freeName(folder, file)}`
@@ -59,9 +62,28 @@ export function moveOut(files: { file: string; area: HandledArea }[]): void {
     if (sources[file]) {
       sources[moved] = sources[file]
       delete sources[file]
-      rekeyed = true
+      writeInboxSources(sources)
     }
     console.log(`Moved ${file} out of the PRD inbox to ${moved}`)
   }
-  if (rekeyed) writeInboxSources(sources)
+}
+
+/**
+ * Gives each waiting file that Saransh moved back from done/ or skipped/, to have it tried again,
+ * its sources.json entry back under its waiting name, so its PRD page still cites the Discord
+ * message it came from. An entry is taken back only while its file is gone from where it names.
+ */
+export function reclaimMovedBack(): void {
+  const sources = readInboxSources()
+  let reclaimed = false
+  for (const file of waitingFiles()) {
+    if (sources[file]) continue
+    const moved = (['done', 'skipped'] as const).map((area) => `${area}/${file}`).find((path) => sources[path] && !existsSync(join(prdInboxDir(), path)))
+    if (!moved) continue
+    sources[file] = sources[moved]
+    delete sources[moved]
+    reclaimed = true
+    console.log(`${file} came back into the PRD inbox from ${moved}, with its source`)
+  }
+  if (reclaimed) writeInboxSources(sources)
 }

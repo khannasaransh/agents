@@ -4,11 +4,13 @@
 // then the docs branch's pages waiting for review, the PRD inbox files set aside and the undocumented
 // Repos with new commits, then the Memory changes waiting for Saransh and the Run's health with the
 // number of Repos reviewed.
-// It runs even when earlier Steps failed, and says when the PM output is missing.
+// It runs even when earlier Steps failed, and says when the PM output is missing, or out of date
+// since an earlier Step was re-run after the PM answered.
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, readJsonFiles } from '../src/files.ts'
 import { pendingProposals, type MemoryProposal } from '../src/memory.ts'
+import { coversItsRuns } from '../src/pm-inputs.ts'
 import { teams } from '../src/repos.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
@@ -66,7 +68,11 @@ function pmLines(pm: PmResult | null, discord: DiscordRead | null): string[] {
     return [`The PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo.${why}`, '']
   }
   const listed = (items: string[], none: string) => (items.length ? items.map((item) => `- ${item}`) : [none])
+  const stale = coversItsRuns(pm)
+    ? []
+    : ["The PM output is out of date: an earlier Step was re-run after the PM Agent answered, so its To-dos, highlights and Repo lines may miss what changed. Re-run the pm Step with --force to bring them up to date.", '']
   return [
+    ...stale,
     '## To-dos',
     '',
     ...listed(pm.todos, 'Nothing is waiting on you.'),
@@ -95,8 +101,10 @@ function mentionLines(discord: DiscordRead | null): string[] {
 
 /** The docs branch's pages waiting for Saransh's review, and how this Run's Docs Step went, with the PRD pages it wrote. */
 function docsLines(docs: DocsResult | null): string[] {
-  const stopped = docs?.status === 'conflict' || docs?.status === 'check-failed' || docs?.status === 'rejected'
-  if (!docs || (!docs.waiting && !stopped && !docs.prds.length)) return []
+  const stopped = docs !== null && !['updated', 'no-edits', 'nothing-to-update'].includes(docs.status)
+  // A docs.json from before the PRD inbox has no PRDs.
+  const prds = docs?.prds ?? []
+  if (!docs || (!docs.waiting && !stopped && !prds.length)) return []
   const lines = ['## Docs branch waiting for review', '']
   if (docs.waiting) {
     const { commits, pages } = docs.waiting
@@ -108,9 +116,9 @@ function docsLines(docs: DocsResult | null): string[] {
   switch (docs.status) {
     case 'updated':
       if (docs.pages.length) lines.push('This Run updated:', '', ...docs.pages.map((p) => `- ${p.page}: ${p.summary}`), '')
-      if (docs.prds.length) {
+      if (prds.length) {
         lines.push('This Run wrote PRD pages from the PRD inbox, and moved their files to done/ there:', '')
-        lines.push(...docs.prds.map((p) => `- ${p.page}, from ${p.file}: ${p.summary}`), '')
+        lines.push(...prds.map((p) => `- ${p.page}, from ${p.file}: ${p.summary}`), '')
       }
       break
     case 'conflict':
@@ -122,11 +130,14 @@ function docsLines(docs: DocsResult | null): string[] {
     case 'check-failed':
       lines.push(`${notCommitted} the wiki's check still reports errors:`, '', '```', docs.check, '```', '')
       break
+    case 'tool-failed':
+      lines.push(`${notCommitted} the wiki's ${docs.tool} tool failed:`, '', '```', docs.output, '```', '')
+      break
     case 'rejected':
-      lines.push(
-        `${notCommitted} the Docs Agent added, deleted or replaced ${docs.files.join(', ')}, and it may only update pages that exist and add PRD pages with copies of PRD inbox files.`,
-        '',
-      )
+      lines.push(`${notCommitted} the Docs Agent changed ${docs.files.join(', ')}, and it may only update pages and add PRD pages with copies of PRD inbox files.`, '')
+      break
+    case 'failed':
+      lines.push(`This Run's Docs Step failed, so it changed nothing on the wiki: ${firstLine(docs.error)}. The next Run tries the same work again.`, '')
       break
   }
   if (docs.waiting) lines.push(`Review it with \`git diff ${mainLine}...${docs.branch}\` in the wiki, and merge it into ${mainLine} when you accept it.`, '')
@@ -134,7 +145,7 @@ function docsLines(docs: DocsResult | null): string[] {
 }
 
 function skippedLines(docs: DocsResult | null): string[] {
-  if (!docs?.skipped.length) return []
+  if (!docs?.skipped?.length) return []
   return [
     '## PRD inbox files set aside',
     '',

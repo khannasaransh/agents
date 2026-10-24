@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { acquireLock } from './lock.ts'
 import { decideProposal, memoryFile, pendingProposals, proposalDiff } from './memory.ts'
 import { runDir } from './paths.ts'
 import { runPipeline, runSingleStep } from './pipeline.ts'
@@ -64,7 +65,14 @@ async function main(argv: string[]): Promise<number> {
       const [action, agent, name, ...extra] = rest
       if (action === 'accept' || action === 'reject') {
         if (!agent || !name || extra.length) return fail(usage)
-        const { run } = decideProposal(agent, name, action === 'accept' ? 'accepted' : 'rejected')
+        // Under the Run lock, so no Run's Save state queues a proposal for this Memory meanwhile.
+        const release = acquireLock()
+        let run: string
+        try {
+          run = decideProposal(agent, name, action === 'accept' ? 'accepted' : 'rejected').run
+        } finally {
+          release()
+        }
         console.log(
           action === 'accept'
             ? `Accepted ${agent} ${name} from Run ${run}: the next Run reads it from ${memoryFile(agent, name)}`

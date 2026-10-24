@@ -88,3 +88,55 @@ test("a dry run's Save state records first-Run baselines but never counts a fake
 
   assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: sha(1) }, tangy_tv_flutter: { lastReviewed: sha(6) } })
 })
+
+test("a Run whose PM failed after its review succeeded joins the PM backlog, and leaves it once a later PM's answer covers it", async () => {
+  prepareRun({ crux_flutter: { lastReviewed: sha(1) } }, [changed('crux_flutter', sha(1), sha(2))], [reviewed('crux_flutter', sha(1), sha(2))])
+  ws.writeRunFile(runId, 'pm.json', { status: 'failed', error: 'claude-code failed: Session limit reached' })
+
+  await saveState()
+
+  assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: sha(2) } })
+  assert.deepEqual(ws.readPmBacklog(), [runId])
+
+  const nextRunId = '2026-10-23-0530'
+  ws.prepareRun(nextRunId)
+  ws.writeRunFile(nextRunId, 'pm.json', { status: 'answered', repoLines: [], highlights: [], todos: [], memory: null, runs: [runId, nextRunId], inputs: 'f'.repeat(64), memoryRead: '' })
+  const next = await ws.agents('step', 'save-state', '--run', nextRunId)
+
+  assert.equal(next.status, 0, next.stderr)
+  assert.deepEqual(ws.readPmBacklog(), [])
+})
+
+/** What the Docs Step recorded in a Run, covering crux_flutter's commits from `from` to `to`. */
+const docsResult = (status: string, from: string, to: string) => ({
+  status,
+  branch: 'agents/docs',
+  ...(status === 'failed' ? { error: 'claude-code failed; then codex failed' } : {}),
+  prds: [],
+  skipped: [],
+  ranges: [{ repo: 'crux_flutter', branch: 'main', from, to }],
+  waiting: null,
+  undocumented: [],
+})
+
+test("the wiki's progress per Repo advances only when the Docs Step finished, so a failed Docs Step is retried on the same commits after their review succeeded", async () => {
+  prepareRun({ crux_flutter: { lastReviewed: sha(1) } }, [changed('crux_flutter', sha(1), sha(2))], [reviewed('crux_flutter', sha(1), sha(2))])
+  ws.prepareRun(runId, { steps: [{ name: 'docs', status: 'failed' }, { name: 'save-state', status: 'pending' }] })
+  ws.writeRunFile(runId, 'docs.json', docsResult('failed', sha(1), sha(2)))
+
+  await saveState()
+
+  assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: sha(2) } })
+  assert.deepEqual(ws.readDocsState(), { crux_flutter: { lastDocumented: sha(1) } })
+
+  ws.prepareRun(runId, { steps: [{ name: 'docs', status: 'succeeded' }, { name: 'save-state', status: 'pending' }] })
+  ws.writeRunFile(runId, 'docs.json', docsResult('updated', sha(1), sha(2)))
+  await saveState()
+
+  assert.deepEqual(ws.readDocsState(), { crux_flutter: { lastDocumented: sha(2) } })
+
+  ws.writeRunFile(runId, 'docs.json', docsResult('updated', sha(1), sha(3)))
+  await saveState()
+
+  assert.deepEqual(ws.readDocsState(), { crux_flutter: { lastDocumented: sha(2) } }, "re-running an older Run's Save state never moves the wiki's progress")
+})

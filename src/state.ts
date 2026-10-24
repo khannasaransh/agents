@@ -34,3 +34,37 @@ export function readDiscordState(): DiscordState | null {
 export function writeDiscordState(state: DiscordState): void {
   writeJson(discordStateFile(), state)
 }
+
+/** What the Pipeline remembers about one Repo's documentation between Runs. */
+export interface DocsRepoState {
+  /**
+   * The last commit the Docs Step finished bringing the wiki up to, or, until it first finishes,
+   * where it started. Kept apart from the last reviewed commit, so a Docs Step that fails is retried
+   * on the same commits even once their review succeeded.
+   */
+  lastDocumented: string
+}
+
+const docsStateFile = () => join(stateDir(), 'docs.json')
+
+export function readDocsState(): Record<string, DocsRepoState> {
+  return existsSync(docsStateFile()) ? readJson(docsStateFile()) : {}
+}
+
+export function writeDocsState(state: Record<string, DocsRepoState>): void {
+  writeJson(docsStateFile(), state)
+}
+
+const pmBacklogFile = () => join(stateDir(), 'pm-backlog.json')
+
+/**
+ * The Runs whose reviews, new commits and Discord messages no PM answer has covered yet, since
+ * their PM failed, oldest first. The next PM is given them beside its own Run's.
+ */
+export function readPmBacklog(): string[] {
+  return existsSync(pmBacklogFile()) ? readJson(pmBacklogFile()) : []
+}
+
+export function writePmBacklog(runs: string[]): void {
+  writeJson(pmBacklogFile(), runs)
+}

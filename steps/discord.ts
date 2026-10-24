@@ -27,13 +27,13 @@ const isPrdFile = (filename: string) => /\.(docx?|pdf|md)$/i.test(filename)
 /** Where documents need a login, so the Pipeline can't download them and Saransh does by hand. A host counts with its subdomains. */
 const loginHosts = ['docs.google.com', 'drive.google.com', 'notion.so', 'notion.site', 'atlassian.net', 'sharepoint.com', 'onedrive.live.com', '1drv.ms', 'dropbox.com']
 
-/** The links in a message's text to documents that need a login, without the punctuation of the sentence around them. */
+/** The links in a message's text to documents that need a login, without the punctuation of the sentence around them. Text that only looks like a link is left out. */
 function loginLinks(content: string): string[] {
   return (content.match(/https?:\/\/[^\s<>]+/g) ?? [])
     .map((link) => link.replace(/[.,;:!?)\]]+$/, ''))
     .filter((link) => {
-      const { hostname } = new URL(link)
-      return loginHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`))
+      const hostname = URL.parse(link)?.hostname
+      return !!hostname && loginHosts.some((host) => hostname === host || hostname.endsWith(`.${host}`))
     })
 }
 
@@ -206,14 +206,26 @@ async function saveToInbox(files: Attached[]): Promise<void> {
 /** Discord lists active threads per server, not per channel, so each server's are asked for once. */
 const activeThreads = new Map<string, ApiThread[]>()
 
-/** A channel's threads that can hold messages posted since `since`: its active ones, and those archived since. */
+/**
+ * A channel's threads that can hold messages posted since `since`: its active ones, and those
+ * archived since. Discord lists archived threads a page at a time, the latest archived first, so it
+ * asks for pages until one reaches a thread archived before `since`, or there are no more.
+ */
 async function threadsOf(config: DiscordConfig, channel: ApiChannel, { since }: Window): Promise<ApiThread[]> {
   if (!activeThreads.has(channel.guild_id)) {
     activeThreads.set(channel.guild_id, (await get<{ threads: ApiThread[] }>(config, `/guilds/${channel.guild_id}/threads/active`)).threads)
   }
   const active = activeThreads.get(channel.guild_id)!.filter((t) => t.parent_id === channel.id)
-  const { threads: archived } = await get<{ threads: ApiThread[] }>(config, `/channels/${channel.id}/threads/archived/public`, { limit: '100' })
-  return [...active, ...archived.filter((t) => Date.parse(t.thread_metadata.archive_timestamp) >= Date.parse(since))]
+  const archived: ApiThread[] = []
+  const archivedSince = (t: ApiThread) => Date.parse(t.thread_metadata.archive_timestamp) >= Date.parse(since)
+  for (let before: string | undefined; ; ) {
+    const query = { limit: String(pageSize), ...(before ? { before } : {}) }
+    const page = await get<{ threads: ApiThread[]; has_more?: boolean }>(config, `/channels/${channel.id}/threads/archived/public`, query)
+    archived.push(...page.threads.filter(archivedSince))
+    if (!page.has_more || !page.threads.length || !page.threads.every(archivedSince)) break
+    before = page.threads.at(-1)!.thread_metadata.archive_timestamp
+  }
+  return [...active, ...archived]
 }
 
 async function readChannel(config: DiscordConfig, channelId: string, window: Window): Promise<DiscordMessage[]> {

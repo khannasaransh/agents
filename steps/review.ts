@@ -50,6 +50,8 @@ export type ReviewResult =
       findings: Finding[]
       /** The whole Memory of the Repo the Reviewer proposes, which Save state applies or queues; null to leave it as it is. */
       memory: string | null
+      /** The Memory the Reviewer read, which its proposal builds on. A review from before reviews recorded it has none. */
+      memoryRead?: string
     })
   | (ReviewedRange & { status: 'failed'; error: string })
 
@@ -86,7 +88,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
       const log = (line: string) => console.log(`${range.repo}: ${line}`)
       const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun, log }))) as ReviewerAnswer
       const findings = answer.findings.map((f) => markAuthor(f, fetched.commits))
-      result = { ...range, status: 'reviewed', summary: answer.summary, findings, memory: answer.memory }
+      result = { ...range, status: 'reviewed', summary: answer.summary, findings, memory: answer.memory, memoryRead: memory }
       console.log(`${range.repo}: reviewed, ${result.findings.length} findings`)
     } catch (error) {
       result = { ...range, status: 'failed', error: error instanceof Error ? error.message : String(error) }

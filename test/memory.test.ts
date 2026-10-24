@@ -72,7 +72,7 @@ test("by default Save state applies the Reviewer's proposed Memory and records t
 
   assert.equal(ws.readMemory('reviewer', 'crux_flutter'), newMemory)
   assert.equal(ws.readMemory('reviewer', 'inpix-panel'), null)
-  assert.deepEqual(recordedChange('crux_flutter'), { agent: 'reviewer', name: 'crux_flutter', decision: 'applied', before: oldMemory, after: newMemory })
+  assert.deepEqual(recordedChange('crux_flutter'), { agent: 'reviewer', name: 'crux_flutter', decision: 'applied', proposed: newMemory, before: oldMemory, after: newMemory })
   assert.deepEqual(ws.runFiles(runId, 'memory/reviewer'), ['crux_flutter.json'])
   assert.match((await ws.agents('memory')).stdout, /^No Memory changes are waiting for you\.$/m)
 
@@ -136,10 +136,10 @@ test('the Brief lists the Memory changes waiting for Saransh, before its Run hea
 })
 
 /** Prepares a Run whose PM Agent proposed `memory`, then runs its Save state. */
-async function saveStateAfterPm(memory: string | null, { dryRun = false } = {}) {
+async function saveStateAfterPm(memory: string | null, { dryRun = false, memoryRead }: { dryRun?: boolean; memoryRead?: string } = {}) {
   ws.writeRepoList([])
   ws.prepareRun(runId, { dryRun })
-  ws.writeRunFile(runId, 'pm.json', { status: 'answered', repoLines: [], highlights: [], todos: [], memory })
+  ws.writeRunFile(runId, 'pm.json', { status: 'answered', repoLines: [], highlights: [], todos: [], memory, memoryRead })
   const result = await saveState()
   assert.equal(result.status, 0, result.stderr)
 }
@@ -155,7 +155,7 @@ test("Save state applies the PM Agent's proposed Memory and records the change i
 
   assert.equal(ws.readMemory('pm', 'notes'), newOpenItems)
   const { decidedAt, ...change } = JSON.parse(ws.readRunFile(runId, 'memory', 'pm', 'notes.json'))
-  assert.deepEqual(change, { agent: 'pm', name: 'notes', decision: 'applied', before: oldOpenItems, after: newOpenItems })
+  assert.deepEqual(change, { agent: 'pm', name: 'notes', decision: 'applied', proposed: newOpenItems, before: oldOpenItems, after: newOpenItems })
 
   const rerun = await saveState()
 
@@ -183,7 +183,7 @@ test('accepting a proposal makes it the Memory the next Run reads, and records t
   assert.equal(accepted.status, 0, accepted.stderr)
   assert.equal(ws.readMemory('reviewer', 'crux_flutter'), newMemory)
   assert.match((await ws.agents('memory')).stdout, /^No Memory changes are waiting for you\.$/m)
-  assert.deepEqual(recordedChange('crux_flutter'), { agent: 'reviewer', name: 'crux_flutter', decision: 'accepted', before: oldMemory, after: newMemory })
+  assert.deepEqual(recordedChange('crux_flutter'), { agent: 'reviewer', name: 'crux_flutter', decision: 'accepted', proposed: newMemory, before: oldMemory, after: newMemory })
 })
 
 test('rejecting a proposal leaves the Memory as Saransh has it, and records the rejection in the Run that proposed it', async () => {
@@ -196,5 +196,57 @@ test('rejecting a proposal leaves the Memory as Saransh has it, and records the 
   assert.equal(rejected.status, 0, rejected.stderr)
   assert.equal(ws.readMemory('reviewer', 'crux_flutter'), oldMemory)
   assert.match((await ws.agents('memory')).stdout, /^No Memory changes are waiting for you\.$/m)
-  assert.deepEqual(recordedChange('crux_flutter'), { agent: 'reviewer', name: 'crux_flutter', decision: 'rejected', before: oldMemory, after: oldMemory })
+  assert.deepEqual(recordedChange('crux_flutter'), { agent: 'reviewer', name: 'crux_flutter', decision: 'rejected', proposed: newMemory, before: oldMemory, after: oldMemory })
+})
+
+test("a proposal whose Memory changed after the Agent read it, by Saransh's hand or a later Run, waits for Saransh instead of undoing that change", async () => {
+  ws = makeWorkspace()
+  const byHand = `${oldMemory}- Saransh: the paywall copy is final.\n`
+  ws.writeMemory('reviewer', 'crux_flutter', byHand)
+  ws.writeRepoList([])
+  ws.prepareRun(runId)
+  ws.writeRepoState({ crux_flutter: { lastReviewed: sha(1) } })
+  ws.writeRunFile(runId, 'fetch/crux_flutter.json', changed('crux_flutter'))
+  ws.writeRunFile(runId, 'review/crux_flutter.json', { ...reviewed('crux_flutter', newMemory), memoryRead: oldMemory })
+
+  const result = await saveState()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.readMemory('reviewer', 'crux_flutter'), byHand)
+  assert.deepEqual(ws.runFiles(runId, 'memory'), [])
+  assert.match((await ws.agents('memory')).stdout, /^reviewer crux_flutter, proposed in Run 2026-10-22-0530:\n/m)
+})
+
+test("re-running an earlier Run's Save state never replaces a proposal a later Run queued", async () => {
+  ws = makeWorkspace()
+  const laterRun = '2026-10-22-0530-10'
+  const laterMemory = `${newMemory}- Later: payments moved to v2.\n`
+  reviewerMemoryChanges('review')
+  ws.writeRepoList([])
+  for (const [id, memory] of [
+    [laterRun, laterMemory],
+    [runId, newMemory],
+  ]) {
+    ws.prepareRun(id)
+    ws.writeRepoState({ crux_flutter: { lastReviewed: sha(1) } })
+    ws.writeRunFile(id, 'fetch/crux_flutter.json', changed('crux_flutter'))
+    ws.writeRunFile(id, 'review/crux_flutter.json', reviewed('crux_flutter', memory))
+    const result = await ws.agents('step', 'save-state', '--run', id)
+    assert.equal(result.status, 0, result.stderr)
+  }
+
+  assert.match((await ws.agents('memory')).stdout, new RegExp(`^reviewer crux_flutter, proposed in Run ${laterRun}:\n`, 'm'))
+})
+
+test("a forced PM re-run's corrected Memory is applied, though the Run settled the PM's first proposal already", async () => {
+  ws = makeWorkspace()
+  ws.writeMemory('pm', 'notes', oldOpenItems)
+  await saveStateAfterPm(newOpenItems, { memoryRead: oldOpenItems })
+  const corrected = '- 2026-10-22: download the payments revamp PRD from Priya.\n'
+
+  await saveStateAfterPm(corrected, { memoryRead: newOpenItems })
+
+  assert.equal(ws.readMemory('pm', 'notes'), corrected)
+  const { decidedAt, ...change } = JSON.parse(ws.readRunFile(runId, 'memory', 'pm', 'notes.json'))
+  assert.deepEqual(change, { agent: 'pm', name: 'notes', decision: 'applied', proposed: corrected, before: newOpenItems, after: corrected })
 })

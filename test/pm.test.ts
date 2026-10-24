@@ -86,7 +86,11 @@ test("the PM Agent runs on Claude Code with the Run's reviews, commits and healt
     failedToFetch: [{ repo: 'gone', team: 'android', error: 'fatal: repository not found' }],
   })
   assert.equal(promptInput(call.stdin, 'memory'), '- Still open: the inpix-panel login bug.\n')
-  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'pm.json')), { status: 'answered', ...answer })
+  const { runs, inputs, memoryRead, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
+  assert.deepEqual(answered, { status: 'answered', ...answer })
+  assert.deepEqual(runs, [runId])
+  assert.match(inputs, /^[0-9a-f]{64}$/)
+  assert.equal(memoryRead, '- Still open: the inpix-panel login bug.\n')
 })
 
 test('the PM Agent is not given a review of other commits, such as one from before Fetch was re-run and found more', async () => {
@@ -117,7 +121,8 @@ test('re-running PM after it answered calls no Worker, unless forced', async () 
 
   assert.equal(forced.status, 0, forced.stderr)
   assert.equal(ws.workerCliCalls('claude').length, 1)
-  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'pm.json')), { status: 'answered', ...answer })
+  const { runs, inputs, memoryRead, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
+  assert.deepEqual(answered, { status: 'answered', ...answer })
 })
 
 test('a PM Agent that fails on Claude Code is retried on Codex outside any git repo, and when that fails too the Step fails and the Run records why', async () => {
@@ -134,4 +139,51 @@ test('a PM Agent that fails on Claude Code is retried on Codex outside any git r
   const recorded = JSON.parse(ws.readRunFile(runId, 'pm.json'))
   assert.equal(recorded.status, 'failed')
   assert.match(recorded.error, /^claude-code failed: Session limit reached; then codex failed: Codex is overloaded$/)
+})
+
+test('re-running PM answers again once an earlier Step changed what its answer was given, such as a forced re-read of Discord', async () => {
+  ws = makeWorkspace()
+  prepareRun()
+  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  const first = await pm()
+  assert.equal(first.status, 0, first.stderr)
+  ws.writeRunFile(runId, 'discord.json', { since: '2026-10-21T00:00:00.000Z', until: '2026-10-22T00:00:00.000Z', messages: [] })
+
+  const rerun = await pm()
+
+  assert.equal(rerun.status, 0, rerun.stderr)
+  assert.equal(ws.workerCliCalls('claude').length, 2)
+  assert.deepEqual(promptInput(ws.workerCliCalls('claude')[1].stdin, 'discord'), [])
+})
+
+test("the PM Agent is given what earlier Runs in the PM backlog held, since their PM failed, before this Run's, and its answer names the Runs it covers", async () => {
+  ws = makeWorkspace()
+  prepareRun()
+  const earlierRun = '2026-10-21-0530'
+  const earlierFetch: FetchResult = { repo: 'crux_flutter', team: 'flutter', branch: 'main', previous: sha(9), status: 'new-commits', head: sha(1), commits: [{ ...commit, sha: sha(1), subject: 'Add login' }] }
+  const loginFinding = { severity: 'high' as const, file: 'lib/login.dart', line: 3, commit: sha(1), author: 'Asha', summary: 'Logs the password', bySaransh: false }
+  ws.prepareRun(earlierRun)
+  ws.writeRunFile(earlierRun, 'fetch/crux_flutter.json', earlierFetch)
+  ws.writeRunFile(earlierRun, 'review/crux_flutter.json', { ...review, from: sha(9), to: sha(1), summary: 'Adds a login.', findings: [loginFinding] } satisfies ReviewResult)
+  ws.writeRunFile(earlierRun, 'discord.json', { since: '2026-10-20T00:00:00.000Z', until: '2026-10-21T00:00:00.000Z', messages: [] })
+  ws.writePmBacklog([earlierRun])
+  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+
+  const result = await pm()
+
+  assert.equal(result.status, 0, result.stderr)
+  const [call] = ws.workerCliCalls('claude')
+  assert.deepEqual(
+    (promptInput(call.stdin, 'reviews') as ReviewResult[]).map((r) => [r.from, r.to, r.status === 'reviewed' && r.findings.length]),
+    [
+      [sha(9), sha(1), 1],
+      [sha(1), sha(2), 0],
+    ],
+  )
+  assert.deepEqual(
+    (promptInput(call.stdin, 'commits') as { commits: { subject: string }[] }[]).map((c) => c.commits[0].subject),
+    ['Add login', 'Add paywall'],
+  )
+  assert.deepEqual(promptInput(call.stdin, 'discord'), [])
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'pm.json')).runs, [earlierRun, runId])
 })

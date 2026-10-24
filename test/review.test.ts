@@ -65,6 +65,7 @@ test('the Review Step reviews a Repo with new commits and records what the Revie
     summary: 'Adds a paywall.',
     findings: [{ ...finding, bySaransh: false }],
     memory: null,
+    memoryRead: '',
   })
 })
 
@@ -110,6 +111,7 @@ test("a review records the Memory the Reviewer proposes for its Repo, or no prop
   assert.equal(result.status, 0, result.stderr)
   assert.equal(ws.reviewResult(runId, 'crux_flutter').memory, proposed)
   assert.equal(ws.reviewResult(runId, 'inpix-panel').memory, null)
+  assert.equal(ws.reviewResult(runId, 'crux_flutter').memoryRead, '', 'the proposal builds on the Memory the Reviewer read, here none')
 })
 
 test('the Review Step makes no Reviewer call for unchanged Repos or first-Run baselines', async () => {

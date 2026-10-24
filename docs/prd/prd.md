@@ -197,7 +197,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
    - **Never:** it doesn't use Discord messages as wiki sources, doesn't document a Repo for the first time, and doesn't push or merge.
    - **Wiki rules:** it follows them throughout. It reads code only at pinned commits, leaves pages as drafts, and runs the wiki's stamp, region and check tools until the check reports no errors. It commits under Saransh's git identity with trailers naming the Agent and the Run.
    - **Output:** the pages changed, the PRDs processed, the inbox files set aside with why, and undocumented Repos with large changes, for the Brief.
-6. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run. For an Agent whose config says its Memory changes wait for review, it queues them for Saransh instead (see Agents).
+6. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run. For an Agent whose config says its Memory changes wait for review, or when the Memory changed after the Agent read it, it queues them for Saransh instead (see Agents). It advances the wiki's progress per Repo only once the Docs Step finished, and keeps a Run whose PM failed in the PM backlog, whose reviews, commits and Discord messages the next PM is given too.
 7. **Brief** (command): the last Step, so its Run health covers every other Step. It renders the Brief as Markdown in the Run folder. Sections, in order:
    - To-dos;
    - Discord highlights;
@@ -295,7 +295,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 ### Secrets, identity and data
 
 - A local, git-ignored env file holds the Discord bot token, the channel list, Saransh's Discord user ID and his git author emails.
-- A git-ignored data area holds Runs, state (the last reviewed commit per Repo, and the time of the last successful Discord read), Memory, the PRD inbox and temporary worktrees.
+- A git-ignored data area holds Runs, state (the last reviewed commit per Repo, the commit the wiki was last brought up to per Repo, the PM backlog, and the time of the last successful Discord read), Memory, the PRD inbox and temporary worktrees.
 
 ## Testing Decisions
 

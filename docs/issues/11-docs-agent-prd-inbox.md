@@ -16,7 +16,7 @@
 
 **Notes:**
 
-- The Step stages the inbox's waiting files (every top-level file but `sources.json` and hidden files) in the Agent's worktree at `_runs/prds/inbox/`, and removes them before committing. It pins every Repo fetched in the Run at its head in `_runs/prds/pins.txt`, where the PRD skill keeps a batch's pins, and commits that file with the work.
+- The Step stages the inbox's waiting files (every top-level file but `sources.json` and hidden files) in the Agent's worktree at `_runs/prds/inbox/`, and removes them before committing. It pins every Repo fetched in the Run at its head in a pins file in the Run folder, out of the Agent's reach and off the docs branch.
 - The Agent can't copy a binary file or run `docx2md` under Claude Code, so its `prd` Tool does both: `prd convert` renders a Word file as Markdown for reading, and `prd add` copies the file into `_sources/<codebase>/PRD/` and converts it into `_runs/prds/<feature>/`.
 - The Agent follows the wiki's `prd-to-wiki` skill with its Saransh checkpoints, fetching, subagents, viewer sweep and accept step left out; the instructions say how.
 - The Step rejects the Agent's edits, committing nothing, if the Agent deletes anything, adds files outside the PRD pages, their folder indexes and `_runs/prds/`, or writes a PRD copy that isn't a waiting inbox file, byte for byte, in a Codebase with a `_sources/` folder. With nothing waiting, it may add nothing, as before.

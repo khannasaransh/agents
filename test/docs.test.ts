@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync, realpathSync, writeFileSync } from 'node:fs'
+import { readFileSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { git, makeWorkspace, type TestRepo, type TestWiki, type Workspace } from './helpers.ts'
@@ -506,36 +506,48 @@ test("a PRD's copy is committed before the wiki's tools run, and its page is sta
 
   assert.equal(result.status, 0, result.stderr)
   const [call] = ws.workerCliCalls('claude')
-  assert.equal(promptInput(call.stdin, 'prdPinsFile'), '_runs/prds/pins.txt')
-  const pins = `crux_flutter main ${changed.folder} ${head}\ninpix-panel main ${unchanged.folder} ${lastFetched(unchanged)}\n`
-  assert.equal(git(wiki.folder, 'show', `${docsBranch}:_runs/prds/pins.txt`), pins.trimEnd())
+  const prdPins = promptInput(call.stdin, 'prdPinsFile') as string
+  assert.equal(readFileSync(prdPins, 'utf8'), `crux_flutter main ${changed.folder} ${head}\ninpix-panel main ${unchanged.folder} ${lastFetched(unchanged)}\n`)
+  assert.ok(!prdPins.startsWith(realpathSync(ws.dataDir) + '/worktrees') && !prdPins.startsWith(join(ws.dataDir, 'worktrees')), 'the PRD pins stay out of the wiki, where the Agent could change them')
+  assert.equal(git(wiki.folder, 'ls-tree', '-r', '--name-only', docsBranch, '_runs/'), '', 'and off the docs branch')
   const runs = wiki.toolRuns()
   assert.deepEqual(
     runs.map((r) => [r.tool, r.args]),
     [
       ['regions', []],
-      ['stamp', ['_runs/prds/pins.txt', paywallPrdPage]],
-      ['check', [paywallPrdPage, '--pins', '_runs/prds/pins.txt']],
+      ['stamp', [prdPins, paywallPrdPage]],
+      ['check', [paywallPrdPage, '--pins', prdPins]],
     ],
   )
   assert.equal(git(wiki.folder, 'show', '--name-only', '--format=%s', runs[1].head), `Add PRD copies from the PRD inbox\n\n${paywallCopy}`)
   assert.equal(git(wiki.folder, 'rev-parse', `${runs[1].head}^`), main)
 })
 
-test("when the wiki's check still reports errors on a PRD page, nothing is committed and the PRD stays waiting in the inbox", async () => {
+test("when the wiki's check still reports errors on a PRD page, nothing is committed and the PRD stays waiting in the inbox, while a file that isn't a PRD is still set aside", async () => {
   ws = makeWorkspace()
   const { wiki } = wikiWithInpix()
   ws.writePrdInboxFile('Paywall_PRD.md', paywallPrd)
+  ws.writePrdInboxFile('Lunch_menu.pdf', '%PDF-1.7\nFriday lunch')
   prepareRun(wiki, [])
-  ws.setWorkerCli('claude', paywallPrdWritten({ [paywallPrdPage]: prdPage(undefined) + '\nThe price is BROKEN (?).\n' }))
+  ws.setWorkerCli(
+    'claude',
+    claudeCodeEditing(
+      { [paywallCopy]: paywallPrd, [paywallPrdPage]: prdPage(undefined) + '\nThe price is BROKEN (?).\n' },
+      {
+        pages: [],
+        prds: [{ file: 'Paywall_PRD.md', codebase: 'inpix', page: paywallPrdPage, summary: 'Premium subscribers skip the paywall.' }],
+        skipped: [{ file: 'Lunch_menu.pdf', reason: 'A lunch menu, not a PRD.' }],
+      },
+    ),
+  )
 
   const result = await docs()
 
   assert.equal(result.status, 1)
   assert.equal(git(wiki.folder, 'branch', '--list', docsBranch), '')
-  assert.deepEqual(ws.prdInboxFiles(), ['Paywall_PRD.md'])
-  const { status, prds } = JSON.parse(ws.readRunFile(runId, 'docs.json'))
-  assert.deepEqual({ status, prds }, { status: 'check-failed', prds: [] })
+  assert.deepEqual(ws.prdInboxFiles(), ['Paywall_PRD.md', 'skipped'])
+  const { status, prds, skipped } = JSON.parse(ws.readRunFile(runId, 'docs.json'))
+  assert.deepEqual({ status, prds, skipped }, { status: 'check-failed', prds: [], skipped: [{ file: 'Lunch_menu.pdf', reason: 'A lunch menu, not a PRD.' }] })
 })
 
 test("with PRDs waiting, a Docs Agent that writes a PRD copy that isn't the inbox file, a copy in a Codebase the wiki doesn't have, or a Repo's first page gets nothing committed, and the inbox stays as it was", async () => {
@@ -625,4 +637,192 @@ test("the folder indexes the wiki's regions tool makes for a new PRD page, here 
 
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(git(wiki.folder, 'ls-tree', '-r', '--name-only', docsBranch, 'products/').split('\n'), ['products/shared/index.md', 'products/shared/prds/index.md', shared])
+})
+
+test("a PRD page for one Product adds that Product's folder index beside it", async () => {
+  ws = makeWorkspace()
+  const { wiki } = wikiWithInpix()
+  ws.writePrdInboxFile('Paywall_PRD.md', paywallPrd)
+  prepareRun(wiki, [])
+  ws.setWorkerCli('claude', paywallPrdWritten({ 'products/inpix/index.md': ['---', 'type: index', '---', '', '# InPix', ''].join('\n') }))
+
+  const result = await docs()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(git(wiki.folder, 'ls-tree', '-r', '--name-only', docsBranch, 'products/').split('\n'), ['products/inpix/index.md', paywallPrdPage])
+})
+
+test("a Docs Agent that changes the wiki's own tools, here its check, gets nothing committed, and the Step runs none of them", async () => {
+  ws = makeWorkspace()
+  const { wiki, firstTip, nextRun } = await afterFirstDocsRun()
+  const toolRunsBefore = wiki.toolRuns().length
+
+  const result = await nextRun({
+    [paywallPage]: page([paywallSource], { body: 'The price is BROKEN (?).' }),
+    '_wiki/tools/check.mjs': "console.log('0 errors')\n",
+  })
+
+  assert.equal(result.status, 1)
+  assert.equal(git(wiki.folder, 'rev-parse', docsBranch), firstTip)
+  const { status, files } = JSON.parse(ws.readRunFile(nextRunId, 'docs.json'))
+  assert.deepEqual({ status, files }, { status: 'rejected', files: ['_wiki/tools/check.mjs'] })
+  assert.equal(wiki.toolRuns().length, toolRunsBefore)
+})
+
+for (const tool of ['regions', 'stamp']) {
+  test(`when the wiki's ${tool} tool fails on the Docs Agent's edits, nothing is committed and the check never runs`, async () => {
+    ws = makeWorkspace()
+    const { wiki, firstTip, nextRun } = await afterFirstDocsRun()
+    const file = `_wiki/tools/${tool}.mjs`
+    wiki.commit(`Break the ${tool} tool`, { [file]: `${readFileSync(join(wiki.folder, file), 'utf8')}console.error('${tool} broke')\nprocess.exitCode = 1\n` })
+    const toolRunsBefore = wiki.toolRuns().length
+
+    const result = await nextRun()
+
+    assert.equal(result.status, 1)
+    assert.equal(git(wiki.folder, 'rev-parse', docsBranch), firstTip)
+    const recorded = JSON.parse(ws.readRunFile(nextRunId, 'docs.json'))
+    assert.deepEqual([recorded.status, recorded.tool], ['tool-failed', tool])
+    assert.match(recorded.output, new RegExp(`${tool} broke`))
+    assert.deepEqual(
+      wiki.toolRuns().slice(toolRunsBefore).map((r) => r.tool),
+      tool === 'regions' ? ['regions'] : ['regions', 'stamp'],
+    )
+  })
+}
+
+test('when both Workers fail, the Run still records what waits on the docs branch, and the failed forced retry replaces the earlier success', async () => {
+  ws = makeWorkspace()
+  const { wiki, firstTip } = await afterFirstDocsRun()
+  ws.setWorkerCli('claude', { stderr: 'Session limit reached', exitCode: 1 })
+  ws.setWorkerCli('codex', { stderr: 'Codex is overloaded', exitCode: 1 })
+
+  const forced = await docs('--force')
+
+  assert.equal(forced.status, 1)
+  assert.equal(git(wiki.folder, 'rev-parse', docsBranch), firstTip)
+  const recorded = JSON.parse(ws.readRunFile(runId, 'docs.json'))
+  assert.equal(recorded.status, 'failed')
+  assert.match(recorded.error, /Session limit reached/)
+  assert.deepEqual(recorded.waiting, { commits: 1, pages: [paywallPage] })
+})
+
+test('commits whose documentation failed are documented in a later Run, though their review succeeded and Fetch finds nothing new there', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Price from payments', { files: { 'lib/paywall.dart': 'class Paywall {}\n' } })
+  const wiki = ws.addWiki()
+  wiki.commit('Document the paywall', { [paywallPage]: page([paywallSource]) })
+  prepareRun(wiki, [[repo, from]])
+  ws.setWorkerCli('claude', { stderr: 'Session limit reached', exitCode: 1 })
+  assert.equal((await docs()).status, 1)
+  const saved = await ws.agents('step', 'save-state', '--run', runId)
+  assert.equal(saved.status, 0, saved.stderr)
+
+  prepareRun(wiki, [[repo, lastFetched(repo)]], { id: nextRunId })
+  ws.setWorkerCli('claude', claudeCodeEditing({ [paywallPage]: page([paywallSource], { body: 'Updated at last.' }) }))
+  const next = await ws.agents('step', 'docs', '--run', nextRunId)
+
+  assert.equal(next.status, 0, next.stderr)
+  assert.match(git(wiki.folder, 'show', `${docsBranch}:${paywallPage}`), /Updated at last\./)
+  const call = ws.workerCliCalls('claude').at(-1)!
+  assert.deepEqual(
+    (promptInput(call.stdin, 'repos') as { from: string; to: string }[]).map((r) => [r.from, r.to]),
+    [[from, lastFetched(repo)]],
+  )
+})
+
+test('a re-run finishes moving the inbox files of PRD pages an interrupted Run committed, without calling the Docs Agent again, and redoes the work when the branch never moved', async () => {
+  ws = makeWorkspace()
+  const { wiki, main } = wikiWithInpix()
+  const entry = { 'Paywall_PRD.md': { message: paywallMessage, attachment: '1400000000000000001' } }
+  ws.writePrdInboxFile('Paywall_PRD.md', paywallPrd)
+  ws.writePrdInboxFile('sources.json', JSON.stringify(entry))
+  prepareRun(wiki, [])
+  ws.setWorkerCli('claude', paywallPrdWritten())
+  assert.equal((await docs()).status, 0)
+  const tip = git(wiki.folder, 'rev-parse', docsBranch)
+  /** As if the Run had stopped before it moved the file out of the inbox. */
+  const unmove = () => {
+    renameSync(join(ws.dataDir, 'prd-inbox', 'done', 'Paywall_PRD.md'), join(ws.dataDir, 'prd-inbox', 'Paywall_PRD.md'))
+    ws.writePrdInboxFile('sources.json', JSON.stringify(entry))
+  }
+  unmove()
+
+  const rerun = await docs()
+
+  assert.equal(rerun.status, 0, rerun.stderr)
+  assert.equal(ws.workerCliCalls('claude').length, 1)
+  assert.equal(git(wiki.folder, 'rev-parse', docsBranch), tip)
+  assert.deepEqual(ws.prdInboxFiles(), ['done', 'sources.json'])
+  assert.deepEqual(JSON.parse(ws.readPrdInboxFile('sources.json')), { 'done/Paywall_PRD.md': entry['Paywall_PRD.md'] })
+
+  // As if the Run had stopped before the branch moved, too.
+  unmove()
+  git(wiki.folder, 'update-ref', `refs/heads/${docsBranch}`, main)
+  const redone = await docs()
+
+  assert.equal(redone.status, 0, redone.stderr)
+  assert.equal(ws.workerCliCalls('claude').length, 2)
+  assert.match(git(wiki.folder, 'show', `${docsBranch}:${paywallPrdPage}`), /^# Paywall$/m)
+  assert.deepEqual(ws.prdInboxFiles(), ['done', 'sources.json'])
+})
+
+test('a file the Docs Agent set aside, which Saransh moves back into the inbox, keeps its Discord message, and its PRD page cites it', async () => {
+  ws = makeWorkspace()
+  const { wiki } = wikiWithInpix()
+  const source = { message: paywallMessage, attachment: '1400000000000000001' }
+  ws.writePrdInboxFile('Paywall_PRD.md', paywallPrd)
+  ws.writePrdInboxFile('sources.json', JSON.stringify({ 'Paywall_PRD.md': source }))
+  prepareRun(wiki, [])
+  ws.setWorkerCli('claude', claudeCodeEditing({}, { pages: [], prds: [], skipped: [{ file: 'Paywall_PRD.md', reason: 'Looks like meeting notes.' }] }))
+  assert.equal((await docs()).status, 0)
+  renameSync(join(ws.dataDir, 'prd-inbox', 'skipped', 'Paywall_PRD.md'), join(ws.dataDir, 'prd-inbox', 'Paywall_PRD.md'))
+
+  prepareRun(wiki, [], { id: nextRunId })
+  ws.setWorkerCli('claude', paywallPrdWritten())
+  const retried = await ws.agents('step', 'docs', '--run', nextRunId)
+
+  assert.equal(retried.status, 0, retried.stderr)
+  const call = ws.workerCliCalls('claude').at(-1)!
+  assert.deepEqual(promptInput(call.stdin, 'prds'), [{ file: 'Paywall_PRD.md', staged: '_runs/prds/inbox/Paywall_PRD.md', discordMessage: paywallMessage }])
+  assert.match(git(wiki.folder, 'show', `${docsBranch}:${paywallPrdPage}`), new RegExp(`  - ${paywallMessage}  # the Discord message this copy came from`))
+  assert.deepEqual(JSON.parse(ws.readPrdInboxFile('sources.json')), { 'done/Paywall_PRD.md': source })
+})
+
+test('a PRD from Discord whose page has no frontmatter to cite the message in stays waiting in the inbox', async () => {
+  ws = makeWorkspace()
+  const { wiki } = wikiWithInpix()
+  ws.writePrdInboxFile('Paywall_PRD.md', paywallPrd)
+  ws.writePrdInboxFile('sources.json', JSON.stringify({ 'Paywall_PRD.md': { message: paywallMessage, attachment: '1400000000000000001' } }))
+  prepareRun(wiki, [])
+  ws.setWorkerCli('claude', paywallPrdWritten({ [paywallPrdPage]: '# Paywall\n\nPremium subscribers skip the paywall.\n' }))
+
+  const result = await docs()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.prdInboxFiles(), ['Paywall_PRD.md', 'sources.json'])
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'docs.json')).prds, [])
+})
+
+test('a page the Docs Agent links to a new PRD page from is stamped at the PRD pins, which it traced the PRD at', async () => {
+  ws = makeWorkspace()
+  const { wiki } = wikiWithInpix()
+  wiki.commit('Document the paywall', { [paywallPage]: page([paywallSource]) })
+  ws.writePrdInboxFile('Paywall_PRD.md', paywallPrd)
+  prepareRun(wiki, [])
+  ws.setWorkerCli('claude', paywallPrdWritten({ [paywallPage]: page([paywallSource], { body: 'See [the PRD](../../products/inpix/prds/paywall.md).' }) }))
+
+  const result = await docs()
+
+  assert.equal(result.status, 0, result.stderr)
+  const prdPins = promptInput(ws.workerCliCalls('claude')[0].stdin, 'prdPinsFile')
+  assert.deepEqual(
+    wiki.toolRuns().filter((r) => r.tool !== 'regions').map((r) => [r.tool, r.args]),
+    [
+      ['stamp', [prdPins, paywallPrdPage, paywallPage]],
+      ['check', [paywallPrdPage, paywallPage, '--pins', prdPins]],
+    ],
+  )
 })

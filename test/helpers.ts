@@ -127,6 +127,12 @@ export interface Workspace {
   writeDiscordState(state: { lastRead: string }): void
   /** The Discord state, or null when there is none. */
   readDiscordState(): { lastRead: string } | null
+  /** The Runs waiting in the PM backlog, as Save state keeps them. */
+  writePmBacklog(runs: string[]): void
+  /** The Runs waiting in the PM backlog, or none when there is no backlog. */
+  readPmBacklog(): string[]
+  /** How far the Docs Step brought the wiki per Repo, or none when it never has. */
+  readDocsState(): Record<string, { lastDocumented: string }>
   /** Writes an Agent's Memory file in the data area, as Saransh would by hand. */
   writeMemory(agent: string, name: string, text: string): void
   /** An Agent's Memory file in the data area, as Saransh would open it; null when there is none. */
@@ -320,6 +326,21 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
     readDiscordState() {
       const file = join(dataDir, 'state', 'discord.json')
       return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null
+    },
+
+    writePmBacklog(runs) {
+      mkdirSync(join(dataDir, 'state'), { recursive: true })
+      writeFileSync(join(dataDir, 'state', 'pm-backlog.json'), JSON.stringify(runs))
+    },
+
+    readPmBacklog() {
+      const file = join(dataDir, 'state', 'pm-backlog.json')
+      return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : []
+    },
+
+    readDocsState() {
+      const file = join(dataDir, 'state', 'docs.json')
+      return existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : {}
     },
 
     writeMemory(agent, name, text) {

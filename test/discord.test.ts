@@ -240,6 +240,37 @@ test("the Discord Step reads a watched channel's active threads and those archiv
   assert.ok(!asked.includes(`/channels/${elsewhere.id}/messages`), asked.join('\n'))
 })
 
+test('the Discord Step asks for archived threads a page at a time, until a page reaches threads archived before the last read', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const latest = thread('1200000000000000001', payments.id, 'Paywall launch', '2026-10-21T15:00:00.000Z')
+  const second = thread('1200000000000000002', payments.id, 'Price bug', '2026-10-21T12:00:00.000Z')
+  const older = thread('1200000000000000003', payments.id, 'Last quarter', '2026-10-01T12:00:00.000Z')
+  const inSecond = message(second.id, '2026-10-21T11:00:00.000Z', priya, `<@${saransh.id}> the PRD is attached`, [saransh])
+  const archivedPath = `/channels/${payments.id}/threads/archived/public`
+  await workspaceWithDiscord({
+    ...watched(payments, [], {
+      archived: [
+        [latest, []],
+        [second, [inSecond]],
+        [older, []],
+      ],
+    }),
+    [archivedPath]: [{ body: { threads: [latest], members: [], has_more: true } }, { body: { threads: [second, older], members: [], has_more: true } }],
+  })
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(
+    readMessages().messages.map((m: any) => [m.thread, m.content]),
+    [['Price bug', inSecond.content]],
+  )
+  const pages = api!.requests.filter((r) => r.path === archivedPath).map((r) => r.query)
+  assert.deepEqual(pages, [{ limit: '100' }, { limit: '100', before: latest.thread_metadata.archive_timestamp }])
+  assert.ok(!api!.requests.some((r) => r.path === `/channels/${older.id}/messages`))
+})
+
 test('the Discord Step waits out a rate limit and asks again', async () => {
   const payments = channel('1100000000000000001', 'payments')
   const ask = message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'Is the paywall live?')
@@ -533,7 +564,8 @@ test('links to documents that need a login, such as Google Docs, are recorded wi
   )
   const wiki = message(launch.id, '2026-10-21T10:00:00.000Z', priya, 'Specs: https://inshorts.atlassian.net/wiki/spaces/PAY/pages/42, https://inshorts.notion.site/Wallet-3f2e and https://inshorts.sharepoint.com/:w:/s/pay/Refunds.')
   const lookalike = message(payments.id, '2026-10-21T11:00:00.000Z', priya, 'Not a doc: https://docs.google.com.example.net/document/d/1AbC')
-  await workspaceWithDiscord(watched(payments, [docs, lookalike], { active: [[launch, [wiki]]] }))
+  const malformed = message(payments.id, '2026-10-21T11:30:00.000Z', priya, 'Half a link: https://% and the doc https://docs.google.com/document/d/2DeF')
+  await workspaceWithDiscord(watched(payments, [docs, lookalike, malformed], { active: [[launch, [wiki]]] }))
   ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
 
   const result = await discord()
@@ -548,9 +580,11 @@ test('links to documents that need a login, such as Google Docs, are recorded wi
         ['https://inshorts.atlassian.net/wiki/spaces/PAY/pages/42', 'https://inshorts.notion.site/Wallet-3f2e', 'https://inshorts.sharepoint.com/:w:/s/pay/Refunds'],
       ],
       [`https://discord.com/channels/${guildId}/${payments.id}/${lookalike.id}`, []],
+      [`https://discord.com/channels/${guildId}/${payments.id}/${malformed.id}`, ['https://docs.google.com/document/d/2DeF']],
     ],
   )
   assert.deepEqual(ws.prdInboxFiles(), [])
+  assert.ok(ws.readDiscordState())
 })
 
 test('a dry run lists the PRD files attached in discord.json but saves nothing into the PRD inbox', async () => {

@@ -280,6 +280,7 @@ test("after the Repos, the Brief lists the docs branch's pages waiting for Saran
     prds: [],
     skipped: [],
     waiting,
+    ranges: [],
     undocumented: [],
   } satisfies DocsResult)
 
@@ -316,6 +317,7 @@ test('the Brief lists the PRD pages this Run wrote from the PRD inbox on the doc
     prds: [{ file: 'Paywall_PRD.pdf', codebase: 'inpix', page: 'products/inpix/prds/paywall.md', summary: 'Premium subscribers skip the paywall.' }],
     skipped: [{ file: 'Lunch_menu.pdf', reason: 'A lunch menu, not a PRD.' }],
     waiting: { commits: 2, pages: ['products/inpix/prds/paywall.md'] },
+    ranges: [],
     undocumented: [],
   } satisfies DocsResult)
 
@@ -353,6 +355,7 @@ test('the Brief lists the PRD inbox files set aside even when the docs branch ha
     prds: [],
     skipped: [{ file: 'Lunch_menu.pdf', reason: 'A lunch menu, not a PRD.' }],
     waiting: null,
+    ranges: [],
     undocumented: [],
   } satisfies DocsResult)
 
@@ -371,6 +374,7 @@ test('when merging main into the docs branch conflicted, the Brief says the wiki
     prds: [],
     skipped: [],
     waiting: { commits: 1, pages: ['repos/crux_flutter/paywall.md'] },
+    ranges: [],
     undocumented: [],
   } satisfies DocsResult)
 
@@ -391,6 +395,7 @@ test("when the wiki's check failed on the Docs Agent's edits, the Brief says the
     prds: [],
     skipped: [],
     waiting: null,
+    ranges: [],
     undocumented: [],
   } satisfies DocsResult)
 
@@ -404,12 +409,45 @@ test("when the wiki's check failed on the Docs Agent's edits, the Brief says the
 
 test('when the Docs Agent added a page, the Brief says its edits were rejected and names the file', async () => {
   prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
-  ws.writeRunFile(runId, 'docs.json', { status: 'rejected', branch: 'agents/docs', files: ['repos/inpix-panel/index.md'], prds: [], skipped: [], waiting: null, undocumented: [] } satisfies DocsResult)
+  ws.writeRunFile(runId, 'docs.json', { status: 'rejected', branch: 'agents/docs', files: ['repos/inpix-panel/index.md'], prds: [], skipped: [], waiting: null, ranges: [], undocumented: [] } satisfies DocsResult)
 
   assert.match(
     await brief(),
-    /This Run's wiki edits weren't committed, since the Docs Agent added, deleted or replaced repos\/inpix-panel\/index\.md, and it may only update pages that exist and add PRD pages with copies of PRD inbox files\.\n/,
+    /This Run's wiki edits weren't committed, since the Docs Agent changed repos\/inpix-panel\/index\.md, and it may only update pages and add PRD pages with copies of PRD inbox files\.\n/,
   )
+})
+
+test("when one of the wiki's other tools failed on the Docs Agent's edits, the Brief says which, with what it said", async () => {
+  prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'docs.json', { status: 'tool-failed', branch: 'agents/docs', tool: 'stamp', output: 'cannot read pins', prds: [], skipped: [], waiting: null, ranges: [], undocumented: [] } satisfies DocsResult)
+
+  assert.match(await brief(), /This Run's wiki edits weren't committed, since the wiki's stamp tool failed:\n\n```\ncannot read pins\n```\n/)
+})
+
+test('when the Docs Step failed, such as when both Workers did, the Brief still lists what waits on the docs branch from earlier Runs', async () => {
+  prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'docs.json', {
+    status: 'failed',
+    branch: 'agents/docs',
+    error: 'claude-code failed: Session limit reached; then codex failed: Codex is overloaded',
+    prds: [],
+    skipped: [],
+    waiting: { commits: 2, pages: ['repos/crux_flutter/paywall.md'] },
+    ranges: [],
+    undocumented: [],
+  } satisfies DocsResult)
+
+  assert.match(
+    await brief(),
+    /`agents\/docs` has 2 commits not on main, changing these pages, each a draft:\n\n- repos\/crux_flutter\/paywall\.md\n\nThis Run's Docs Step failed, so it changed nothing on the wiki: claude-code failed: Session limit reached; then codex failed: Codex is overloaded\. The next Run tries the same work again\.\n/,
+  )
+})
+
+test('a docs.json from before the PRD inbox, with no PRDs or skipped files, still makes a Brief', async () => {
+  prepareRun([changed])
+  ws.writeRunFile(runId, 'docs.json', { status: 'updated', branch: 'agents/docs', commit: sha(8), pages: [], waiting, undocumented: [] })
+
+  assert.match(await brief(), /`agents\/docs` has 3 commits not on main/)
 })
 
 test('the Brief lists the Repos with new commits that the wiki has never documented, after the docs branch', async () => {
@@ -420,6 +458,7 @@ test('the Brief lists the Repos with new commits that the wiki has never documen
     prds: [],
     skipped: [],
     waiting,
+    ranges: [],
     undocumented: [
       { repo: 'inpix-panel', team: 'frontend', commits: 2 },
       { repo: 'news-read-go', team: 'backend', commits: 1 },
