@@ -1,0 +1,20 @@
+#!/usr/bin/env node
+// Finishes an edit as the wiki's AGENTS.md says, from the wiki root (the folder it runs in): fills the
+// generated regions, stamps the given pages' sources at the pins, and checks them. Exits with the
+// check's code, so it exits 0 only once the check reports no errors.
+// Usage: finish <pins file> <page>…
+import { spawnSync } from 'node:child_process'
+
+const [pinsFile, ...pages] = process.argv.slice(2)
+if (!pinsFile || !pages.length) {
+  console.error('usage: finish <pins file> <page>…')
+  process.exit(2)
+}
+
+const tool = (name, args) => {
+  console.log(`$ node _wiki/tools/${name}.mjs ${args.join(' ')}`)
+  return spawnSync(process.execPath, [`_wiki/tools/${name}.mjs`, ...args], { stdio: 'inherit' }).status ?? 1
+}
+tool('regions', [])
+tool('stamp', [pinsFile, ...pages])
+process.exitCode = tool('check', [...pages, '--pins', pinsFile])

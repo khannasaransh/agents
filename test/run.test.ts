@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
-import { makeWorkspace, type Workspace } from './helpers.ts'
+import { git, makeWorkspace, type Workspace } from './helpers.ts'
 
 let ws: Workspace
 afterEach(() => ws.cleanup())
@@ -28,7 +28,7 @@ test('agents run daily creates a Run named by local start date and time that run
 
   const run = ws.readRun(id)
   assert.equal(run.pipeline, 'daily')
-  assert.equal(run.status, 'succeeded', 'Discord, not set up yet, is skipped without counting against the Run')
+  assert.equal(run.status, 'succeeded', 'Discord and Docs, not set up yet, are skipped without counting against the Run')
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
@@ -36,6 +36,7 @@ test('agents run daily creates a Run named by local start date and time that run
       ['review', 'succeeded'],
       ['discord', 'skipped'],
       ['pm', 'succeeded'],
+      ['docs', 'skipped'],
       ['save-state', 'succeeded'],
       ['brief', 'succeeded'],
     ],
@@ -84,6 +85,7 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
       ['review', 'succeeded'],
       ['discord', 'skipped'],
       ['pm', 'succeeded'],
+      ['docs', 'skipped'],
       ['save-state', 'succeeded'],
       ['brief', 'succeeded'],
     ],
@@ -124,6 +126,38 @@ test('agents run daily --dry-run reviews new commits on the fake Worker, and lea
   assert.match(ws.readRunFile(id, 'brief.md'), /## To-dos\n\nNothing is waiting on you\.\n[\s\S]*### crux_flutter[\s\S]*Review: Answered by the fake Worker\.\n\nNo findings\./)
   assert.deepEqual(ws.workerCliCalls('claude'), [])
   assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: baseline } })
+})
+
+test('agents run daily --dry-run runs the Docs Step after the PM Agent, without making or moving the docs branch', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  ws.writeRepoList()
+  const wiki = ws.addWiki()
+  const main = wiki.commit('Document the paywall', {
+    'repos/crux_flutter/paywall.md': ['---', 'type: repo', 'review: draft', 'sources:', '  - crux_flutter@main@1234567:lib/paywall.dart', '---', '', '# Paywall', ''].join('\n'),
+  })
+  ws.writeEnvFile(`WIKI_FOLDER=${wiki.folder}\n`)
+  await ws.agents('run', 'daily', '--dry-run')
+  repo.pushCommit('Price from payments', { files: { 'lib/paywall.dart': 'class Paywall {}\n' } })
+
+  const result = await ws.agents('run', 'daily', '--dry-run')
+
+  assert.equal(result.status, 0, result.stderr)
+  const [, id] = ws.runIds()
+  assert.deepEqual(
+    ws.readRun(id).steps.map((s) => [s.name, s.status]),
+    [
+      ['fetch', 'succeeded'],
+      ['review', 'succeeded'],
+      ['discord', 'skipped'],
+      ['pm', 'succeeded'],
+      ['docs', 'succeeded'],
+      ['save-state', 'succeeded'],
+      ['brief', 'succeeded'],
+    ],
+  )
+  assert.equal(git(wiki.folder, 'branch', '--list', 'agents/docs'), '')
+  assert.equal(git(wiki.folder, 'rev-parse', 'HEAD'), main)
 })
 
 test('a Run whose review fails ends partial, and its Brief says so', async () => {

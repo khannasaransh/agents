@@ -1,0 +1,45 @@
+#!/usr/bin/env node
+// Reads a Repo's committed code at its pin, never a working tree, as the wiki's rules ask. The pins
+// file names each Repo's branch, local clone and pin: `<repo> <branch> <local clone> <pin sha>`.
+// Usage:
+//   code <pins file> <repo> show <path>              the file at the pin
+//   code <pins file> <repo> ls [<path>]              the files under a folder at the pin
+//   code <pins file> <repo> grep <pattern> [<path>]  matching lines at the pin
+//   code <pins file> <repo> log <from> [<path>]      the commits from..pin, touching a path
+//   code <pins file> <repo> diff <from> [<path>]     what changed from..pin
+import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
+
+const usage = 'usage: code <pins file> <repo> show <path> | ls [<path>] | grep <pattern> [<path>] | log <from> [<path>] | diff <from> [<path>]'
+const [pinsFile, repo, command, ...rest] = process.argv.slice(2)
+if (!pinsFile || !repo || !command) fail(usage)
+
+const pins = Object.fromEntries(
+  readFileSync(pinsFile, 'utf8')
+    .split('\n')
+    .map((line) => line.replace(/#.*$/, '').trim().split(/\s+/))
+    .filter(([name, , , pin]) => name && pin)
+    .map(([name, branch, clone, pin]) => [name, { branch, clone: clone.replace(/^~(?=\/|$)/, homedir()), pin }]),
+)
+const pinned = pins[repo]
+if (!pinned) fail(`${repo} has no pin in ${pinsFile}; pinned: ${Object.keys(pins).join(', ') || 'none'}`)
+const { clone, pin } = pinned
+const paths = (path) => (path ? ['--', path] : [])
+
+const args = {
+  show: () => (rest[0] ? ['show', `${pin}:${rest[0]}`] : fail(usage)),
+  ls: () => ['ls-tree', '-r', '--name-only', pin, ...paths(rest[0])],
+  grep: () => (rest[0] ? ['grep', '-n', '-e', rest[0], pin, ...paths(rest[1])] : fail(usage)),
+  log: () => (rest[0] ? ['log', '--format=%h %an %ad %s', '--date=short', `${rest[0]}..${pin}`, ...paths(rest[1])] : fail(usage)),
+  diff: () => (rest[0] ? ['diff', rest[0], pin, ...paths(rest[1])] : fail(usage)),
+}[command]
+if (!args) fail(usage)
+
+const { status } = spawnSync('git', ['-C', clone, '--no-pager', ...args()], { stdio: 'inherit', env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } })
+process.exitCode = status ?? 1
+
+function fail(message) {
+  console.error(message)
+  process.exit(2)
+}

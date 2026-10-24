@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
+import type { DocsResult } from '../steps/docs.ts'
 import type { FetchResult } from '../steps/fetch.ts'
 import type { PmResult } from '../steps/pm.ts'
 import type { Finding, ReviewResult } from '../steps/review.ts'
@@ -265,6 +266,116 @@ test('when the PM Agent failed, the Brief says its output is missing and why, an
   )
   assert.match(text, /Review: Adds a paywall\.\n\n- \*\*high\*\* `lib\/paywall\.dart:42`/)
   assert.match(text.split('## Run health')[1], /- pm: failed\. Log: logs\/pm\.log/)
+})
+
+const waiting = { commits: 3, pages: ['repos/crux_flutter/paywall.md', 'codebases/inpix/index.md'] }
+
+test("after the Repos, the Brief lists the docs branch's pages waiting for Saransh's review, with what this Run changed on it", async () => {
+  prepareRun([changed])
+  ws.writeRunFile(runId, 'docs.json', {
+    status: 'updated',
+    branch: 'agents/docs',
+    commit: sha(8),
+    pages: [{ page: 'repos/crux_flutter/paywall.md', summary: 'The price now comes from the payments service.' }],
+    waiting,
+    undocumented: [],
+  } satisfies DocsResult)
+
+  const text = await brief()
+
+  const docs = text.slice(text.indexOf('## Docs branch waiting for review'), text.indexOf('## Run health'))
+  assert.ok(text.indexOf('## flutter') < text.indexOf('## Docs branch waiting for review'), text)
+  assert.equal(
+    docs.trim(),
+    [
+      '## Docs branch waiting for review',
+      '',
+      '`agents/docs` has 3 commits not on main, changing these pages, each a draft:',
+      '',
+      '- repos/crux_flutter/paywall.md',
+      '- codebases/inpix/index.md',
+      '',
+      'This Run updated:',
+      '',
+      '- repos/crux_flutter/paywall.md: The price now comes from the payments service.',
+      '',
+      'Review it with `git diff main...agents/docs` in the wiki, and merge it into main when you accept it.',
+    ].join('\n'),
+  )
+})
+
+test('when merging main into the docs branch conflicted, the Brief says the wiki was left as it was, and how to go on', async () => {
+  prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'docs.json', {
+    status: 'conflict',
+    branch: 'agents/docs',
+    files: ['repos/crux_flutter/paywall.md'],
+    waiting: { commits: 1, pages: ['repos/crux_flutter/paywall.md'] },
+    undocumented: [],
+  } satisfies DocsResult)
+
+  const text = await brief()
+
+  assert.match(
+    text,
+    /`agents\/docs` has 1 commit not on main[\s\S]*This Run left it as it was: merging main into it conflicts in repos\/crux_flutter\/paywall\.md\. Merge main into agents\/docs yourself, then re-run the docs Step\.\n/,
+  )
+})
+
+test("when the wiki's check failed on the Docs Agent's edits, the Brief says they weren't committed, even with nothing waiting on the docs branch", async () => {
+  prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'docs.json', {
+    status: 'check-failed',
+    branch: 'agents/docs',
+    check: 'E repos/crux_flutter/paywall.md: cites lib/gone.dart, not at the pin\n1 errors',
+    waiting: null,
+    undocumented: [],
+  } satisfies DocsResult)
+
+  const text = await brief()
+
+  assert.match(
+    text,
+    /## Docs branch waiting for review\n\nNothing on `agents\/docs` is waiting for you\.\n\nThis Run's wiki edits weren't committed, since the wiki's check still reports errors:\n\n```\nE repos\/crux_flutter\/paywall\.md: cites lib\/gone\.dart, not at the pin\n1 errors\n```\n/,
+  )
+})
+
+test('when the Docs Agent added a page, the Brief says its edits were rejected and names the file', async () => {
+  prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'docs.json', { status: 'rejected', branch: 'agents/docs', files: ['repos/inpix-panel/index.md'], waiting: null, undocumented: [] } satisfies DocsResult)
+
+  assert.match(
+    await brief(),
+    /This Run's wiki edits weren't committed, since the Docs Agent added or deleted repos\/inpix-panel\/index\.md, and it may only update pages that exist\.\n/,
+  )
+})
+
+test('the Brief lists the Repos with new commits that the wiki has never documented, after the docs branch', async () => {
+  prepareRun([changed])
+  ws.writeRunFile(runId, 'docs.json', {
+    status: 'nothing-to-update',
+    branch: 'agents/docs',
+    waiting,
+    undocumented: [
+      { repo: 'inpix-panel', team: 'frontend', commits: 2 },
+      { repo: 'news-read-go', team: 'backend', commits: 1 },
+    ],
+  } satisfies DocsResult)
+
+  const text = await brief()
+
+  assert.ok(text.indexOf('## Docs branch waiting for review') < text.indexOf('## Undocumented Repos with new commits'), text)
+  assert.equal(
+    text.slice(text.indexOf('## Undocumented Repos with new commits'), text.indexOf('## Run health')).trim(),
+    [
+      '## Undocumented Repos with new commits',
+      '',
+      "The wiki has no pages of these Repos, and the Docs Agent never writes a Repo's first pages. Document one with the wiki's code-to-wiki skill when you choose.",
+      '',
+      '- inpix-panel (frontend): 2 new commits',
+      '- news-read-go (backend): 1 new commit',
+    ].join('\n'),
+  )
 })
 
 test('a Brief written before the PM Agent answered says its output is missing', async () => {

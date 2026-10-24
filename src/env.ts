@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parseEnv } from 'node:util'
 import { agentsRoot } from './paths.ts'
@@ -33,6 +34,12 @@ export function discordConfig(): DiscordConfig | { missing: string[] } {
   const missing = [!token && 'DISCORD_BOT_TOKEN', !channelIds.length && 'DISCORD_CHANNEL_IDS', !userId && 'DISCORD_USER_ID'].filter((key) => key !== false)
   const readDms = env.DISCORD_READ_DMS?.trim().toLowerCase() !== 'false'
   return missing.length ? { missing } : { token, channelIds, userId, readDms }
+}
+
+/** Saransh's own checkout of the org wiki, from WIKI_FOLDER in the env file, or null when it isn't set. `~` stands for the home folder. */
+export function wikiFolder(): string | null {
+  const folder = readEnvFile().WIKI_FOLDER?.trim()
+  return folder ? folder.replace(/^~(?=\/|$)/, homedir()) : null
 }
 
 /** Saransh's git author emails, lowercased, from SARANSH_GIT_EMAILS (comma-separated) in the env file. */

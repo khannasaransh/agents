@@ -68,6 +68,17 @@ export interface WorkerCliBehavior {
   leaveRunning?: boolean
   /** Wait this long before answering, as a CLI at work would. */
   answerAfterMs?: number
+  /** Write these files, by path within the folder it runs in, before answering, as an Agent that edits files would. */
+  writeFiles?: Record<string, string>
+}
+
+/** A wiki repo standing in for Saransh's, with his checkout on main and stand-ins for the wiki's tools. */
+export interface TestWiki {
+  folder: string
+  /** Commits files on the branch Saransh's checkout is on, as he would, and returns the commit. */
+  commit(subject: string, files: Record<string, string>): string
+  /** Each run of the wiki's stand-in tools, oldest first, with the folder it ran in. */
+  toolRuns(): { tool: string; args: string[]; cwd: string }[]
 }
 
 /** A call the stand-in for a Worker's CLI received. */
@@ -100,6 +111,11 @@ export interface Workspace {
   addRepo(name: string, options?: { team?: string; branch?: string }): TestRepo
   /** Adds a Repo whose remote doesn't exist, so its fetch fails. */
   addBrokenRepo(name: string, options?: { team?: string }): RepoEntry
+  /**
+   * Creates the wiki, with Saransh's git identity in its config. Its tools stand in for the real
+   * ones: they record each run, and the check reports an error on any page it is given holding "BROKEN".
+   */
+  addWiki(): TestWiki
   /** Writes the Repo list: every Repo added so far, unless given entries. */
   writeRepoList(entries?: RepoEntry[]): void
   /** Prepares a Run folder holding just a Run record, as a Step's input. */
@@ -216,11 +232,58 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       return entry
     },
 
+    addWiki() {
+      const folder = join(root, 'wiki')
+      const toolLog = join(root, 'wiki-tools.jsonl')
+      mkdirSync(join(folder, '_wiki', 'tools'), { recursive: true })
+      git(root, 'init', '-q', '-b', 'main', folder)
+      git(folder, 'config', 'user.name', 'Saransh Khanna')
+      git(folder, 'config', 'user.email', 'saransh@example.com')
+      const recordRun = (tool: string) =>
+        `import { appendFileSync, readFileSync } from 'node:fs'\n` +
+        `const args = process.argv.slice(2)\n` +
+        `appendFileSync(${JSON.stringify(toolLog)}, JSON.stringify({ tool: ${JSON.stringify(tool)}, args, cwd: process.cwd() }) + '\\n')\n`
+      const tools = {
+        'regions.mjs': recordRun('regions'),
+        'stamp.mjs': recordRun('stamp'),
+        'check.mjs':
+          recordRun('check') +
+          `const pins = args.indexOf('--pins')\n` +
+          `const pages = args.filter((_, i) => pins < 0 || (i !== pins && i !== pins + 1))\n` +
+          `const broken = pages.filter((page) => readFileSync(page, 'utf8').includes('BROKEN'))\n` +
+          `for (const page of broken) console.log('E ' + page + ': a claim could not be confirmed')\n` +
+          `console.log(broken.length + ' errors')\n` +
+          `process.exitCode = broken.length ? 1 : 0\n`,
+      }
+      for (const [name, text] of Object.entries(tools)) writeFileSync(join(folder, '_wiki', 'tools', name), text)
+      git(folder, 'add', '.')
+      git(folder, 'commit', '-q', '-m', 'Add the wiki tools')
+      return {
+        folder,
+        commit(subject, files) {
+          for (const [path, content] of Object.entries(files)) {
+            mkdirSync(dirname(join(folder, path)), { recursive: true })
+            writeFileSync(join(folder, path), content)
+            git(folder, 'add', path)
+          }
+          git(folder, 'commit', '-q', '-m', subject)
+          return git(folder, 'rev-parse', 'HEAD')
+        },
+        toolRuns() {
+          if (!existsSync(toolLog)) return []
+          return readFileSync(toolLog, 'utf8')
+            .split('\n')
+            .filter(Boolean)
+            .map((line) => JSON.parse(line))
+        },
+      }
+    },
+
     writeRepoList(list = entries) {
       writeFileSync(repoListFile, `export default ${JSON.stringify(list, null, 2)}\n`)
     },
 
-    prepareRun(id, { steps = ['fetch', 'review', 'discord', 'pm', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
+    prepareRun(id, { steps = ['fetch', 'review', 'discord', 'pm', 'docs', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
       ws.writeRunFile(id, 'run.json', {
         id,
         pipeline: 'daily',
@@ -395,9 +458,9 @@ function writeWorkerCliStandIn(binDir: string, command: string) {
   writeFileSync(
     file,
     `#!${process.execPath}
-const { appendFileSync, existsSync, readFileSync, readdirSync, statSync } = require('node:fs')
+const { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } = require('node:fs')
 const { execFileSync, spawn } = require('node:child_process')
-const { join, relative } = require('node:path')
+const { dirname, join, relative } = require('node:path')
 const filesIn = (folder) => readdirSync(folder).flatMap((entry) => {
   const path = join(folder, entry)
   return statSync(path).isDirectory() ? filesIn(path) : [path]
@@ -432,6 +495,10 @@ if (behavior.hang) {
   setTimeout(() => {}, 30_000)
 } else
   setTimeout(() => {
+    for (const [path, content] of Object.entries(behavior.writeFiles ?? {})) {
+      mkdirSync(dirname(join(call.cwd, path)), { recursive: true })
+      writeFileSync(join(call.cwd, path), content)
+    }
     record()
     process.stdout.write(behavior.stdout ?? '')
     process.stderr.write(behavior.stderr ?? '')

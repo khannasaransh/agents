@@ -1,8 +1,9 @@
 // Brief: renders the day's Brief as Markdown in the Run folder from what earlier Steps wrote there:
 // the PM Agent's To-dos and Discord highlights, the Discord messages that mention Saransh and the
 // DMs with the bot, then by Team each Repo's line from the PM Agent, its new commits and review,
-// then the Memory changes waiting for Saransh and the Run's health with the number of Repos
-// reviewed. It runs even when earlier Steps failed, and says when the PM output is missing.
+// then the docs branch's pages waiting for review and the undocumented Repos with new commits, then
+// the Memory changes waiting for Saransh and the Run's health with the number of Repos reviewed.
+// It runs even when earlier Steps failed, and says when the PM output is missing.
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, readJsonFiles } from '../src/files.ts'
@@ -10,7 +11,9 @@ import { pendingProposals, type MemoryProposal } from '../src/memory.ts'
 import { teams } from '../src/repos.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
+import { mainLine } from '../agents/docs/config.ts'
 import type { DiscordMessage, DiscordRead } from './discord.ts'
+import type { DocsResult } from './docs.ts'
 import type { FetchResult } from './fetch.ts'
 import type { PmResult } from './pm.ts'
 import { severities } from '../agents/reviewer/config.ts'
@@ -89,12 +92,58 @@ function mentionLines(discord: DiscordRead | null): string[] {
   ]
 }
 
+/** The docs branch's pages waiting for Saransh's review, and how this Run's Docs Step went. */
+function docsLines(docs: DocsResult | null): string[] {
+  const stopped = docs?.status === 'conflict' || docs?.status === 'check-failed' || docs?.status === 'rejected'
+  if (!docs || (!docs.waiting && !stopped)) return []
+  const lines = ['## Docs branch waiting for review', '']
+  if (docs.waiting) {
+    const { commits, pages } = docs.waiting
+    lines.push(`\`${docs.branch}\` has ${commits === 1 ? '1 commit' : `${commits} commits`} not on ${mainLine}, changing these pages, each a draft:`, '')
+    lines.push(...pages.map((page) => `- ${page}`), '')
+  } else lines.push(`Nothing on \`${docs.branch}\` is waiting for you.`, '')
+
+  const notCommitted = "This Run's wiki edits weren't committed, since"
+  switch (docs.status) {
+    case 'updated':
+      lines.push('This Run updated:', '', ...docs.pages.map((p) => `- ${p.page}: ${p.summary}`), '')
+      break
+    case 'conflict':
+      lines.push(
+        `This Run left it as it was: merging ${mainLine} into it conflicts in ${docs.files.join(', ')}. Merge ${mainLine} into ${docs.branch} yourself, then re-run the docs Step.`,
+        '',
+      )
+      break
+    case 'check-failed':
+      lines.push(`${notCommitted} the wiki's check still reports errors:`, '', '```', docs.check, '```', '')
+      break
+    case 'rejected':
+      lines.push(`${notCommitted} the Docs Agent added or deleted ${docs.files.join(', ')}, and it may only update pages that exist.`, '')
+      break
+  }
+  if (docs.waiting) lines.push(`Review it with \`git diff ${mainLine}...${docs.branch}\` in the wiki, and merge it into ${mainLine} when you accept it.`, '')
+  return lines
+}
+
+function undocumentedLines(docs: DocsResult | null): string[] {
+  if (!docs?.undocumented.length) return []
+  return [
+    '## Undocumented Repos with new commits',
+    '',
+    "The wiki has no pages of these Repos, and the Docs Agent never writes a Repo's first pages. Document one with the wiki's code-to-wiki skill when you choose.",
+    '',
+    ...docs.undocumented.map((r) => `- ${r.repo} (${r.team}): ${r.commits === 1 ? '1 new commit' : `${r.commits} new commits`}`),
+    '',
+  ]
+}
+
 function render(
   run: RunRecord,
   results: FetchResult[],
   reviews: Map<string, ReviewResult>,
   pm: PmResult | null,
   discord: DiscordRead | null,
+  docs: DocsResult | null,
   proposals: MemoryProposal[],
 ): string {
   const lines = [`# Brief ${run.id}`, '']
@@ -126,7 +175,7 @@ function render(
     if (unchanged.length) lines.push(`Unchanged: ${unchanged.join(', ')}`, '')
   }
 
-  lines.push(...proposalLines(proposals))
+  lines.push(...docsLines(docs), ...undocumentedLines(docs), ...proposalLines(proposals))
   const reviewed = [...reviews.values()].filter((r) => r.status === 'reviewed').length
   lines.push('## Run health', '', `Run ${run.id} of the ${run.pipeline} Pipeline.`, '', `Repos reviewed: ${reviewed}.`, '')
   const notSucceeded = stepsNotSucceeded(run.steps).filter((s) => s.name !== 'brief')
@@ -151,6 +200,8 @@ await runAsStep(({ runId, runFolder, force }) => {
   const pm = existsSync(pmFile) ? readJson<PmResult>(pmFile) : null
   const discordFile = join(runFolder, 'discord.json')
   const discord = existsSync(discordFile) ? readJson<DiscordRead>(discordFile) : null
-  writeFileSync(out, render(readRun(runId), results, reviews, pm, discord, pendingProposals()))
+  const docsFile = join(runFolder, 'docs.json')
+  const docs = existsSync(docsFile) ? readJson<DocsResult>(docsFile) : null
+  writeFileSync(out, render(readRun(runId), results, reviews, pm, discord, docs, pendingProposals()))
   console.log(`Wrote ${out}`)
 })
