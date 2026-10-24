@@ -1,0 +1,2 @@
+# The Workers' config is installed as it is, and bash can't run a script with Windows line endings.
+worker-config/** text eol=lf

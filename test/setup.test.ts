@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { delimiter, dirname, join } from 'node:path'
+import { delimiter, dirname, join, relative } from 'node:path'
 import { test } from 'node:test'
 import { cli, git, gitEnv, type CliResult, type RepoEntry } from './helpers.ts'
 
@@ -23,6 +23,12 @@ const realPath = (process.env.PATH ?? '')
 interface Machine {
   /** The folder setup makes the Team folders in. */
   root: string
+  /** The machine's home folder, where the Workers keep their config. */
+  home: string
+  /** The Workers' config setup installs, standing in for the one in this repo. */
+  workerConfig: string
+  /** Puts a file in the Workers' config, at `<worker>/<its path in the home>`. */
+  addWorkerConfig(file: string, text: string): void
   /**
    * Adds a Repo whose local "remote" has a commit on `main` and one on its production branch, with
    * `main` as the remote's default branch, so a clone that ignored the production branch would show.
@@ -44,14 +50,22 @@ function makeMachine(): Machine {
   const binDir = join(base, 'bin')
   const homeDir = join(base, 'home')
   const repoListFile = join(base, 'repos.ts')
+  const workerConfig = join(base, 'worker-config')
   const entries: RepoEntry[] = []
   let path = [binDir, ...realPath]
-  for (const folder of [binDir, homeDir]) mkdirSync(folder)
+  for (const folder of [binDir, homeDir, workerConfig]) mkdirSync(folder)
   // Every tool present and current, unless a test says otherwise.
   const tools: Record<(typeof standIns)[number], string | null> = { node: 'v25.2.0', claude: '2.1.310 (Claude Code)', codex: 'codex-cli 0.163.0', agy: '1.4.5' }
 
   const machine: Machine = {
     root,
+    home: homeDir,
+    workerConfig,
+
+    addWorkerConfig(file, text) {
+      mkdirSync(dirname(join(workerConfig, file)), { recursive: true })
+      writeFileSync(join(workerConfig, file), text)
+    },
 
     addRepo(name, team, branch = 'main') {
       const remote = join(base, 'remotes', `${name}.git`)
@@ -91,7 +105,7 @@ function makeMachine(): Machine {
       // Windows spells it Path, and either spelling would do, so only one is kept.
       const env = Object.fromEntries(Object.entries(gitEnv).filter(([name]) => name.toUpperCase() !== 'PATH'))
       const child = spawn(process.execPath, [cli, 'setup', '--root', root, ...args], {
-        env: { ...env, HOME: homeDir, USERPROFILE: homeDir, PATH: path.join(delimiter), AGENTS_REPOS_FILE: repoListFile },
+        env: { ...env, HOME: homeDir, USERPROFILE: homeDir, PATH: path.join(delimiter), AGENTS_REPOS_FILE: repoListFile, AGENTS_WORKER_CONFIG_DIR: workerConfig },
       })
       let stdout = ''
       let stderr = ''
@@ -133,6 +147,11 @@ function toolLine(stdout: string, command: string): string | undefined {
 /** The stdout line that mentions `text`. */
 function lineWith(stdout: string, text: string): string | undefined {
   return stdout.split(/\r?\n/).find((line) => line.includes(text))
+}
+
+/** A path as setup writes it into JSON config: in forward slashes, which bash takes on Windows too. */
+function forward(path: string): string {
+  return path.replaceAll('\\', '/')
 }
 
 test("setup clones each Repo into a folder named for its Team, on its production branch, whatever the remote's default branch", async () => {
@@ -354,6 +373,245 @@ test('without git, setup says so first and clones nothing', async () => {
     assert.ok(result.stdout.indexOf('git: not found on PATH') < result.stdout.indexOf('crux_flutter'), result.stdout)
     assert.match(lineWith(result.stdout, join(machine.root, 'flutter', 'crux_flutter')) ?? '', /not cloned, since git is missing/)
     assert.equal(existsSync(join(machine.root, 'flutter', 'crux_flutter')), false)
+  } finally {
+    machine.cleanup()
+  }
+})
+
+test("setup installs the Workers' config into the home, with the captured machine's paths made this machine's", async () => {
+  const machine = makeMachine()
+  try {
+    machine.addWorkerConfig('claude-code/.claude/settings.json', `${JSON.stringify({ model: 'opus', statusLine: { type: 'command', command: '{{home}}/.claude/statusline.sh' } }, null, 2)}\n`)
+    machine.addWorkerConfig('claude-code/.claude/statusline.sh', '#!/usr/bin/env bash\necho status\n')
+    machine.addWorkerConfig('codex/.codex/config.toml', `model = "gpt-6-astra"\n\n[projects.'{{root}}/backend/ash_backend']\ntrust_level = "trusted"\n\n[projects."{{home}}"]\ntrust_level = "trusted"\n`)
+    machine.addWorkerConfig('antigravity/.gemini/antigravity-cli/keybindings.json', '{\n  "cli.exit": ["ctrl+d"]\n}\n')
+
+    const result = await machine.setup()
+
+    assert.equal(result.status, 0, result.stderr + result.stdout)
+    const settings = JSON.parse(readFileSync(join(machine.home, '.claude', 'settings.json'), 'utf8'))
+    assert.deepEqual(settings, { model: 'opus', statusLine: { type: 'command', command: forward(join(machine.home, '.claude', 'statusline.sh')) } })
+    assert.equal(readFileSync(join(machine.home, '.claude', 'statusline.sh'), 'utf8'), '#!/usr/bin/env bash\necho status\n')
+    // Claude Code runs it as a command. Windows has no executable bit.
+    if (process.platform !== 'win32') assert.equal(statSync(join(machine.home, '.claude', 'statusline.sh')).mode & 0o111, 0o111)
+    const toml = readFileSync(join(machine.home, '.codex', 'config.toml'), 'utf8')
+    const backend = join(machine.root, 'backend', 'ash_backend')
+    // A basic string escapes a Windows path's backslashes; a literal string can't.
+    assert.ok(toml.includes(`[projects.'${backend}']`), toml)
+    assert.ok(toml.includes(`[projects.${JSON.stringify(machine.home)}]`), toml)
+    assert.deepEqual(JSON.parse(readFileSync(join(machine.home, '.gemini', 'antigravity-cli', 'keybindings.json'), 'utf8')), { 'cli.exit': ['ctrl+d'] })
+    for (const file of [join('.claude', 'settings.json'), join('.codex', 'config.toml')]) {
+      assert.match(lineWith(result.stdout, join(machine.home, file)) ?? '', /installed/)
+    }
+  } finally {
+    machine.cleanup()
+  }
+})
+
+test("setup backs up the config it replaces, leaves config that already matches alone, and reports which is which", async () => {
+  const machine = makeMachine()
+  try {
+    machine.addWorkerConfig('claude-code/.claude/settings.json', '{\n  "model": "opus"\n}\n')
+    machine.addWorkerConfig('antigravity/.gemini/antigravity-cli/keybindings.json', '{\n  "cli.exit": ["ctrl+d"]\n}\n')
+    const settings = join(machine.home, '.claude', 'settings.json')
+    const keybindings = join(machine.home, '.gemini', 'antigravity-cli', 'keybindings.json')
+    mkdirSync(dirname(settings), { recursive: true })
+    writeFileSync(settings, '{ "model": "sonnet", "theme": "light" }\n')
+    mkdirSync(dirname(keybindings), { recursive: true })
+    writeFileSync(keybindings, '{\n  "cli.exit": [\n    "ctrl+d"\n  ]\n}\n')
+
+    const result = await machine.setup()
+
+    assert.equal(result.status, 0, result.stderr + result.stdout)
+    assert.deepEqual(JSON.parse(readFileSync(settings, 'utf8')), { model: 'opus' })
+    const backups = readdirSync(dirname(settings)).filter((file) => file.startsWith('settings.json.backup-'))
+    assert.equal(backups.length, 1, readdirSync(dirname(settings)).join(', '))
+    const backup = join(dirname(settings), backups[0])
+    assert.equal(readFileSync(backup, 'utf8'), '{ "model": "sonnet", "theme": "light" }\n')
+    assert.ok(lineWith(result.stdout, `${settings}:`)?.endsWith(`: replaced; the old one is in ${backup}`), result.stdout)
+    // The same settings, only spaced differently, so there is nothing to replace.
+    assert.deepEqual(readdirSync(dirname(keybindings)), ['keybindings.json'])
+    assert.match(lineWith(result.stdout, `${keybindings}:`) ?? '', /already as in this repo/)
+
+    const again = await machine.setup()
+
+    assert.match(lineWith(again.stdout, `${settings}:`) ?? '', /already as in this repo/)
+    assert.equal(readdirSync(dirname(settings)).filter((file) => file.startsWith('settings.json.backup-')).length, 1)
+  } finally {
+    machine.cleanup()
+  }
+})
+
+test("setup puts Claude Code's MCP servers into its .claude.json, keeping the state Claude Code keeps there", async () => {
+  const machine = makeMachine()
+  try {
+    const servers = { docs: { type: 'stdio', command: 'npx', args: ['-y', 'docs-mcp', '--root', '{{root}}/backend'] } }
+    machine.addWorkerConfig('claude-code/.claude.json', `${JSON.stringify({ mcpServers: servers }, null, 2)}\n`)
+    const claudeJson = join(machine.home, '.claude.json')
+    const state = { numStartups: 12, oauthAccount: { emailAddress: 'saransh@example.com' }, projects: { '/old/project': {} } }
+    writeFileSync(claudeJson, JSON.stringify({ ...state, mcpServers: { old: { command: 'old-mcp' } } }))
+
+    const result = await machine.setup()
+
+    assert.equal(result.status, 0, result.stderr + result.stdout)
+    assert.deepEqual(JSON.parse(readFileSync(claudeJson, 'utf8')), {
+      ...state,
+      mcpServers: { docs: { type: 'stdio', command: 'npx', args: ['-y', 'docs-mcp', '--root', forward(join(machine.root, 'backend'))] } },
+    })
+    assert.match(lineWith(result.stdout, `${claudeJson}:`) ?? '', /replaced; the old one is in/)
+  } finally {
+    machine.cleanup()
+  }
+})
+
+/** Every file in a folder, by its path inside it in forward slashes, with what it holds. */
+function filesIn(folder: string): Record<string, string> {
+  return Object.fromEntries(
+    readdirSync(folder, { recursive: true, withFileTypes: true })
+      .filter((entry) => entry.isFile())
+      .map((entry) => join(entry.parentPath, entry.name))
+      .map((file) => [relative(folder, file).replaceAll('\\', '/'), readFileSync(file, 'utf8')]),
+  )
+}
+
+function writeHomeFile(home: string, file: string, text: string) {
+  mkdirSync(dirname(join(home, file)), { recursive: true })
+  writeFileSync(join(home, file), text)
+}
+
+test("setup capture copies this machine's Workers' config into the repo, with its paths made placeholders, leaving out secrets and what the Codex app writes itself", async () => {
+  const source = makeMachine()
+  const target = makeMachine()
+  try {
+    const { home, root } = source
+    writeHomeFile(home, '.claude/settings.json', JSON.stringify({
+      model: 'opus',
+      statusLine: { type: 'command', command: join(home, '.claude', 'statusline.sh') },
+      env: { ANTHROPIC_API_KEY: 'sk-ant-secret', DISABLE_TELEMETRY: '1' },
+      autoMode: { environment: [`**Trusted repo**: ash_new (${join(root, 'backend', 'portfolio-dashboard')}), private`] },
+      enabledPlugins: { 'skill-creator@claude-plugins-official': true },
+    }))
+    writeHomeFile(home, '.claude/statusline.sh', '#!/usr/bin/env bash\necho status\n')
+    writeHomeFile(home, '.claude/history.jsonl', '{"display":"a prompt"}\n')
+    writeHomeFile(home, '.claude/plugins/known_marketplaces.json', JSON.stringify({
+      'claude-plugins-official': {
+        source: { source: 'github', repo: 'anthropics/claude-plugins-official' },
+        installLocation: join(home, '.claude', 'plugins', 'marketplaces', 'claude-plugins-official'),
+        lastUpdated: '2026-10-24T09:23:03.671Z',
+      },
+    }))
+    writeHomeFile(home, '.claude.json', JSON.stringify({
+      numStartups: 40,
+      oauthAccount: { emailAddress: 'saransh@example.com' },
+      mcpServers: { linear: { type: 'http', url: 'https://mcp.linear.app/mcp', headers: { Authorization: 'Bearer lin-secret' } } },
+    }))
+    writeHomeFile(home, '.codex/auth.json', '{"OPENAI_API_KEY":"sk-openai-secret"}')
+    const runtime = join(home, 'AppData', 'Local', 'OpenAI', 'Codex', 'runtimes', 'cua_node', '78fb')
+    writeHomeFile(home, '.codex/config.toml', [
+      'model = "gpt-6-astra"',
+      `notify = [ ${JSON.stringify(join(runtime, 'codex-computer-use.exe'))}, "turn-ended" ]`,
+      '',
+      '[marketplaces.openai-bundled]',
+      'source_type = "local"',
+      `source = '${join(home, '.codex', '.tmp', 'bundled-marketplaces', 'openai-bundled')}'`,
+      '',
+      '[plugins."browser@openai-bundled"]',
+      'enabled = true',
+      '',
+      '[mcp_servers.node_repl]',
+      `command = '${join(runtime, 'node_repl.exe')}'`,
+      '',
+      '[mcp_servers.node_repl.env]',
+      `CODEX_HOME = '${join(home, '.codex')}'`,
+      '',
+      '[mcp_servers.github]',
+      'command = "github-mcp"',
+      'env = { GITHUB_TOKEN = "ghp-secret", GITHUB_HOST = "github.com" }',
+      '',
+      '[mcp_servers.search]',
+      'url = "https://search.example.com/mcp"',
+      'bearer_token = "search-secret"',
+      '',
+      // Codex writes the folders it trusts in lower case on Windows.
+      `[projects.'${join(root, 'backend', 'ash_backend').toLowerCase()}']`,
+      'trust_level = "trusted"',
+      '',
+      `[projects.${JSON.stringify(home)}]`,
+      'trust_level = "trusted"',
+      '',
+    ].join('\n'))
+    writeHomeFile(home, '.gemini/antigravity-cli/keybindings.json', '{\n  "cli.exit": ["ctrl+d"]\n}\n')
+    // Antigravity leaves its MCP config empty until a server is added.
+    writeHomeFile(home, '.gemini/config/mcp_config.json', '')
+
+    const captured = await source.setup('capture')
+
+    assert.equal(captured.status, 0, captured.stderr + captured.stdout)
+    const config = filesIn(source.workerConfig)
+    assert.deepEqual(Object.keys(config).sort(), [
+      'antigravity/.gemini/antigravity-cli/keybindings.json',
+      'claude-code/.claude.json',
+      'claude-code/.claude/settings.json',
+      'claude-code/.claude/statusline.sh',
+      'codex/.codex/config.toml',
+      'secrets.json',
+    ])
+    const everything = Object.values(config).join('\n')
+    for (const secret of ['sk-ant-secret', 'lin-secret', 'ghp-secret', 'search-secret', 'saransh@example.com']) assert.ok(!everything.includes(secret), secret)
+    // Nothing points at the machine it was captured on, however it is spelled.
+    for (const machinePath of [dirname(home), JSON.stringify(dirname(home)).slice(1, -1)]) assert.ok(!everything.toLowerCase().includes(machinePath.toLowerCase()), everything)
+    const settings = JSON.parse(config['claude-code/.claude/settings.json'])
+    assert.equal(settings.statusLine.command, '{{home}}/.claude/statusline.sh')
+    assert.deepEqual(settings.env, { DISABLE_TELEMETRY: '1' })
+    assert.deepEqual(settings.autoMode.environment, ['**Trusted repo**: ash_new ({{root}}/backend/portfolio-dashboard), private'])
+    assert.deepEqual(settings.enabledPlugins, { 'skill-creator@claude-plugins-official': true })
+    assert.deepEqual(settings.extraKnownMarketplaces, { 'claude-plugins-official': { source: { source: 'github', repo: 'anthropics/claude-plugins-official' } } })
+    assert.deepEqual(JSON.parse(config['claude-code/.claude.json']), { mcpServers: { linear: { type: 'http', url: 'https://mcp.linear.app/mcp', headers: {} } } })
+    const toml = config['codex/.codex/config.toml']
+    for (const managed of ['notify', '[marketplaces.openai-bundled]', 'node_repl', 'AppData']) assert.ok(!toml.includes(managed), `${managed} in\n${toml}`)
+    assert.ok(toml.includes('[plugins."browser@openai-bundled"]\nenabled = true'), toml)
+    assert.ok(toml.includes("[projects.'{{root}}/backend/ash_backend']"), toml)
+    assert.ok(toml.includes('[projects."{{home}}"]'), toml)
+    assert.ok(toml.includes('GITHUB_HOST = "github.com"'), toml)
+    assert.deepEqual(JSON.parse(config['secrets.json']), [
+      { worker: 'codex', file: '.codex/config.toml', setting: 'mcp_servers.github.env.GITHUB_TOKEN' },
+      { worker: 'codex', file: '.codex/config.toml', setting: 'mcp_servers.search.bearer_token' },
+      { worker: 'claude-code', file: '.claude/settings.json', setting: 'env.ANTHROPIC_API_KEY' },
+      { worker: 'claude-code', file: '.claude.json', setting: 'mcpServers.linear.headers.Authorization' },
+    ])
+
+    cpSync(source.workerConfig, target.workerConfig, { recursive: true })
+    const installed = await target.setup()
+
+    assert.equal(installed.status, 0, installed.stderr + installed.stdout)
+    const targetSettings = JSON.parse(readFileSync(join(target.home, '.claude', 'settings.json'), 'utf8'))
+    assert.equal(targetSettings.statusLine.command, forward(join(target.home, '.claude', 'statusline.sh')))
+    assert.deepEqual(targetSettings.autoMode.environment, [`**Trusted repo**: ash_new (${forward(join(target.root, 'backend', 'portfolio-dashboard'))}), private`])
+    assert.ok(readFileSync(join(target.home, '.codex', 'config.toml'), 'utf8').includes(`[projects.'${join(target.root, 'backend', 'ash_backend')}']`))
+    assert.deepEqual(readdirSync(target.home).sort(), ['.claude', '.claude.json', '.codex', '.gemini'])
+    const checklist = installed.stdout.slice(installed.stdout.indexOf('Still to do by hand'))
+    for (const setting of ['env.ANTHROPIC_API_KEY', 'mcpServers.linear.headers.Authorization', 'mcp_servers.github.env.GITHUB_TOKEN', 'mcp_servers.search.bearer_token']) {
+      assert.ok(checklist.includes(setting), checklist)
+    }
+  } finally {
+    source.cleanup()
+    target.cleanup()
+  }
+})
+
+test('setup capture refuses a file holding a secret it has no setting to leave out of, and leaves the repo as it was', async () => {
+  const machine = makeMachine()
+  try {
+    machine.addWorkerConfig('codex/.codex/config.toml', 'model = "gpt-6-astra"\n')
+    writeHomeFile(machine.home, '.codex/config.toml', 'model = "gpt-6-astra-2"\n')
+    writeHomeFile(machine.home, '.claude/statusline.sh', '#!/usr/bin/env bash\ngh api user -H "Authorization: Bearer ghp_abcdefghijklmnopqrstuvwxyz0123456789"\n')
+
+    const result = await machine.setup('capture')
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /statusline\.sh: it holds what looks like a secret/)
+    assert.ok(!result.stderr.includes('abcdefghijklmnop'), result.stderr)
+    assert.deepEqual(filesIn(machine.workerConfig), { 'codex/.codex/config.toml': 'model = "gpt-6-astra"\n' })
   } finally {
     machine.cleanup()
   }

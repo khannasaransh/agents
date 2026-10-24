@@ -1,11 +1,14 @@
 // Machine setup: makes a new Mac or Windows machine match this one. It checks the commands the
-// Pipeline needs, clones the Repos into Team folders, and lists what it can't do. It starts git and
-// the commands directly, never through bash, so it runs the same on both.
+// Pipeline needs, clones the Repos into Team folders, installs the Workers' config this repo holds,
+// and lists what it can't do. It starts git and the commands directly, never through bash, so it
+// runs the same on both. Capture is its other half: it copies a machine's Workers' config into the repo.
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
+import { homedir } from 'node:os'
 import { delimiter, join, resolve } from 'node:path'
-import { antigravityHomeDir, agentsRoot } from './paths.ts'
+import { antigravityHomeDir, agentsRoot, workerConfigDir } from './paths.ts'
 import { loadRepos, teams, type Repo, type Team } from './repos.ts'
+import { captureWorkerConfig, installWorkerConfig, workerConfigSecrets, type Secret } from './worker-config.ts'
 
 /** Where setup makes the Team folders unless told otherwise: the folder holding this repo, as on this Mac. */
 export const defaultRoot = resolve(agentsRoot, '..')
@@ -19,9 +22,10 @@ interface Outcome {
 /**
  * Sets up the machine, printing what it does as it goes: checks the commands the Pipeline needs,
  * clones each Repo of the selected Teams (all of them when none is named) into
- * `<root>/<team>/<name>` on its production branch, and prints the manual checklist. A Repo whose
- * folder exists is left as it is. Returns whether everything setup can do is done: no command is
- * missing and no clone failed.
+ * `<root>/<team>/<name>` on its production branch, installs the Workers' config into the home
+ * folder, and prints the manual checklist. A Repo whose folder exists is left as it is. Returns
+ * whether everything setup can do is done: no command is missing, no clone failed and every file
+ * of the Workers' config is in place.
  */
 export async function setupMachine({ root, teams: selected }: { root: string; teams: string[] }): Promise<boolean> {
   const unknown = selected.filter((team) => !(teams as readonly string[]).includes(team))
@@ -42,9 +46,28 @@ export async function setupMachine({ root, teams: selected }: { root: string; te
   })
   if (!repos.length) console.log(`  none in the Repo list${selected.length ? ' for those Teams' : ''}`)
 
+  console.log(`\nThe Workers' config, from ${workerConfigDir()}:`)
+  const installed = installWorkerConfig({ home: homedir(), root, platform: process.platform })
+  for (const { file, line } of installed) console.log(`  ${file}: ${line}`)
+  if (!installed.length) console.log('  none in this repo')
+
   console.log('\nStill to do by hand:')
-  for (const step of manualSteps(repos)) console.log(`  - ${step}`)
-  return checks.every((check) => check.ok) && clones.every(Boolean)
+  for (const step of manualSteps(repos, workerConfigSecrets())) console.log(`  - ${step}`)
+  return [...checks, ...installed].every((outcome) => outcome.ok) && clones.every(Boolean)
+}
+
+/** Copies this machine's Workers' config into the repo, printing what it took and the secrets it left out. */
+export function captureConfig({ root }: { root: string }): void {
+  const { files, secrets } = captureWorkerConfig({ home: homedir(), root })
+  console.log(`The Workers' config, captured into ${workerConfigDir()}:`)
+  for (const file of files) console.log(`  ~/${file}`)
+  if (!files.length) console.log('  none found in this home folder')
+  if (secrets.length) console.log(`\nSecrets left out, which setup lists to set by hand: ${secrets.map(describeSecret).join('; ')}`)
+  console.log('\nCheck the changes with git diff before committing them.')
+}
+
+function describeSecret({ file, setting }: Secret): string {
+  return `${setting} in ~/${file}`
 }
 
 /** Clones a Repo onto its production branch, unless its folder exists. */
@@ -138,12 +161,13 @@ const teamSdks: Partial<Record<Team, string>> = {
 }
 
 /** What setup can't do for the given Repos, in the order to do it. */
-function manualSteps(repos: Repo[]): string[] {
+function manualSteps(repos: Repo[], secrets: Secret[]): string[] {
   const selected = teams.filter((team) => repos.some((repo) => repo.team === team) && teamSdks[team])
   const ssh = repos.filter((repo) => /^(git@|ssh:\/\/)/.test(repo.remote)).map((repo) => repo.name)
   return [
     ...(selected.length ? [`SDKs and IDEs, by Team: ${selected.map((team) => teamSdks[team]).join('; ')}.`] : []),
     `Git access: sign in to GitHub for the HTTPS remotes${ssh.length ? `, and add an SSH key for the SSH ones (${ssh.join(', ')})` : ''}, then run setup again for any Repo that failed to clone.`,
+    ...(secrets.length ? [`Secrets the Workers' config needs, which this repo doesn't hold: set ${secrets.map(describeSecret).join('; ')}.`] : []),
     `Secrets and env files: fill in ${join(agentsRoot, '.env')} from .env.example, and copy each Repo's own env files and secrets, which git doesn't hold, from the old machine.`,
     "Folders that aren't Repos, which setup doesn't clone: personal repos, repos without a remote, the Flutter SDK clone, autopay-android, and your checkout of the org wiki (WIKI_FOLDER in .env).",
     `Workers: log in to claude, codex and agy, then log in once to the Pipeline's own Antigravity home by running agy with HOME set to ${antigravityHomeDir()}.`,

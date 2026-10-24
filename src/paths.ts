@@ -9,6 +9,11 @@ export function agentsDir(): string {
   return process.env.AGENTS_AGENTS_DIR ?? join(agentsRoot, 'agents')
 }
 
+/** The Workers' config that setup installs, a folder per Worker laid out as in the home folder. */
+export function workerConfigDir(): string {
+  return process.env.AGENTS_WORKER_CONFIG_DIR ?? join(agentsRoot, 'worker-config')
+}
+
 /** The git-ignored data area: Runs, state, Memory and the PRD inbox. */
 export function dataDir(): string {
   return process.env.AGENTS_DATA_DIR ?? join(agentsRoot, 'data')

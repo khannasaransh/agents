@@ -5,7 +5,7 @@ import { decideProposal, memoryFile, pendingProposals, proposalDiff } from './me
 import { runDir } from './paths.ts'
 import { runPipeline, runSingleStep } from './pipeline.ts'
 import { installSchedules, recordScheduledStart } from './schedule.ts'
-import { defaultRoot, setupMachine } from './setup.ts'
+import { captureConfig, defaultRoot, setupMachine } from './setup.ts'
 
 const usage = `Usage:
   agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily; a dry run
@@ -21,7 +21,12 @@ const usage = `Usage:
   agents setup [--team <team,...>]          Prepare this machine: clone each Repo of the named Teams
                [--root <folder>]            (all of them by default) into a folder named for its
                                             Team, in the folder holding this repo unless given one;
-                                            check the tools; list what's left to do by hand`
+                                            check the tools; install the Workers' config from this
+                                            repo, backing up what it replaces; list what's left to
+                                            do by hand
+  agents setup capture [--root <folder>]    Copy this machine's Workers' config into this repo, with
+                                            the paths to its home and root folders made portable
+                                            and its secrets left out, for setup to install elsewhere`
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv
@@ -90,6 +95,10 @@ async function main(argv: string[]): Promise<number> {
         allowPositionals: true,
         options: { team: { type: 'string', multiple: true, default: [] }, root: { type: 'string', default: defaultRoot } },
       })
+      if (positionals.length === 1 && positionals[0] === 'capture' && !values.team.length) {
+        captureConfig({ root: values.root })
+        return 0
+      }
       if (positionals.length) return fail(usage)
       const teams = values.team.flatMap((list) => list.split(',')).map((team) => team.trim()).filter(Boolean)
       return (await setupMachine({ root: values.root, teams })) ? 0 : 1
