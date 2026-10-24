@@ -1,0 +1,51 @@
+#!/usr/bin/env node
+// Readies a file from the PRD inbox for the wiki's PRD skill, from the wiki root (the folder it runs
+// in), where the Docs Step stages the inbox's files. A Word file is read through the wiki's docx2md.
+// Usage:
+//   prd convert <staged file>                   converts a staged .docx to Markdown, for reading, and prints where it wrote it
+//   prd add <staged file> <codebase> <feature>  copies it into _sources/<codebase>/PRD/ under its own name, then converts the
+//                                               copy into _runs/prds/<feature>/ (source.md and media/), as the PRD skill's first step does
+import { spawnSync } from 'node:child_process'
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs'
+import { basename, dirname, extname, join } from 'node:path'
+
+const usage = 'usage: prd convert <staged file> | add <staged file> <codebase> <feature>'
+const [command, staged, codebase, feature] = process.argv.slice(2)
+if (!['convert', 'add'].includes(command) || !staged) fail(usage)
+if (!existsSync(staged)) fail(`${staged} doesn't exist`)
+const kind = extname(staged).toLowerCase()
+if (kind === '.doc') fail(`${staged} is an old Word file, which the wiki's tools can't read: skip it, so Saransh saves it as .docx`)
+if (!['.docx', '.md', '.pdf'].includes(kind)) fail(`${staged} isn't Word, PDF or Markdown`)
+
+if (command === 'convert') {
+  if (kind !== '.docx') fail(`only a .docx needs converting: read ${staged} itself`)
+  const out = join(dirname(staged), '.converted', basename(staged))
+  docx2md(staged, out)
+  console.log(join(out, 'source.md'))
+} else {
+  if (!codebase || !feature) fail(usage)
+  if (!existsSync(join('_sources', codebase))) fail(`the wiki has no _sources/${codebase}; its Codebases: ${readdirSync('_sources').join(', ')}`)
+  if (!/^[a-z0-9]+(-[a-z0-9]+)*$/.test(feature)) fail(`${feature} isn't a lowercase kebab-case name`)
+  const copy = join('_sources', codebase, 'PRD', basename(staged))
+  const replaced = existsSync(copy)
+  mkdirSync(dirname(copy), { recursive: true })
+  copyFileSync(staged, copy)
+  console.log(`${replaced ? 'Replaced' : 'Added'} ${copy}`)
+  const out = join('_runs', 'prds', feature)
+  if (kind === '.docx') docx2md(copy, out)
+  else if (kind === '.md') {
+    mkdirSync(out, { recursive: true })
+    copyFileSync(copy, join(out, 'source.md'))
+  }
+  console.log(kind === '.pdf' ? `A PDF has no converter: read ${copy} itself` : `Wrote ${join(out, 'source.md')}`)
+}
+
+function docx2md(file, out) {
+  const { status } = spawnSync(process.execPath, ['_wiki/tools/docx2md.mjs', file, out], { stdio: 'inherit' })
+  if (status !== 0) process.exit(status ?? 1)
+}
+
+function fail(message) {
+  console.error(message)
+  process.exit(2)
+}

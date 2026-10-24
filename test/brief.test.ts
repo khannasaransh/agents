@@ -277,6 +277,8 @@ test("after the Repos, the Brief lists the docs branch's pages waiting for Saran
     branch: 'agents/docs',
     commit: sha(8),
     pages: [{ page: 'repos/crux_flutter/paywall.md', summary: 'The price now comes from the payments service.' }],
+    prds: [],
+    skipped: [],
     waiting,
     undocumented: [],
   } satisfies DocsResult)
@@ -304,12 +306,70 @@ test("after the Repos, the Brief lists the docs branch's pages waiting for Saran
   )
 })
 
+test('the Brief lists the PRD pages this Run wrote from the PRD inbox on the docs branch, and the inbox files it set aside, with why', async () => {
+  prepareRun([changed])
+  ws.writeRunFile(runId, 'docs.json', {
+    status: 'updated',
+    branch: 'agents/docs',
+    commit: sha(8),
+    pages: [],
+    prds: [{ file: 'Paywall_PRD.pdf', codebase: 'inpix', page: 'products/inpix/prds/paywall.md', summary: 'Premium subscribers skip the paywall.' }],
+    skipped: [{ file: 'Lunch_menu.pdf', reason: 'A lunch menu, not a PRD.' }],
+    waiting: { commits: 2, pages: ['products/inpix/prds/paywall.md'] },
+    undocumented: [],
+  } satisfies DocsResult)
+
+  const text = await brief()
+
+  assert.equal(
+    text.slice(text.indexOf('## Docs branch waiting for review'), text.indexOf('## Run health')).trim(),
+    [
+      '## Docs branch waiting for review',
+      '',
+      '`agents/docs` has 2 commits not on main, changing these pages, each a draft:',
+      '',
+      '- products/inpix/prds/paywall.md',
+      '',
+      'This Run wrote PRD pages from the PRD inbox, and moved their files to done/ there:',
+      '',
+      '- products/inpix/prds/paywall.md, from Paywall_PRD.pdf: Premium subscribers skip the paywall.',
+      '',
+      'Review it with `git diff main...agents/docs` in the wiki, and merge it into main when you accept it.',
+      '',
+      '## PRD inbox files set aside',
+      '',
+      "The Docs Agent didn't turn these into PRD pages, so they were moved to skipped/ in the PRD inbox. Move one back into the inbox for the next Run to try it again.",
+      '',
+      '- Lunch_menu.pdf: A lunch menu, not a PRD.',
+    ].join('\n'),
+  )
+})
+
+test('the Brief lists the PRD inbox files set aside even when the docs branch has nothing waiting', async () => {
+  prepareRun([changed])
+  ws.writeRunFile(runId, 'docs.json', {
+    status: 'no-edits',
+    branch: 'agents/docs',
+    prds: [],
+    skipped: [{ file: 'Lunch_menu.pdf', reason: 'A lunch menu, not a PRD.' }],
+    waiting: null,
+    undocumented: [],
+  } satisfies DocsResult)
+
+  const text = await brief()
+
+  assert.doesNotMatch(text, /## Docs branch waiting for review/)
+  assert.match(text, /## PRD inbox files set aside\n\n[^\n]+\n\n- Lunch_menu\.pdf: A lunch menu, not a PRD\.\n/)
+})
+
 test('when merging main into the docs branch conflicted, the Brief says the wiki was left as it was, and how to go on', async () => {
   prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
   ws.writeRunFile(runId, 'docs.json', {
     status: 'conflict',
     branch: 'agents/docs',
     files: ['repos/crux_flutter/paywall.md'],
+    prds: [],
+    skipped: [],
     waiting: { commits: 1, pages: ['repos/crux_flutter/paywall.md'] },
     undocumented: [],
   } satisfies DocsResult)
@@ -328,6 +388,8 @@ test("when the wiki's check failed on the Docs Agent's edits, the Brief says the
     status: 'check-failed',
     branch: 'agents/docs',
     check: 'E repos/crux_flutter/paywall.md: cites lib/gone.dart, not at the pin\n1 errors',
+    prds: [],
+    skipped: [],
     waiting: null,
     undocumented: [],
   } satisfies DocsResult)
@@ -342,11 +404,11 @@ test("when the wiki's check failed on the Docs Agent's edits, the Brief says the
 
 test('when the Docs Agent added a page, the Brief says its edits were rejected and names the file', async () => {
   prepareRun([changed], { steps: [{ name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }] })
-  ws.writeRunFile(runId, 'docs.json', { status: 'rejected', branch: 'agents/docs', files: ['repos/inpix-panel/index.md'], waiting: null, undocumented: [] } satisfies DocsResult)
+  ws.writeRunFile(runId, 'docs.json', { status: 'rejected', branch: 'agents/docs', files: ['repos/inpix-panel/index.md'], prds: [], skipped: [], waiting: null, undocumented: [] } satisfies DocsResult)
 
   assert.match(
     await brief(),
-    /This Run's wiki edits weren't committed, since the Docs Agent added or deleted repos\/inpix-panel\/index\.md, and it may only update pages that exist\.\n/,
+    /This Run's wiki edits weren't committed, since the Docs Agent added, deleted or replaced repos\/inpix-panel\/index\.md, and it may only update pages that exist and add PRD pages with copies of PRD inbox files\.\n/,
   )
 })
 
@@ -355,6 +417,8 @@ test('the Brief lists the Repos with new commits that the wiki has never documen
   ws.writeRunFile(runId, 'docs.json', {
     status: 'nothing-to-update',
     branch: 'agents/docs',
+    prds: [],
+    skipped: [],
     waiting,
     undocumented: [
       { repo: 'inpix-panel', team: 'frontend', commits: 2 },

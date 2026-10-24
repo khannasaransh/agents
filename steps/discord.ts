@@ -7,11 +7,12 @@
 // It is skipped, not failed, until the env file holds the bot token, the channel list and Saransh's
 // Discord user ID.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
-import { join, parse } from 'node:path'
+import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { discordConfig, type DiscordConfig } from '../src/env.ts'
 import { readJson, writeJson } from '../src/files.ts'
 import { prdInboxDir } from '../src/paths.ts'
+import { freeName, readInboxSources, writeInboxSources } from '../src/prd-inbox.ts'
 import { readRun } from '../src/run.ts'
 import { readDiscordState, writeDiscordState } from '../src/state.ts'
 import { runAsStep, StepSkipped } from '../src/step.ts'
@@ -131,9 +132,6 @@ interface Attached {
   message: string
 }
 
-/** Where each file the Discord Step saved into the PRD inbox came from, by its name there, as sources.json in the inbox. */
-type InboxSources = Record<string, { message: string; attachment: string }>
-
 /** Discord's IDs grow with time, so a time's ID asks for the messages after it. */
 const snowflakeAt = (time: string) => String((BigInt(Date.parse(time)) - 1420070400000n) << 22n)
 
@@ -185,18 +183,9 @@ async function readMessages(config: DiscordConfig, at: Conversation, window: Win
   })
 }
 
-/** `filename`, or when the inbox holds a file by that name, the first free `name (n).ext`. */
-function freeName(filename: string): string {
-  const { name, ext } = parse(filename)
-  let free = filename
-  for (let n = 2; existsSync(join(prdInboxDir(), free)); n++) free = `${name} (${n})${ext}`
-  return free
-}
-
 /** Downloads each attached PRD file from Discord's CDN into the PRD inbox, recording the message it came from. */
 async function saveToInbox(files: Attached[]): Promise<void> {
-  const sourcesFile = join(prdInboxDir(), 'sources.json')
-  const sources = existsSync(sourcesFile) ? readJson<InboxSources>(sourcesFile) : {}
+  const sources = readInboxSources()
   for (const { attachment, message } of files) {
     if (Object.values(sources).some((s) => s.attachment === attachment.id)) {
       console.log(`${attachment.filename} from ${message} is in the PRD inbox already`)
@@ -205,11 +194,11 @@ async function saveToInbox(files: Attached[]): Promise<void> {
     // The URL is signed, so it needs no bot token, and the token stays with Discord's API.
     const response = await fetch(attachment.url)
     if (!response.ok) throw new Error(`Discord's CDN answered ${response.status} for ${attachment.filename} from ${message}`)
-    const file = freeName(attachment.filename)
+    const file = freeName(prdInboxDir(), attachment.filename)
     mkdirSync(prdInboxDir(), { recursive: true })
     writeFileSync(join(prdInboxDir(), file), Buffer.from(await response.arrayBuffer()))
     sources[file] = { message, attachment: attachment.id }
-    writeJson(sourcesFile, sources)
+    writeInboxSources(sources)
     console.log(`Saved ${file} from ${message} into the PRD inbox`)
   }
 }

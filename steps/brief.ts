@@ -1,8 +1,9 @@
 // Brief: renders the day's Brief as Markdown in the Run folder from what earlier Steps wrote there:
 // the PM Agent's To-dos and Discord highlights, the Discord messages that mention Saransh and the
 // DMs with the bot, then by Team each Repo's line from the PM Agent, its new commits and review,
-// then the docs branch's pages waiting for review and the undocumented Repos with new commits, then
-// the Memory changes waiting for Saransh and the Run's health with the number of Repos reviewed.
+// then the docs branch's pages waiting for review, the PRD inbox files set aside and the undocumented
+// Repos with new commits, then the Memory changes waiting for Saransh and the Run's health with the
+// number of Repos reviewed.
 // It runs even when earlier Steps failed, and says when the PM output is missing.
 import { existsSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
@@ -92,10 +93,10 @@ function mentionLines(discord: DiscordRead | null): string[] {
   ]
 }
 
-/** The docs branch's pages waiting for Saransh's review, and how this Run's Docs Step went. */
+/** The docs branch's pages waiting for Saransh's review, and how this Run's Docs Step went, with the PRD pages it wrote. */
 function docsLines(docs: DocsResult | null): string[] {
   const stopped = docs?.status === 'conflict' || docs?.status === 'check-failed' || docs?.status === 'rejected'
-  if (!docs || (!docs.waiting && !stopped)) return []
+  if (!docs || (!docs.waiting && !stopped && !docs.prds.length)) return []
   const lines = ['## Docs branch waiting for review', '']
   if (docs.waiting) {
     const { commits, pages } = docs.waiting
@@ -106,7 +107,11 @@ function docsLines(docs: DocsResult | null): string[] {
   const notCommitted = "This Run's wiki edits weren't committed, since"
   switch (docs.status) {
     case 'updated':
-      lines.push('This Run updated:', '', ...docs.pages.map((p) => `- ${p.page}: ${p.summary}`), '')
+      if (docs.pages.length) lines.push('This Run updated:', '', ...docs.pages.map((p) => `- ${p.page}: ${p.summary}`), '')
+      if (docs.prds.length) {
+        lines.push('This Run wrote PRD pages from the PRD inbox, and moved their files to done/ there:', '')
+        lines.push(...docs.prds.map((p) => `- ${p.page}, from ${p.file}: ${p.summary}`), '')
+      }
       break
     case 'conflict':
       lines.push(
@@ -118,11 +123,26 @@ function docsLines(docs: DocsResult | null): string[] {
       lines.push(`${notCommitted} the wiki's check still reports errors:`, '', '```', docs.check, '```', '')
       break
     case 'rejected':
-      lines.push(`${notCommitted} the Docs Agent added or deleted ${docs.files.join(', ')}, and it may only update pages that exist.`, '')
+      lines.push(
+        `${notCommitted} the Docs Agent added, deleted or replaced ${docs.files.join(', ')}, and it may only update pages that exist and add PRD pages with copies of PRD inbox files.`,
+        '',
+      )
       break
   }
   if (docs.waiting) lines.push(`Review it with \`git diff ${mainLine}...${docs.branch}\` in the wiki, and merge it into ${mainLine} when you accept it.`, '')
   return lines
+}
+
+function skippedLines(docs: DocsResult | null): string[] {
+  if (!docs?.skipped.length) return []
+  return [
+    '## PRD inbox files set aside',
+    '',
+    "The Docs Agent didn't turn these into PRD pages, so they were moved to skipped/ in the PRD inbox. Move one back into the inbox for the next Run to try it again.",
+    '',
+    ...docs.skipped.map((s) => `- ${s.file}: ${s.reason}`),
+    '',
+  ]
 }
 
 function undocumentedLines(docs: DocsResult | null): string[] {
@@ -175,7 +195,7 @@ function render(
     if (unchanged.length) lines.push(`Unchanged: ${unchanged.join(', ')}`, '')
   }
 
-  lines.push(...docsLines(docs), ...undocumentedLines(docs), ...proposalLines(proposals))
+  lines.push(...docsLines(docs), ...skippedLines(docs), ...undocumentedLines(docs), ...proposalLines(proposals))
   const reviewed = [...reviews.values()].filter((r) => r.status === 'reviewed').length
   lines.push('## Run health', '', `Run ${run.id} of the ${run.pipeline} Pipeline.`, '', `Repos reviewed: ${reviewed}.`, '')
   const notSucceeded = stepsNotSucceeded(run.steps).filter((s) => s.name !== 'brief')

@@ -485,6 +485,24 @@ test('a file already in the PRD inbox from an earlier Run is not saved again', a
   assert.equal(cdn!.requests.length, 1)
 })
 
+test('a file the Docs Agent has moved out of the PRD inbox, into done/ or skipped/, is not saved again', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const [pdf] = await uploaded(payments.id, { filename: 'Paywall_PRD.pdf', contentType: 'application/pdf', content: '%PDF-1.7\nThe paywall PRD' })
+  const post = message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'PRD for the paywall', [], [pdf])
+  await workspaceWithDiscord(watched(payments, [post]))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+  const sources = { 'done/Paywall_PRD.pdf': { message: `https://discord.com/channels/${guildId}/${payments.id}/${post.id}`, attachment: pdf.id } }
+  ws.writePrdInboxFile('done/Paywall_PRD.pdf', '%PDF-1.7\nThe paywall PRD')
+  ws.writePrdInboxFile('sources.json', JSON.stringify(sources))
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.prdInboxFiles(), ['done', 'sources.json'])
+  assert.deepEqual(JSON.parse(ws.readPrdInboxFile('sources.json')), sources)
+  assert.equal(cdn!.requests.length, 0)
+})
+
 test('a file Saransh dropped into the PRD inbox by hand is kept, and a different one from Discord with the same name gets a numbered name', async () => {
   const payments = channel('1100000000000000001', 'payments')
   const [pdf] = await uploaded(payments.id, { filename: 'Paywall_PRD.pdf', contentType: 'application/pdf', content: '%PDF-1.7\nThe paywall PRD, v2' })

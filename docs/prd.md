@@ -193,17 +193,18 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 5. **Docs** (Agent): runs on Claude Code in its own worktree of the wiki, on a single rolling docs branch.
    - **Branch:** it continues an unmerged branch, starts fresh from the wiki's main line once the branch has been merged, and merges main in first if main has moved. On a conflict it stops and reports.
    - **Scope:** existing pages whose sources cite files changed by new commits, and every file in the PRD inbox. It uses the wiki's own skills: the PRD skill for PRDs and the update procedure for code changes.
-   - **PRD files:** it decides whether each one is a PRD and which Codebase it belongs to, copies it into that Codebase's PRD sources, and writes the PRD page. A copy from Discord cites the Discord message link in the page's sources. It moves processed files out of the inbox, and files that aren't PRDs to a separate holding area.
+   - **PRD files:** it decides whether each one is a PRD and which Codebase it belongs to, copies it into that Codebase's PRD sources, and writes the PRD page. A copy from Discord cites the Discord message link in the page's sources. Once its work is committed, it moves processed files into the inbox's `done/`, and files it set aside, such as those that aren't PRDs, into `skipped/`. Each file's `sources.json` entry moves with it.
    - **Never:** it doesn't use Discord messages as wiki sources, doesn't document a Repo for the first time, and doesn't push or merge.
    - **Wiki rules:** it follows them throughout. It reads code only at pinned commits, leaves pages as drafts, and runs the wiki's stamp, region and check tools until the check reports no errors. It commits under Saransh's git identity with trailers naming the Agent and the Run.
-   - **Output:** the pages changed, the PRDs processed, and undocumented Repos with large changes, for the Brief.
+   - **Output:** the pages changed, the PRDs processed, the inbox files set aside with why, and undocumented Repos with large changes, for the Brief.
 6. **Save state** (command): advances the last reviewed commit only for Repos whose review succeeded, and applies the Memory edits the Agents proposed, logging each in the Run. For an Agent whose config says its Memory changes wait for review, it queues them for Saransh instead (see Agents).
 7. **Brief** (command): the last Step, so its Run health covers every other Step. It renders the Brief as Markdown in the Run folder. Sections, in order:
    - To-dos;
    - Discord highlights;
    - the Discord messages that mention Saransh and the DMs with the bot, straight from the Discord Step, so they show even without the PM output;
    - by Team, per Repo: one line on what changed, its new commits, and its findings by severity, with Saransh's own first;
-   - wiki drafts and the docs branch waiting for review;
+   - wiki drafts and the docs branch waiting for review, with the PRD pages the Run wrote;
+   - PRD inbox files set aside, with why;
    - undocumented Repos with large changes;
    - Memory changes waiting for Saransh;
    - Run health, with the number of Repos reviewed.

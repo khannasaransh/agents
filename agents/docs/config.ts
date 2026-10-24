@@ -15,27 +15,46 @@ const docs: AgentConfig = {
     pages: 'The wiki pages to update: each with the sources it cites that new commits changed, and those changed files',
     repos: 'Each Repo with new commits: its production branch, local clone, the last reviewed commit (from) and its pin (to), its new head',
     pinsFile: 'The pins file naming each of those Repos at its pin, for your Tools',
+    prds: 'Each file waiting in the PRD inbox: its name there (file), where it is staged in the folder you run in (staged), and the Discord message it was posted in, or null when Saransh dropped it in by hand (discordMessage)',
+    prdPinsFile: 'The pins file naming every Repo fetched in this Run at its pin, for tracing PRDs, in the folder you run in; null when the PRD inbox is empty',
   },
   tools: {
     code: 'code <pins file> <repo> show <path> | ls [<path>] | grep <pattern> [<path>] | log <from> [<path>] | diff <from> [<path>]: reads a Repo at its pin, the only way you read code',
     finish: "finish <pins file> <page>…: runs the wiki's regions, stamp and check tools on the pages you changed; exits 0 once the check reports no errors",
+    prd: "prd convert <staged file> | add <staged file> <codebase> <feature>: convert prints where it wrote a staged Word file as Markdown, for reading; add copies a staged file into the Codebase's PRD sources under its own name and converts it into _runs/prds/<feature>/ for the PRD skill",
   },
   outputs: {
-    pages: 'Each page you changed, with one line on what changed in it',
+    pages: 'Each page you changed from new commits, with one line on what changed in it',
+    prds: 'Each file from the PRD inbox you turned into a PRD page: its name in the inbox, its Codebase, its PRD page, and one line on what the PRD covers',
+    skipped: "Each file from the PRD inbox you didn't turn into a PRD page, with one line on why",
   },
   outputSchema: {
     type: 'object',
     additionalProperties: false,
-    required: ['pages'],
+    required: ['pages', 'prds', 'skipped'],
     properties: {
       pages: {
         type: 'array',
         items: { type: 'object', additionalProperties: false, required: ['page', 'summary'], properties: { page: { type: 'string' }, summary: { type: 'string' } } },
       },
+      prds: {
+        type: 'array',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['file', 'codebase', 'page', 'summary'],
+          properties: { file: { type: 'string' }, codebase: { type: 'string' }, page: { type: 'string' }, summary: { type: 'string' } },
+        },
+      },
+      skipped: {
+        type: 'array',
+        items: { type: 'object', additionalProperties: false, required: ['file', 'reason'], properties: { file: { type: 'string' }, reason: { type: 'string' } } },
+      },
     },
   },
-  timeoutSeconds: 1800,
-  maxTurns: 80,
+  // A PRD takes the wiki's whole PRD skill: converting, tracing the code, writing, checking and verifying.
+  timeoutSeconds: 3600,
+  maxTurns: 200,
 }
 
 export default docs

@@ -77,8 +77,8 @@ export interface TestWiki {
   folder: string
   /** Commits files on the branch Saransh's checkout is on, as he would, and returns the commit. */
   commit(subject: string, files: Record<string, string>): string
-  /** Each run of the wiki's stand-in tools, oldest first, with the folder it ran in. */
-  toolRuns(): { tool: string; args: string[]; cwd: string }[]
+  /** Each run of the wiki's stand-in tools, oldest first, with the folder it ran in and the commit checked out there. */
+  toolRuns(): { tool: string; args: string[]; cwd: string; head: string }[]
 }
 
 /** A call the stand-in for a Worker's CLI received. */
@@ -131,10 +131,11 @@ export interface Workspace {
   writeMemory(agent: string, name: string, text: string): void
   /** An Agent's Memory file in the data area, as Saransh would open it; null when there is none. */
   readMemory(agent: string, name: string): string | null
-  /** Drops a file into the PRD inbox, as Saransh would by hand. */
+  /** Drops a file into the PRD inbox, as Saransh would by hand, by its path in the inbox, such as done/<name>. */
   writePrdInboxFile(name: string, content: string): void
-  /** The files in the PRD inbox, by name, or none when it doesn't exist. */
+  /** What the PRD inbox holds at its top level, files and folders, by name, or none when it doesn't exist. */
   prdInboxFiles(): string[]
+  /** A file in the PRD inbox, by its path there. */
   readPrdInboxFile(name: string): string
   /**
    * Fetches a Repo's clone and writes what Fetch records for it in a Run, as a Step's input: the
@@ -241,8 +242,10 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       git(folder, 'config', 'user.email', 'saransh@example.com')
       const recordRun = (tool: string) =>
         `import { appendFileSync, readFileSync } from 'node:fs'\n` +
+        `import { execFileSync } from 'node:child_process'\n` +
         `const args = process.argv.slice(2)\n` +
-        `appendFileSync(${JSON.stringify(toolLog)}, JSON.stringify({ tool: ${JSON.stringify(tool)}, args, cwd: process.cwd() }) + '\\n')\n`
+        `const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()\n` +
+        `appendFileSync(${JSON.stringify(toolLog)}, JSON.stringify({ tool: ${JSON.stringify(tool)}, args, cwd: process.cwd(), head }) + '\\n')\n`
       const tools = {
         'regions.mjs': recordRun('regions'),
         'stamp.mjs': recordRun('stamp'),
@@ -330,8 +333,9 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
     },
 
     writePrdInboxFile(name, content) {
-      mkdirSync(join(dataDir, 'prd-inbox'), { recursive: true })
-      writeFileSync(join(dataDir, 'prd-inbox', name), content)
+      const file = join(dataDir, 'prd-inbox', name)
+      mkdirSync(dirname(file), { recursive: true })
+      writeFileSync(file, content)
     },
 
     prdInboxFiles() {
