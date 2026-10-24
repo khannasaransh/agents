@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { hangingRemote, makeWorkspace, until, type Workspace } from './helpers.ts'
@@ -44,6 +44,19 @@ test('a second Run refuses to start while one is active, and can start once it e
   await first.result
   await ws.agents('run', 'daily')
   assert.equal(ws.runIds().length, 2)
+})
+
+test('a scheduled start while a Run is active is refused by the lock, and the refusal is recorded', async () => {
+  await slowWorkspace(2)
+  const manual = ws.start('run', 'daily')
+  await until(() => ws.runIds().length === 1)
+
+  const scheduled = await ws.agents('run', 'daily', '--scheduled')
+
+  assert.equal(scheduled.status, 1)
+  assert.equal(ws.runIds().length, 1)
+  assert.match(readFileSync(join(ws.dataDir, 'scheduled-starts.log'), 'utf8'), /^\S+Z daily: refused: A Run is already active \(pid \d+\); try again once it ends\n$/)
+  await manual.result
 })
 
 test('agents step refuses while a Run is active', async () => {

@@ -6,6 +6,9 @@ import { failAbandonedRuns } from './run.ts'
 
 const lockFile = () => join(dataDir(), 'run.lock')
 
+/** Thrown when the lock refuses a Run, or a Step, because another Run is active. */
+export class RunActiveError extends Error {}
+
 /**
  * Takes the lock that lets only one Run be active at a time, returning a function that releases
  * it. Throws if another Run is active. The lock is a file lock, which ends with the process
@@ -18,7 +21,7 @@ export function acquireLock(): () => void {
   const fd = openLocked(lockFile())
   if (fd === null) {
     const pid = readFileSync(lockFile(), 'utf8').trim()
-    throw new Error(`A Run is already active${pid ? ` (pid ${pid})` : ''}; try again once it ends`)
+    throw new RunActiveError(`A Run is already active${pid ? ` (pid ${pid})` : ''}; try again once it ends`)
   }
   try {
     stopRecordedProcesses()

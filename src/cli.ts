@@ -4,23 +4,36 @@ import { parseArgs } from 'node:util'
 import { decideProposal, memoryFile, pendingProposals, proposalDiff } from './memory.ts'
 import { runDir } from './paths.ts'
 import { runPipeline, runSingleStep } from './pipeline.ts'
+import { installSchedules, recordScheduledStart } from './schedule.ts'
 
 const usage = `Usage:
   agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily; a dry run
-                                            runs every Agent on the fake Worker
+             [--scheduled]                  runs every Agent on the fake Worker; a scheduled one,
+                                            as a Schedule starts it, records in the data area's
+                                            scheduled-starts.log how it ended or why it didn't start
   agents step <name> --run <id> [--force]   Run one Step inside an existing Run
   agents memory                             List the Memory changes Agents proposed, waiting for you
   agents memory accept <agent> <name>       Make a proposed change the Memory the next Run reads
-  agents memory reject <agent> <name>       Drop a proposed change, leaving the Memory as it is`
+  agents memory reject <agent> <name>       Drop a proposed change, leaving the Memory as it is
+  agents schedule install                   Install every Schedule into launchd, replacing what an
+                                            earlier install wrote; it runs with this shell's PATH`
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv
   switch (command) {
     case 'run': {
-      const { values, positionals } = parseArgs({ args: rest, allowPositionals: true, options: { 'dry-run': { type: 'boolean', default: false } } })
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: { 'dry-run': { type: 'boolean', default: false }, scheduled: { type: 'boolean', default: false } },
+      })
       const [pipeline] = positionals
       if (!pipeline) return fail(usage)
-      const run = await runPipeline(pipeline, { dryRun: values['dry-run'] })
+      const run = await runPipeline(pipeline, { dryRun: values['dry-run'] }).catch((error: unknown) => {
+        if (values.scheduled) recordScheduledStart(pipeline, { error })
+        throw error
+      })
+      if (values.scheduled) recordScheduledStart(pipeline, { run })
       console.log(`Run ${run.id} ${run.status}${run.dryRun ? ' (dry run)' : ''}: ${runDir(run.id)}`)
       console.log(`Brief: ${join(runDir(run.id), 'brief.md')}`)
       return run.status === 'succeeded' ? 0 : 2
@@ -57,6 +70,13 @@ async function main(argv: string[]): Promise<number> {
         console.log(`${agent} ${name}, proposed in Run ${run}:\n\n${proposalDiff(proposal)}`)
         console.log(`Accept with: agents memory accept ${agent} ${name}\nReject with: agents memory reject ${agent} ${name}\n`)
       }
+      return 0
+    }
+    case 'schedule': {
+      if (rest.length !== 1 || rest[0] !== 'install') return fail(usage)
+      const { files, missing } = await installSchedules()
+      for (const file of files) console.log(`Installed ${file}`)
+      if (missing.length) console.error(`Not found on the Schedule's PATH, so a scheduled Run can't use them: ${missing.join(', ')}`)
       return 0
     }
     default:

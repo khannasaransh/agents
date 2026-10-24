@@ -11,5 +11,5 @@
     "verbatimModuleSyntax": true,
     "skipLibCheck": true
   },
-  "include": ["src", "steps", "pipelines", "test", "repos.ts"]
+  "include": ["src", "steps", "pipelines", "schedules", "test", "repos.ts"]
 }
