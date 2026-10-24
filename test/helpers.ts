@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url'
 import type { FetchResult } from '../steps/fetch.ts'
 import type { CannedAnswer } from '../src/workers/fake.ts'
 
-const cli = fileURLToPath(new URL('../src/cli.ts', import.meta.url))
+export const cli = fileURLToPath(new URL('../src/cli.ts', import.meta.url))
 
 // Keep every git call in the tests away from the user's own git config.
-const gitEnv = {
+export const gitEnv = {
   ...process.env,
   GIT_CONFIG_GLOBAL: '/dev/null',
   GIT_CONFIG_NOSYSTEM: '1',

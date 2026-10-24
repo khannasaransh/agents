@@ -5,6 +5,7 @@ import { decideProposal, memoryFile, pendingProposals, proposalDiff } from './me
 import { runDir } from './paths.ts'
 import { runPipeline, runSingleStep } from './pipeline.ts'
 import { installSchedules, recordScheduledStart } from './schedule.ts'
+import { defaultRoot, setupMachine } from './setup.ts'
 
 const usage = `Usage:
   agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily; a dry run
@@ -16,7 +17,11 @@ const usage = `Usage:
   agents memory accept <agent> <name>       Make a proposed change the Memory the next Run reads
   agents memory reject <agent> <name>       Drop a proposed change, leaving the Memory as it is
   agents schedule install                   Install every Schedule into launchd, replacing what an
-                                            earlier install wrote; it runs with this shell's PATH`
+                                            earlier install wrote; it runs with this shell's PATH
+  agents setup [--team <team,...>]          Prepare this machine: clone each Repo of the named Teams
+               [--root <folder>]            (all of them by default) into a folder named for its
+                                            Team, in the folder holding this repo unless given one;
+                                            check the tools; list what's left to do by hand`
 
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv
@@ -78,6 +83,16 @@ async function main(argv: string[]): Promise<number> {
       for (const file of files) console.log(`Installed ${file}`)
       if (missing.length) console.error(`Not found on the Schedule's PATH, so a scheduled Run can't use them: ${missing.join(', ')}`)
       return 0
+    }
+    case 'setup': {
+      const { values, positionals } = parseArgs({
+        args: rest,
+        allowPositionals: true,
+        options: { team: { type: 'string', multiple: true, default: [] }, root: { type: 'string', default: defaultRoot } },
+      })
+      if (positionals.length) return fail(usage)
+      const teams = values.team.flatMap((list) => list.split(',')).map((team) => team.trim()).filter(Boolean)
+      return (await setupMachine({ root: values.root, teams })) ? 0 : 1
     }
     default:
       return fail(usage)
