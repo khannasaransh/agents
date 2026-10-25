@@ -8,7 +8,7 @@
 
 **Status:** ready-for-agent
 
-- [ ] Only the versions Saransh approved (issue 25) are tested.
+- [ ] Only the versions Saransh approved (issue 25) are tested: `pdash.strategies.approvals.candidates` gives the built-in strategies whose current version is approved in ash_new's `config/approved_versions.yaml`.
 - [ ] Each strategy in a Book's market is tested for:
   - holdout CAGR against the benchmark's over the same years (2013–2016);
   - a deflated Sharpe that clears 95%, counting every variant tried in its family as a trial (using the robustness tools from ash_new's ticket 44);
