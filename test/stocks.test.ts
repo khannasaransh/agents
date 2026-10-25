@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { ashNewFolder } from '../src/env.ts'
@@ -9,9 +9,18 @@ import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
 let ws: Workspace
 afterEach(() => ws?.cleanup())
 
-test('agents run stocks --dry-run reads the Lake as it is, then writes the Stocks Brief', async () => {
-  ws = makeWorkspace()
-  ws.setPd({ status: { example: 'status.healthy.json' } })
+/** A workspace with an ash_new folder for the Health Agent to run in. */
+function workspace(): Workspace {
+  const made = makeWorkspace()
+  const ashNew = join(made.homeDir, 'portfolio-dashboard')
+  mkdirSync(ashNew)
+  made.writeEnvFile(`ASH_NEW_FOLDER=${ashNew}\n`)
+  return made
+}
+
+test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agent on a healthy Lake, then writes the Stocks Brief', async () => {
+  ws = workspace()
+  ws.setPd({ status: { example: 'status.clean.json' } })
 
   const result = await ws.agents('run', 'stocks', '--dry-run')
 
@@ -24,6 +33,7 @@ test('agents run stocks --dry-run reads the Lake as it is, then writes the Stock
     run.steps.map((s) => [s.name, s.status]),
     [
       ['lake', 'succeeded'],
+      ['health', 'skipped'],
       ['brief', 'succeeded'],
     ],
   )
@@ -37,8 +47,8 @@ test('agents run stocks --dry-run reads the Lake as it is, then writes the Stock
   assert.deepEqual(readdirSync(join(ws.dataDir, 'processes')), [], 'every process the Run started is recorded as ended')
 })
 
-test('a stocks Run whose refresh fails twice ends partial, with a Brief that says why the Data gate failed', async () => {
-  ws = makeWorkspace()
+test('a stocks Run whose refresh fails twice calls the Health Agent and ends partial, with a Brief that says why the Data gate failed and that the Health Agent failed too', async () => {
+  ws = workspace()
   ws.setPd({ 'clear-refresh': { example: 'clear-refresh.nothing.json' }, daily: { stderr: 'Stopped: Yahoo answered 429\n', exitCode: 1 }, status: { example: 'status.hold.json' } })
 
   const result = await ws.agents('run', 'stocks')
@@ -51,11 +61,16 @@ test('a stocks Run whose refresh fails twice ends partial, with a Brief that say
     run.steps.map((s) => [s.name, s.status]),
     [
       ['lake', 'failed'],
+      ['health', 'failed'],
       ['brief', 'succeeded'],
     ],
   )
+  // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent fails on both.
+  assert.equal(ws.workerCliCalls('codex').length, 1)
+  assert.equal(ws.workerCliCalls('claude').length, 1)
   const brief = ws.readRunFile(id, 'brief.html')
   assert.match(brief, /Data gate: fail/)
+  assert.match(brief, /The Health Agent failed, so there is no diagnosis: claude-code failed/)
   assert.match(brief, /lake: failed\. Log: <a href="logs\/lake\.log">/)
 })
 

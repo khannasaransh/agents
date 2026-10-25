@@ -1,8 +1,9 @@
 // Brief: writes the Stocks Brief, one self-contained HTML page in the Run folder that loads nothing
-// from the internet, from what earlier Steps wrote there: the Data gate's verdict and its reasons,
-// each market's latest session in the Lake against its last finished one, the To-dos the Steps
-// raised, how this Run's Lake Step went and how ash_new's last refresh ended, the Health report's
-// verdict and flags, and the Run's health.
+// from the internet, from what earlier Steps wrote there: the Data gate's verdict and its reasons;
+// under them, the Health Agent's diagnosis and proposed fix, or that it failed; each market's latest
+// session in the Lake against its last finished one; the To-dos the Steps raised; how this Run's
+// Lake Step went and how ash_new's last refresh ended; the Health report's verdict and flags; and
+// the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -11,6 +12,7 @@ import type { PdStatus } from '../../src/pd.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
+import type { HealthResult } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 
 /** Escapes text for HTML, so nothing from the Lake or a log is read as markup. */
@@ -30,6 +32,28 @@ function gateSection(status: PdStatus | null, lakeLog: string): string {
   const { verdict, reasons } = status.gate
   if (verdict === 'pass') return `<section class="gate pass"><h2>Data gate: pass.</h2><p>India's and the US's data are as of their last finished sessions, and the Health report fails neither.</p></section>`
   return `<section class="gate fail"><h2>Data gate: fail. Nothing should be decided on this data:</h2>\n${list(reasons.map(esc))}</section>`
+}
+
+/**
+ * The Health Agent's diagnosis, or that it failed; nothing when the Health Step didn't run or
+ * skipped itself. A Health Step that failed before recording its failure may have left the
+ * diagnosis of an earlier run of it, which says nothing about this Lake.
+ */
+function diagnosisSection(run: RunRecord, health: HealthResult | null): string {
+  const step = run.steps.find((s) => s.name === 'health')
+  const failed = (why: string) => `<section class="diagnosis"><h2>Health Agent</h2><p>${why} See its log: ${logLink(step?.log ?? 'logs/health.log')}</p></section>`
+  if (health?.status === 'failed') return failed(`The Health Agent failed, so there is no diagnosis: ${esc(health.error.replace(/\.$/, ''))}.`)
+  if (step?.status === 'failed') return failed('The Health Agent failed before it recorded a diagnosis.')
+  if (!health) return ''
+  const evidence = health.evidence.map(({ source, shows }) => `<code>${esc(source)}</code>: ${esc(shows)}`)
+  return [
+    `<section class="diagnosis"><h2>Health Agent's diagnosis</h2>`,
+    `<p class="text">${esc(health.diagnosis)}</p>`,
+    `<h3>Proposed fix, not applied</h3>`,
+    `<p class="text">${esc(health.fix)}</p>`,
+    ...(evidence.length ? [`<details><summary>Evidence it read: ${plural(evidence.length, 'item')}</summary>\n${list(evidence)}</details>`] : []),
+    '</section>',
+  ].join('\n')
 }
 
 function marketsSection(status: PdStatus | null): string {
@@ -105,12 +129,14 @@ const style = `
 body { background: var(--bg); color: var(--fg); font: 15px/1.5 system-ui, sans-serif; max-width: 60rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; }
 h1 { font-size: 1.5rem; margin: 0 0 1rem; }
 h2 { font-size: 1.1rem; margin: 1.75rem 0 0.5rem; }
+h3 { font-size: 1rem; margin: 1rem 0 0.25rem; }
 .gate { border-left: 4px solid var(--unknown); background: var(--panel); padding: 0.25rem 1rem 0.5rem; }
 .gate h2 { margin-top: 0.75rem; }
 .gate.pass { border-color: var(--pass); } .gate.pass h2 { color: var(--pass); }
 .gate.fail { border-color: var(--fail); } .gate.fail h2 { color: var(--fail); }
 .gate.unknown h2 { color: var(--unknown); }
 .muted, .note { color: var(--muted); }
+.text { white-space: pre-line; }
 table { border-collapse: collapse; width: 100%; display: block; overflow-x: auto; }
 th, td { text-align: left; padding: 0.3rem 0.75rem 0.3rem 0; border-bottom: 1px solid var(--line); vertical-align: top; }
 th { font-weight: 600; }
@@ -118,7 +144,7 @@ details { margin: 0.5rem 0; } summary { cursor: pointer; }
 a { color: inherit; }
 `
 
-function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null, todos: { step: string; todo: string }[]): string {
+function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   return `<!doctype html>
 <html lang="en">
@@ -131,6 +157,7 @@ function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null
 <body>
 <h1>Stocks Brief ${esc(run.id)}</h1>
 ${run.dryRun ? '<p class="note">Dry run: the Lake was read as it is, not refreshed, and nothing was recorded in ash_new.</p>\n' : ''}${gateSection(status, lakeLog)}
+${diagnosisSection(run, health)}
 ${marketsSection(status)}
 ${todosSection(todos)}
 ${lakeSection(lake, status)}
@@ -148,6 +175,6 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), readTodos(runFolder)))
+  writeText(out, render(readRun(runId), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
   console.log(`Wrote ${out}`)
 })

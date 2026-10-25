@@ -9,14 +9,12 @@ afterEach(() => ws.cleanup())
 
 const runId = '2026-10-27-0930'
 
-function prepare({ lake = 'succeeded', dryRun = false } = {}) {
+/** A stocks Run whose Lake Step ended as `lake`, and its Health Step as `health` when given. */
+function prepare({ lake = 'succeeded', health = undefined as string | undefined, dryRun = false } = {}) {
   ws = makeWorkspace()
   ws.prepareRun(runId, {
     pipeline: 'stocks',
-    steps: [
-      { name: 'lake', status: lake },
-      { name: 'brief', status: 'pending' },
-    ],
+    steps: [{ name: 'lake', status: lake }, ...(health ? [{ name: 'health', status: health }] : []), { name: 'brief', status: 'pending' }],
     dryRun,
   })
 }
@@ -81,6 +79,78 @@ test('a Hold mode day shows why the Data gate failed, and the Lake Step that fai
   assert.match(page, /pd daily failed twice \(exit 1, then exit 1\), so the Lake is as the last refresh left it/)
   assert.match(page, /The last refresh, job 482, failed: YahooUnavailable: Yahoo answered 429 Too Many Requests for 40 tickers in a row/)
   assert.match(page, /lake: failed\. Log: logs\/lake\.log/)
+})
+
+const diagnosis = {
+  why: ['The Lake Step failed.'],
+  inputs: 'f'.repeat(64),
+  status: 'diagnosed',
+  diagnosis: 'Yahoo rate-limited the price top-up, so both runs of pd daily stopped\nbefore the US prices were in.',
+  fix: 'Run pd daily again after 10:00 IST, when the limit resets.',
+  evidence: [
+    { source: 'lakeLog', shows: 'Both runs stopped on "Yahoo answered 429"' },
+    { source: 'data/logs/jobs/482.jsonl', shows: 'The job failed in prices-update' },
+  ],
+}
+
+test("the Health Agent's diagnosis and proposed fix come right under the Data gate's verdict, with the evidence it read", async () => {
+  prepare({ lake: 'failed', health: 'succeeded' })
+  ws.writeRunFile(runId, 'lake.json', lakeResult(false, [1, 1]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.hold.json'))
+  ws.writeRunFile(runId, 'health.json', diagnosis)
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(
+    page,
+    /Data gate: fail\..*1 session behind its last finished session, 2026-10-26 Health Agent's diagnosis Yahoo rate-limited the price top-up, so both runs of pd daily stopped before the US prices were in\. Proposed fix, not applied Run pd daily again after 10:00 IST, when the limit resets\. Evidence it read: 2 items lakeLog ?: Both runs stopped on "Yahoo answered 429" data\/logs\/jobs\/482\.jsonl ?: The job failed in prices-update Markets/,
+  )
+  assert.match(html, /Health Agent's diagnosis<\/h2>\n<p class="text">Yahoo rate-limited the price top-up, so both runs of pd daily stopped\nbefore/, 'its line breaks are kept')
+})
+
+test('a Health Agent that failed is shown under the Data gate, with why and its log', async () => {
+  prepare({ lake: 'failed', health: 'failed' })
+  ws.writeRunFile(runId, 'lake/status.json', example('status.hold.json'))
+  ws.writeRunFile(runId, 'health.json', { why: ['The Lake Step failed.'], inputs: 'f'.repeat(64), status: 'failed', error: "codex failed: You've hit your usage limit.; then claude-code failed: Claude Code is down" })
+
+  const page = text(await brief())
+
+  assert.match(
+    page,
+    /2026-10-26 Health Agent The Health Agent failed, so there is no diagnosis: codex failed: You've hit your usage limit\.; then claude-code failed: Claude Code is down\. See its log: logs\/health\.log Markets/,
+  )
+  assert.match(page, /health: failed\. Log: logs\/health\.log/)
+})
+
+test('a Health Step that failed before recording anything is shown as a failed Health Agent', async () => {
+  prepare({ lake: 'failed', health: 'failed' })
+  ws.writeRunFile(runId, 'lake/status.json', example('status.hold.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /Health Agent The Health Agent failed before it recorded a diagnosis\. See its log: logs\/health\.log Markets/)
+})
+
+test('a Health Step that failed before recording why shows no diagnosis an earlier run of it left', async () => {
+  prepare({ lake: 'failed', health: 'failed' })
+  ws.writeRunFile(runId, 'lake/status.json', example('status.hold.json'))
+  ws.writeRunFile(runId, 'health.json', diagnosis)
+
+  const page = text(await brief())
+
+  assert.match(page, /Health Agent The Health Agent failed before it recorded a diagnosis\./)
+  assert.doesNotMatch(page, /Yahoo rate-limited/)
+})
+
+test('a skipped Health Step adds nothing under the Data gate', async () => {
+  prepare({ health: 'skipped' })
+  ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+
+  const page = text(await brief())
+
+  assert.doesNotMatch(page, /Health Agent/)
 })
 
 test("the Stocks Brief is written when the Lake Step failed before reading the Lake's status", async () => {

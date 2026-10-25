@@ -1,0 +1,75 @@
+{
+  "checked_at": "2026-10-27T01:41:12.512330+00:00",
+  "markets": [
+    {
+      "market": "IN",
+      "name": "India",
+      "gated": true,
+      "latest_session": "2026-10-26",
+      "last_finished_session": "2026-10-26",
+      "sessions_behind": 0
+    },
+    {
+      "market": "US",
+      "name": "United States",
+      "gated": true,
+      "latest_session": "2026-10-26",
+      "last_finished_session": "2026-10-26",
+      "sessions_behind": 0
+    },
+    {
+      "market": "HK",
+      "name": "Hong Kong",
+      "gated": false,
+      "latest_session": "2026-10-27",
+      "last_finished_session": "2026-10-27",
+      "sessions_behind": 0
+    }
+  ],
+  "refresh": {
+    "job": 481,
+    "daily": true,
+    "source": "cli",
+    "status": "succeeded",
+    "started_at": "2026-10-27T01:12:03.004512+00:00",
+    "finished_at": "2026-10-27T01:40:57.881020+00:00",
+    "error": null
+  },
+  "health": {
+    "date": "2026-10-27",
+    "checked_at": "2026-10-27T01:40:31.120934+00:00",
+    "status": "ok",
+    "markets": [
+      {
+        "market": "IN",
+        "status": "ok",
+        "data_as_of": "2026-10-26",
+        "problems": [],
+        "flags": {}
+      },
+      {
+        "market": "US",
+        "status": "ok",
+        "data_as_of": "2026-10-26",
+        "problems": [],
+        "flags": {}
+      },
+      {
+        "market": "HK",
+        "status": "ok",
+        "data_as_of": "2026-10-27",
+        "problems": [],
+        "flags": {}
+      }
+    ],
+    "flags": []
+  },
+  "gate": {
+    "verdict": "pass",
+    "reasons": []
+  },
+  "own_schedule": {
+    "enabled": false,
+    "task_registered": false
+  }
+}

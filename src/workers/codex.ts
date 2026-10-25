@@ -55,6 +55,13 @@ export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, model, eff
       'default_permissions="agent"',
       '--config',
       `permissions.agent={extends=":read-only",filesystem={${sandboxRules.map(([path, access]) => `${JSON.stringify(path)}="${access}"`).join(',')}}}`,
+      // On Windows that sandbox is a restricted token, which needs no setup on the machine. Without
+      // it, Codex there has no sandbox and refuses every command, even one that only reads, yet can
+      // still answer. A restricted token can't enforce a deny rule, so a call that denies a Tool
+      // fails at once instead, and the Agent falls back to its other Worker. Other platforms ignore
+      // the setting.
+      '--config',
+      'windows.sandbox="unelevated"',
       // The Agent's skills are in the prompt, so every skill Codex would find by itself is turned off.
       ...(foundSkills.length ? ['--config', `skills.config=[${foundSkills.map((file) => `{path=${JSON.stringify(file)},enabled=false}`).join(',')}]`] : []),
       '--cd',

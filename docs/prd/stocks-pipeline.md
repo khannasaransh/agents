@@ -621,7 +621,7 @@ There are two seams, and both are a command with files in and files out.
   - the contact for the SEC's User-Agent;
   - later, contract notes, if real brokerage is to enter the costs.
 - **Unconfirmed:**
-  - **Codex's read-only sandbox on Windows** is untested here. If it doesn't hold, the Health Agent and the Chart analyst start on Claude Code.
+  - **Codex's read-only sandbox on Windows:** its unelevated sandbox holds, but it can't enforce the deny rules that keep an Agent from Tools it doesn't declare, so Codex refuses those calls (issue 19). The Health Agent therefore starts on Claude Code, and so does the Chart analyst unless Codex's elevated sandbox proves to enforce them.
   - **NSE and BSE endpoints** need browser-like headers and cookies, and change without notice. A failing Feed skips itself with a To-do.
   - **Broker charges in exports:** whether ICICI Direct's and moomoo's exports include charges, which would let the reviews check the ₹0 / $0 brokerage.
   - **Web search permission:** how Claude Code's web search is allowed for the Events and Risk analysts, given that the Worker denies every command that isn't read-only.
