@@ -61,7 +61,7 @@ export function createRun(pipeline: string, steps: string[], { dryRun = false } 
     status: 'running',
     dryRun,
     startedAt: now.toISOString(),
-    steps: steps.map((name) => ({ name, status: 'pending', log: join('logs', `${name}.log`) })),
+    steps: steps.map((name) => ({ name, status: 'pending', log: `logs/${name}.log` })),
   }
   writeRun(run)
   return run

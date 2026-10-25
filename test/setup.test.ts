@@ -4,7 +4,7 @@ import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, re
 import { tmpdir } from 'node:os'
 import { delimiter, dirname, join, relative } from 'node:path'
 import { test } from 'node:test'
-import { cli, git, gitEnv, type CliResult, type RepoEntry } from './helpers.ts'
+import { cli, git, gitEnvWithoutPath, type CliResult, type RepoEntry } from './helpers.ts'
 
 // The workspace in helpers.ts can't run on Windows yet (issue 16), and setup must, so its tests
 // make their own machine.
@@ -55,7 +55,7 @@ function makeMachine(): Machine {
   let path = [binDir, ...realPath]
   for (const folder of [binDir, homeDir, workerConfig]) mkdirSync(folder)
   // Every tool present and current, unless a test says otherwise.
-  const tools: Record<(typeof standIns)[number], string | null> = { node: 'v25.2.0', claude: '2.1.310 (Claude Code)', codex: 'codex-cli 0.163.0', agy: '1.4.5' }
+  const tools: Record<(typeof standIns)[number], string | null> = { node: 'v26.12.1', claude: '2.1.310 (Claude Code)', codex: 'codex-cli 0.163.0', agy: '1.4.5' }
 
   const machine: Machine = {
     root,
@@ -102,10 +102,9 @@ function makeMachine(): Machine {
       writeFileSync(repoListFile, `export default ${JSON.stringify(entries, null, 2)}\n`)
       for (const file of readdirSync(binDir)) rmSync(join(binDir, file))
       for (const [command, version] of Object.entries(tools)) if (version !== null) writeToolStandIn(binDir, command, version)
-      // Windows spells it Path, and either spelling would do, so only one is kept.
-      const env = Object.fromEntries(Object.entries(gitEnv).filter(([name]) => name.toUpperCase() !== 'PATH'))
       const child = spawn(process.execPath, [cli, 'setup', '--root', root, ...args], {
-        env: { ...env, HOME: homeDir, USERPROFILE: homeDir, PATH: path.join(delimiter), AGENTS_REPOS_FILE: repoListFile, AGENTS_WORKER_CONFIG_DIR: workerConfig },
+        env: { ...gitEnvWithoutPath, HOME: homeDir, USERPROFILE: homeDir, PATH: path.join(delimiter), AGENTS_REPOS_FILE: repoListFile, AGENTS_WORKER_CONFIG_DIR: workerConfig },
+        windowsHide: true,
       })
       let stdout = ''
       let stderr = ''
@@ -275,7 +274,7 @@ test('setup reports the version of each tool the Pipeline needs', async () => {
 
     assert.equal(result.status, 0, result.stderr + result.stdout)
     assert.match(toolLine(result.stdout, 'git') ?? '', /git \d+\.\d+\.\d+/)
-    assert.match(toolLine(result.stdout, 'node') ?? '', /node 25\.2\.0$/)
+    assert.match(toolLine(result.stdout, 'node') ?? '', /node 26\.12\.1$/)
     assert.match(toolLine(result.stdout, 'claude') ?? '', /claude 2\.1\.310$/)
     assert.match(toolLine(result.stdout, 'codex') ?? '', /codex 0\.163\.0$/)
     assert.match(toolLine(result.stdout, 'agy') ?? '', /agy 1\.4\.5$/)
@@ -289,7 +288,7 @@ test('setup flags Workers older than the versions the PRD notes, and a Node olde
   try {
     machine.setTool('codex', 'codex-cli 0.154.0')
     machine.setTool('agy', '1.4.4')
-    machine.setTool('node', 'v24.17.0')
+    machine.setTool('node', 'v25.9.0')
 
     const result = await machine.setup()
 
@@ -297,7 +296,7 @@ test('setup flags Workers older than the versions the PRD notes, and a Node olde
     assert.equal(result.status, 0, result.stderr + result.stdout)
     assert.match(toolLine(result.stdout, 'codex') ?? '', /codex 0\.154\.0: older than 0\.163\.0/)
     assert.match(toolLine(result.stdout, 'agy') ?? '', /agy 1\.4\.4: older than 1\.4\.5/)
-    assert.match(toolLine(result.stdout, 'node') ?? '', /node 24\.17\.0: older than 25\.0\.0/)
+    assert.match(toolLine(result.stdout, 'node') ?? '', /node 25\.9\.0: older than 26\.0\.0/)
     assert.match(toolLine(result.stdout, 'claude') ?? '', /claude 2\.1\.310$/)
   } finally {
     machine.cleanup()

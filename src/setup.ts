@@ -5,7 +5,8 @@
 import { spawnSync, type SpawnSyncOptionsWithStringEncoding } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { delimiter, join, resolve } from 'node:path'
+import { join, resolve } from 'node:path'
+import { findOnPath } from './command.ts'
 import { antigravityHomeDir, agentsRoot, workerConfigDir } from './paths.ts'
 import { loadRepos, teams, type Repo, type Team } from './repos.ts'
 import { captureWorkerConfig, installWorkerConfig, workerConfigSecrets, type Secret } from './worker-config.ts'
@@ -77,7 +78,7 @@ function cloneRepo(repo: Repo, folder: string): Outcome {
   }
   // Git may ask for credentials on a new machine, so it has the terminal, and shows its progress
   // and errors there. A failed clone removes the folder it started.
-  const { status, error } = spawnSync('git', ['clone', '--branch', repo.branch, '--', repo.remote, folder], { stdio: ['inherit', 'ignore', 'inherit'] })
+  const { status, error } = spawnSync('git', ['clone', '--branch', repo.branch, '--', repo.remote, folder], { stdio: ['inherit', 'ignore', 'inherit'], windowsHide: true })
   if (error) return { ok: false, line: `failed to clone: ${error.message}` }
   if (status !== 0) return { ok: false, line: `failed to clone: git exited with ${status}, as it says above` }
   return { ok: true, line: `cloned on ${repo.branch}` }
@@ -113,25 +114,13 @@ function checkCommand({ command, minimum }: RequiredCommand): Outcome {
   return { ok: true, line: `${command} ${version}` }
 }
 
-/**
- * The file PATH finds for a command. On Windows it takes only the PATHEXT extensions, as a shell
- * would, so it skips the bash scripts npm installs beside its .cmd shims.
- */
-function findOnPath(command: string): string | null {
-  const windows = process.platform === 'win32'
-  const names = windows ? (process.env.PATHEXT ?? '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean).map((ext) => command + ext.toLowerCase()) : [command]
-  for (const dir of (process.env.PATH ?? '').split(delimiter).filter(Boolean)) {
-    for (const name of names) if (existsSync(join(dir, name))) return join(dir, name)
-  }
-  return null
-}
 
 /**
  * Runs `<file> --version`. A .cmd or .bat file only runs through cmd.exe, which gets the whole
  * command line quoted, as `cmd /s /c` expects.
  */
 function runVersion(file: string) {
-  const options: SpawnSyncOptionsWithStringEncoding = { encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'] }
+  const options: SpawnSyncOptionsWithStringEncoding = { encoding: 'utf8', timeout: 30_000, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true }
   if (process.platform === 'win32' && /\.(cmd|bat)$/i.test(file)) {
     return spawnSync(process.env.ComSpec ?? 'cmd.exe', ['/d', '/s', '/c', `""${file}" --version"`], { ...options, windowsVerbatimArguments: true })
   }

@@ -137,7 +137,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 ### Language and shape
 
-- TypeScript run directly by Node 25's built-in type stripping. There is no build step and, at first, no npm dependencies.
+- TypeScript run directly by Node's built-in type stripping, on Node 26 or later. There is no build step and, at first, no npm dependencies.
 - The Pipeline is plain code, not an agent and not a workflow engine (ADR 0001). It declares an ordered list of Steps and runs them one at a time. The Discord Step could later run alongside the reviews; for now it runs after them.
 - The repo holds:
   - the Agents, one folder each;

@@ -161,10 +161,13 @@ async function contentPages(folder: string): Promise<string[]> {
   return (await runGit(folder, ['ls-files', '-z', '--', '*.md'])).split('\0').filter((file) => file && isPage(file))
 }
 
-/** What changed in a worktree since its last commit, by path: M modified, A added, D deleted, ?? untracked. */
+/**
+ * What changed in a worktree since its last commit, by path: M modified, A added, D deleted, ??
+ * untracked. Sorted by path, since git lists untracked files in a different order on each platform.
+ */
 async function changesIn(folder: string): Promise<{ status: string; path: string }[]> {
   const entries = (await runGit(folder, ['status', '--porcelain=v1', '-z', '--no-renames', '--untracked-files=all'])).split('\0').filter(Boolean)
-  return entries.map((entry) => ({ status: entry.slice(0, 2).trim(), path: entry.slice(3) }))
+  return entries.map((entry) => ({ status: entry.slice(0, 2).trim(), path: entry.slice(3) })).sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
 }
 
 /** Sets a page's frontmatter to `review: draft`, since only Saransh accepts a page. */

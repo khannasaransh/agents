@@ -3,12 +3,49 @@ import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSyn
 import { createServer, type RequestListener } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { FetchResult } from '../steps/fetch.ts'
+import { killTree } from '../src/process-tree.ts'
 import type { CannedAnswer } from '../src/workers/fake.ts'
 
 export const cli = fileURLToPath(new URL('../src/cli.ts', import.meta.url))
+
+const windows = process.platform === 'win32'
+
+/**
+ * Writes a command named `name` into `dir` that runs `script` (CommonJS) with this Node: an
+ * executable script on macOS, and on Windows the script beside an npm-style .cmd shim, as npm
+ * installs a CLI there.
+ */
+export function writeCommand(dir: string, name: string, script: string): void {
+  if (!windows) {
+    writeFileSync(join(dir, name), `#!${process.execPath}\n${script}`)
+    chmodSync(join(dir, name), 0o755)
+    return
+  }
+  writeFileSync(join(dir, `${name}.js`), script)
+  const shim = [
+    '@ECHO off',
+    'GOTO start',
+    ':find_dp0',
+    'SET dp0=%~dp0',
+    'EXIT /b',
+    ':start',
+    'SETLOCAL',
+    'CALL :find_dp0',
+    '',
+    'IF EXIST "%dp0%\\node.exe" (',
+    '  SET "_prog=%dp0%\\node.exe"',
+    ') ELSE (',
+    '  SET "_prog=node"',
+    '  SET PATHEXT=%PATHEXT:;.JS;=;%',
+    ')',
+    '',
+    `endLocal & goto #_undefined_# 2>NUL || title %COMSPEC% & "%_prog%"  "%dp0%\\${name}.js" %*`,
+  ]
+  writeFileSync(join(dir, `${name}.cmd`), shim.join('\r\n') + '\r\n')
+}
 
 // Keep every git call in the tests away from the user's own git config.
 export const gitEnv = {
@@ -21,8 +58,11 @@ export const gitEnv = {
   GIT_COMMITTER_EMAIL: 'author@example.com',
 }
 
+/** gitEnv without its PATH, for a test to set its own: Windows spells it Path, and with both spellings either could win. */
+export const gitEnvWithoutPath = Object.fromEntries(Object.entries(gitEnv).filter(([name]) => name.toUpperCase() !== 'PATH'))
+
 export function git(cwd: string, ...args: string[]): string {
-  return execFileSync('git', args, { cwd, env: gitEnv, encoding: 'utf8' }).trim()
+  return execFileSync('git', args, { cwd, env: gitEnv, encoding: 'utf8', windowsHide: true }).trim()
 }
 
 export interface RepoEntry {
@@ -206,7 +246,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       const upstream = join(root, 'upstream', name)
       mkdirSync(join(root, 'remotes'), { recursive: true })
       git(root, 'init', '-q', '--bare', '-b', branch, remote)
-      execFileSync('git', ['clone', '-q', remote, upstream], { cwd: root, env: gitEnv, stdio: 'ignore' })
+      execFileSync('git', ['clone', '-q', remote, upstream], { cwd: root, env: gitEnv, stdio: 'ignore', windowsHide: true })
       git(upstream, 'checkout', '-q', '-b', branch)
       git(upstream, 'commit', '-q', '--allow-empty', '-m', 'Initial commit')
       git(upstream, 'push', '-q', 'origin', branch)
@@ -250,7 +290,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
         `import { appendFileSync, readFileSync } from 'node:fs'\n` +
         `import { execFileSync } from 'node:child_process'\n` +
         `const args = process.argv.slice(2)\n` +
-        `const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim()\n` +
+        `const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8', windowsHide: true }).trim()\n` +
         `appendFileSync(${JSON.stringify(toolLog)}, JSON.stringify({ tool: ${JSON.stringify(tool)}, args, cwd: process.cwd(), head }) + '\\n')\n`
       const tools = {
         'regions.mjs': recordRun('regions'),
@@ -421,15 +461,16 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
     start(...args) {
       const child = spawn(process.execPath, [cli, ...args], {
-        env: { ...gitEnv, HOME: homeDir, CODEX_HOME: codexHomeDir, PATH: `${binDir}:${process.env.PATH}`, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, AGENTS_ENV_FILE: envFile, AGENTS_FAKE_ANSWERS: cannedAnswersFile, ...(ownAgents && { AGENTS_AGENTS_DIR: agentsDir }), ...env },
-        detached: true,
+        env: { ...gitEnvWithoutPath, HOME: homeDir, USERPROFILE: homeDir, CODEX_HOME: codexHomeDir, PATH: `${binDir}${delimiter}${process.env.PATH}`, AGENTS_DATA_DIR: dataDir, AGENTS_REPOS_FILE: repoListFile, AGENTS_ENV_FILE: envFile, AGENTS_FAKE_ANSWERS: cannedAnswersFile, ...(ownAgents && { AGENTS_AGENTS_DIR: agentsDir }), ...env },
+        detached: !windows,
+        windowsHide: true,
       })
       let stdout = ''
       let stderr = ''
       child.stdout.on('data', (d) => (stdout += d))
       child.stderr.on('data', (d) => (stderr += d))
       const result = new Promise<CliResult>((resolve) => child.on('close', (status) => resolve({ status, stdout, stderr })))
-      return { killAll: () => process.kill(-child.pid!, 'SIGKILL'), killCliOnly: () => process.kill(child.pid!, 'SIGKILL'), result }
+      return { killAll: () => (windows ? killTree(child.pid!) : process.kill(-child.pid!, 'SIGKILL')), killCliOnly: () => process.kill(child.pid!, 'SIGKILL'), result }
     },
 
     runIds() {
@@ -477,13 +518,12 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
  * then answers as <command>.json beside it says, or fails when there is none.
  */
 function writeWorkerCliStandIn(binDir: string, command: string) {
-  const file = join(binDir, command)
   const behaviorFile = JSON.stringify(join(binDir, `${command}.json`))
   const callsFile = JSON.stringify(join(binDir, `${command}.calls.jsonl`))
-  writeFileSync(
-    file,
-    `#!${process.execPath}
-const { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } = require('node:fs')
+  writeCommand(
+    binDir,
+    command,
+    `const { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } = require('node:fs')
 const { execFileSync, spawn } = require('node:child_process')
 const { dirname, join, relative } = require('node:path')
 const filesIn = (folder) => readdirSync(folder).flatMap((entry) => {
@@ -495,15 +535,16 @@ const behavior = existsSync(${behaviorFile})
   : { stderr: '${command} stand-in: this test expects no ${command} call', exitCode: 1 }
 const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid, home: process.env.HOME }
 try {
-  call.cwdChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8' })
+  call.cwdChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8', windowsHide: true })
 } catch {}
 if (call.args.includes('--plugin-dir')) {
   call.pluginDir = call.args[call.args.indexOf('--plugin-dir') + 1]
-  call.pluginFiles = Object.fromEntries(filesIn(call.pluginDir).map((file) => [relative(call.pluginDir, file), readFileSync(file, 'utf8')]))
+  call.pluginFiles = Object.fromEntries(filesIn(call.pluginDir).map((file) => [relative(call.pluginDir, file).replaceAll('\\\\', '/'), readFileSync(file, 'utf8')]))
 }
-if (behavior.hang) call.childPid = spawn('sleep', ['60'], { stdio: 'ignore' }).pid
+const sleep = [process.execPath, ['-e', 'setTimeout(() => {}, 60_000)']]
+if (behavior.hang) call.childPid = spawn(...sleep, { stdio: 'ignore', windowsHide: true }).pid
 if (behavior.leaveRunning) {
-  const child = spawn('sleep', ['60'], { stdio: ['ignore', 'inherit', 'inherit'] })
+  const child = spawn(...sleep, { stdio: ['ignore', 'inherit', 'inherit'], windowsHide: true })
   child.unref()
   call.childPid = child.pid
 }
@@ -531,7 +572,6 @@ if (behavior.hang) {
   }, behavior.answerAfterMs ?? 0)
 `,
   )
-  chmodSync(file, 0o755)
 }
 
 /** A local HTTP server standing in for a remote, such as one that never answers. */

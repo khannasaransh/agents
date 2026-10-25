@@ -4,7 +4,7 @@
 
 **Repos:** ash_new, agents
 
-**Blocked by:** 34: The Portfolio Manager and the final check
+**Blocked by:** 34: The Portfolio Manager, the Playbook and the final check
 
 **Status:** ready-for-agent
 

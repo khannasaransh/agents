@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import './node-version.ts'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { acquireLock } from './lock.ts'

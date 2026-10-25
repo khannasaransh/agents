@@ -8,9 +8,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] The Run lock and the process records hold on Windows with the same guarantee as on macOS: a record that is still locked belongs to something still running.
-- [ ] Stopping a dead Run's processes stops each one's whole process tree on Windows.
-- [ ] Steps and Workers start the Worker CLIs and git as they are installed on Windows, including npm's `.cmd` shims, without going through a shell.
-- [ ] The test suite passes on Windows. Its stand-in CLIs, Tools and git helpers work on both platforms.
-- [ ] Node 25 runs the repo on this machine, which has 24.17.0 today. An older Node is refused with a message naming the version needed.
+- [x] The Run lock and the process records hold on Windows with the same guarantee as on macOS: a record that is still locked belongs to something still running.
+- [x] Stopping a dead Run's processes stops each one's whole process tree on Windows.
+- [x] Steps and Workers start the Worker CLIs and git as they are installed on Windows, including npm's `.cmd` shims, without going through a shell.
+- [x] The test suite passes on Windows. Its stand-in CLIs, Tools and git helpers work on both platforms.
+- [x] Node 26 runs the repo on this machine, which had 24.17.0 (the repo needed 25 when this was written; it now needs 26, the current line). An older Node is refused with a message naming the version needed.
 - [ ] Nothing changes on macOS. The suite still passes there.

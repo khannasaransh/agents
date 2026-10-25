@@ -113,7 +113,7 @@ test('when only the runner of a Run dies, the next Run first stops the Step and 
 test('of two Runs starting together after a Run died holding the lock, exactly one starts', async () => {
   await slowWorkspace(2)
   mkdirSync(ws.dataDir, { recursive: true })
-  writeFileSync(join(ws.dataDir, 'run.lock'), `${spawnSync('true').pid}\n`)
+  writeFileSync(join(ws.dataDir, 'run.pid'), `${spawnSync(process.execPath, ['-e', '']).pid}\n`)
 
   const results = await Promise.all([ws.start('run', 'daily'), ws.start('run', 'daily')].map((run) => run.result))
 

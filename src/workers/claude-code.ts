@@ -14,6 +14,14 @@ interface ClaudeCodeOptions extends CallOptions {
 }
 
 /**
+ * An absolute path as Claude Code's permission rules spell it, which on Windows is its POSIX form:
+ * C:\Users\saransh becomes /c/Users/saransh.
+ */
+function rulePath(path: string): string {
+  return process.platform === 'win32' ? `/${path[0].toLowerCase()}${path.slice(2).replaceAll('\\', '/')}` : path
+}
+
+/**
  * The `claude --print` command line for one call of `agent`, with the prompt on stdin. It never
  * uses --bare, which ignores Saransh's login.
  */
@@ -21,7 +29,7 @@ export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model
   const { outputSchema, maxTurns, timeoutSeconds } = agent.config
   const writable = writeFolders(agent, cwd)
   const hasSkills = agent.skills.length > 0
-  const allowed = [...agent.tools.map((tool) => `Bash(${tool.path}:*)`), ...writable.map((folder) => `Edit(/${folder}/**)`)]
+  const allowed = [...agent.tools.map((tool) => `Bash(${tool.path}:*)`), ...writable.map((folder) => `Edit(/${rulePath(folder)}/**)`)]
   return {
     command: 'claude',
     args: [

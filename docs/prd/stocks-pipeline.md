@@ -12,6 +12,7 @@ Saransh has built ash_new, his own strategy and portfolio platform. Its Lake hol
 - **Rules can't read what moves a stock on a given day:** results dates, pledges, governance, announcements. When he overrides a rule on instinct, nothing records whether it helped.
 - **There is no broker API.** What he bought, skipped or forgot to protect is known only from exports he downloads by hand.
 - **The old Portfolio Manager in ash_backend** (8 CANSLIM slots, a −8% stop and `PM_BUY` alerts to the Sash app) uses other data and has never been backtested as a whole.
+- **What he holds isn't what a strategy outputs.** He decides how much to hold in a weak market, which of the names the strategies offer to take, and at what size. Nothing makes those calls within limits he has approved, or records the evidence for them.
 
 He wants the highest CAGR he can get, with 30% as the aim and as little drawdown as possible. He wants it run with a professional desk's discipline: every day, checked and accountable, without him watching it.
 
@@ -20,14 +21,14 @@ He wants the highest CAGR he can get, with 30% as the aim and as little drawdown
 A stocks Pipeline in the agents repo, run on the Windows machine that holds the Lake. It runs Tuesday to Saturday at 07:00 IST, so each Run has both markets' previous closes. Each Run:
 
 1. **Records what Saransh did:** his Answers from the last Stocks Brief, and the tradebooks and holdings exports he dropped in the Broker inbox.
-2. **Fetches MarketSmith's data** through ash_backend, on Saturdays.
+2. **Fetches MarketSmith's data** through ash_new, on Saturdays, keeping each fetch as a dated snapshot.
 3. **Brings the Lake up to date** with ash_new's daily chain. It clears a stuck refresh and retries a failed one once. If something still breaks, the Health Agent works out why. The Data gate decides whether the Portfolio Manager may act at all (Hold mode otherwise), and a single flagged security goes into Quarantine.
-4. **Makes the Rule plan in code** for each Book: India and the US, each real and paper. It uses the same engine that backtests the Book, so live trades what was tested.
-5. **Puts the plan to the Desk.** The Events, Chart and Risk analysts read the Feeds and the Lake for the Rule plan's names and argue over it. The Portfolio Manager decides what to subtract and why. A final check holds it to subtractions inside the Mandate.
+4. **Makes the Rule plan in code** for each Book: India and the US, each real and paper. It uses the same engine that backtests the Book, so live trades what was tested. It reads each market's Market condition, which sets how much of the Book may be in stocks.
+5. **Puts the plan to the Desk and the Portfolio Manager.** The Events, Chart and Risk analysts read the Feeds and the Lake for the Rule plan's names and argue over it. The Portfolio Manager decides what to change within the Book's Playbook, and writes a Decision record with the evidence for each change. A final check holds it to the Mandate, the Playbook and the Book's Judgement mode.
 6. **Reviews the Books** on Saturdays: weekly, monthly with attribution, and yearly, when strategies are chosen again.
 7. **Writes the Stocks Brief:** an HTML page holding the Order list for India's open and the US's evening open, everything waiting on Saransh, and buttons to answer.
 
-The Portfolio Manager only advises; Saransh places every order. A strategy reaches real money only through the Stages. Each Book's objective is checked on its own backtest: the highest CAGR with a backtested max drawdown of at most 25% and a holdout CAGR of at least 20%.
+The Portfolio Manager only advises; Saransh places every order. A strategy reaches real money only through the Stages, and the Portfolio Manager's judgement only through its Judgement mode: real Books run in subtract only mode until its judgement has matched the strategies on paper (ADR 0003). Each Book's objective is checked on its own backtest: the highest CAGR with a backtested max drawdown of at most 25% and a holdout CAGR of at least 20%.
 
 ## User Stories
 
@@ -66,7 +67,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 ### MarketSmith
 
-28. As Saransh, I want the Saturday Run to fetch MarketSmith's India and US data through ash_backend, so that fundamentals and MarketSmith's snapshot are never more than a week old.
+28. As Saransh, I want the Saturday Run to fetch MarketSmith's India and US data through ash_new, keeping each fetch as a dated snapshot, so that fundamentals and MarketSmith's snapshot are never more than a week old, and a Decision record that cites a rating can be checked later.
 29. As Saransh, I want an expired MarketSmith cookie to skip the fetch and give me a To-do naming the cookie, so that a login problem never fails the Run.
 30. As Saransh, I want ash_backend's Portfolio Manager and Sash's `PM_BUY` alerts turned off, so that two systems never give me conflicting advice.
 
@@ -122,7 +123,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 60. As Saransh, I want strategy exits to stay end-of-day and come through the Order list, so that I sell exactly when the backtests did.
 61. As Saransh, I want a Disaster stop proposed with every new position, at twice its strategy's stop distance or 15% below entry where the strategy has none, so that a collapse between Runs is limited.
 62. As Saransh, I want Disaster stops raised only on Saturdays, so that I have few stop changes to make.
-63. As Saransh, I want the Rule plan to apply the Data gate, Quarantines, the breakers, the Stages and my approved early exits, so that everything decided before the Desk sits in one place.
+63. As Saransh, I want the Rule plan to apply the Data gate, Quarantines, the breakers, the exposure level, the Stages and my approved early exits, so that everything decided before the Desk sits in one place.
 
 ### The Desk
 
@@ -139,11 +140,28 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 ### The Portfolio Manager
 
-74. As Saransh, I want the Portfolio Manager to chair the Desk, decide each subtraction and write why, so that every difference from the rules has a reason I can read.
-75. As Saransh, I want a final check that every change from the Rule plan is a subtraction and that everything stays inside the Mandate, with the Rule plan sent out unchanged if not, so that an Agent's mistake can only make the Order list smaller.
+74. As Saransh, I want the Portfolio Manager to chair the Desk, decide each change from the Rule plan within the Book's Playbook and write a Decision record for it, so that every difference from the rules has evidence I can read.
+75. As Saransh, I want a final check that every change from the Rule plan is inside the Mandate, inside its Lever's range and allowed by the Book's Judgement mode, with a Decision record whose figures match the Run's inputs. A change that fails is dropped, and if what remains breaks the Mandate the Rule plan goes out unchanged, so that an Agent's mistake never reaches the Order list.
 76. As Saransh, I want the Rule plan sent out as the Order list, with a note, when the Agents fail, so that a Worker outage still leaves me the tested plan.
 77. As Saransh, I want the Portfolio Manager to propose a promotion when a Stage's time is up and its record passes, so that I don't have to track the calendars.
 78. As Saransh, I want the Portfolio Manager to write each Book's commentary in the Brief, so that I read the day's meaning, not raw tables.
+
+### The Playbook
+
+These stories were added on 25 Oct 2026 (ADR 0003), so they are numbered after the rest.
+
+124. As Saransh, I want each Book to have a Playbook of Levers (exposure, selection, size, timing, trim and rebalance), each with the data it must read and a range I approve, so that the Portfolio Manager's judgement is mine, written down.
+125. As Saransh, I want code to read each market's Market condition from the Lake at thresholds I set, with MarketSmith's outlook shown beside it, so that the same data always gives the same condition and it can be backtested.
+126. As Saransh, I want the Market condition to set each Book's exposure level, and the Book backtest to include it, so that holding less in a weak market is tested like any other rule.
+127. As Saransh, I want the Portfolio Manager able to cut exposure below that level but never raise it, so that its judgement on the market can only make a Book safer.
+128. As Saransh, I want an exposure cut to stop new buys first, then trim the weakest holdings (lowest RS Rating first, ties to the one closest to its stop), so that a cut sells what the strategies like least.
+129. As Saransh, I want the Portfolio Manager to buy only names in the Book's Pool, those a strategy with a Sleeve in the Book bought or signalled to buy in the last 2 months, so that every position traces back to a strategy I approved.
+130. As Saransh, I want the Portfolio Manager to size down freely, but above a strategy's size only once the override scorecard shows upsizing adds and I widen the range, so that conviction is earned.
+131. As Saransh, I want each Book to have a Judgement mode (plan only, subtract only or Playbook), with real Books in subtract only and paper Books in Playbook from their first Run, so that the Portfolio Manager builds a record on paper before it adds anything with real money.
+132. As Saransh, I want a real Book moved to Playbook only by my Answer, after 3 months in which the paper Book's Overrides at least matched the Rule plan alone, so that latitude follows evidence.
+133. As Saransh, I want a Decision record for every change and for every Run's exposure level, in words I use (what the strategy said, what went out, the Lever, the figures with their sources, what is expected and when it is judged), so that I can check any decision against its data.
+134. As Saransh, I want a change rejected when its Decision record cites a figure that isn't in the Run's inputs, so that the Portfolio Manager can't invent evidence.
+135. As Saransh, I want the override scorecard tallied by Lever, and a Lever that keeps losing to the Rule plan proposed for a narrower range, so that each kind of judgement is kept or cut on its record.
 
 ### Orders and stops
 
@@ -185,11 +203,11 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 ### Journal and Lessons
 
-102. As Saransh, I want the Portfolio Manager to keep a Journal of why each order and each subtraction was made, what the Desk said and what each was expected to do, so that the reviews can judge decisions against their reasons.
+102. As Saransh, I want the Portfolio Manager to keep a Journal of the Decision record behind each order and each change, what the Desk said and what each was expected to do, so that the reviews can judge decisions against their reasons.
 103. As Saransh, I want the Journal to carry what's still open (orders not yet filled, Quarantines, pending promotions), so that nothing open vanishes between Runs.
 104. As Saransh, I want the Portfolio Manager to propose Lessons in the Brief, with each applied only once I approve it, so that it learns from its record without changing its behaviour on its own.
 105. As Saransh, I want a Lesson I reject never proposed again, so that I answer each idea once.
-106. As Saransh, I want a Lesson only ever to subtract, so that no approved Lesson can add untested risk.
+106. As Saransh, I want a Lesson that widens a Playbook range proposed only with the override scorecard's support, so that no approved Lesson adds risk without evidence.
 
 ### Reviews
 
@@ -205,14 +223,14 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
      - for the US Book in INR, the dollar.
 110. As Saransh, I want the monthly review to show the correlation between Sleeves, each Book's drawdown against its limits and the promotions due, so that risk is reviewed as well as return.
 111. As Saransh, I want the yearly review to be the only time strategies are chosen again, Sleeves re-weighted, new money put in and the India/US split revisited, so that backtest overfitting doesn't creep into live money.
-112. As Saransh, I want each Override scored against what the Rule plan alone would have done, so that the Desk earns more say only on evidence.
+112. As Saransh, I want each Override scored against what the Rule plan alone would have done, so that each Lever and the Desk earn more say only on evidence.
 
 ### The Stocks Brief
 
 113. As Saransh, I want the Stocks Brief to be an HTML page I open on this machine, never a notification, so that it stays private and waits for me.
 114. As Saransh, I want it to open with the Data gate's verdict, then the Order lists by Book in the order I place them, then what waits on me, so that I can act within minutes.
 115. As Saransh, I want it to show each Book's value, its drawdown against its breakers, its Sleeves and their Stages, so that I see each Book's state at a glance.
-116. As Saransh, I want it to list the Desk's subtractions with their reasons, and the Quarantines, Corrections, Lessons and promotions waiting on me, so that I see every judgement made on my behalf.
+116. As Saransh, I want it to list the Portfolio Manager's changes with their Decision records and the Desk's views behind them, each Book's Market condition and Judgement mode, and the Quarantines, Corrections, Lessons and promotions waiting on me, so that I see every judgement made on my behalf.
 117. As Saransh, I want it to list failed and skipped Steps, so that I know which parts of the day are missing.
 118. As Saransh, I want the page to load nothing from the internet, so that opening it sends nothing anywhere.
 
@@ -225,7 +243,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 121. As Saransh, I want no broker credentials anywhere in the system, so that nothing can trade or read my accounts on its own.
 122. As Saransh, I want Run data, the Journal, Lessons, the Broker inbox and Answers kept in git-ignored areas, so that my holdings never leave the machine through a repo.
-123. As Saransh, I want MarketSmith's cookies kept only in ash_backend's env file, so that the stocks Pipeline never handles them.
+123. As Saransh, I want MarketSmith's cookies kept only in ash_new's env file, read only by its MarketSmith fetch, so that the stocks Pipeline never handles them.
 
 ## Implementation Decisions
 
@@ -233,8 +251,8 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 - Three repos each own one part. They are joined only by commands with files in and out (ADR 0001's Step contract).
   - **The agents repo** owns the stocks Pipeline and its Schedule, the Agents (Portfolio Manager, Health Agent and the Desk's three analysts), the Answers round trip and the Stocks Brief.
-  - **ash_new** owns everything about markets: the Lake, Corrections, Books, the Book engine (both the backtest and the Rule plan), the final check, paper and real Books, orders, imports, Reconciliation, Feeds, dossiers and review figures. Each is reached through a `pd` command that writes JSON.
-  - **ash_backend** keeps only the MarketSmith fetch.
+  - **ash_new** owns everything about markets: the Lake, the MarketSmith fetch and its dated snapshots, Corrections, Books, the Book engine (both the backtest and the Rule plan), the Market condition, each Book's Playbook and Judgement mode, the final check, paper and real Books, orders, imports, Reconciliation, Feeds, dossiers and review figures. Each is reached through a `pd` command that writes JSON.
+  - **ash_backend** keeps nothing. Its MarketSmith fetch moves into ash_new, and it is archived once Saransh decides on the Sash app (see "ash_backend").
 - The Pipeline reaches ash_new only through `pd` commands. It never reads ash_new's database or Lake files directly. The JSON those commands write is the contract between the two repos.
 - The stocks Pipeline owns the Lake's Schedule, and ash_new's own schedule and Task Scheduler task are off (ADR 0002).
 - The stocks Pipeline is plain TypeScript, like the daily Pipeline, with the same Run folders, lock, Step records, logs and `agents run|step` commands. It runs on Windows.
@@ -261,7 +279,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 2. **Broker inbox** (command). It records each tradebook in its real Book and matches fills to orders. When a holdings export is present, it runs Reconciliation.
    - Processed files move out of the inbox. A file it can't read is set aside, with a To-do.
    - On a Book's first import, every holding no strategy bought becomes a Legacy holding, and the Brief asks whether to keep each one.
-3. **MarketSmith** (command, Saturdays only; it skips itself otherwise). It runs ash_backend's fetch for India and the US through a new ash_backend command. An expired cookie skips the Step, with a To-do naming the cookie.
+3. **MarketSmith** (command, Saturdays only; it skips itself otherwise). It runs `pd marketsmith` for India and the US, which writes the raw store and keeps the fetch as a dated snapshot. An expired cookie skips the Step, with a To-do naming the cookie.
 4. **Lake** (command):
    - It checks that ash_new's own schedule is off, and raises a To-do if it isn't.
    - It clears a refresh left running by a dead process.
@@ -271,27 +289,28 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
    - a diagnosis;
    - a proposed fix, as text, never applied;
    - proposed Corrections in the Corrections file's format, recorded in ash_new to wait for approval.
-6. **Plan** (command, through `pd`). It applies the Data gate, then makes the Rule plan for each Book, real and paper (see The Book engine). It writes the Rule plans and the names the Desk must review, with a dossier for each name.
+6. **Plan** (command, through `pd`). It applies the Data gate and reads each market's Market condition, then makes the Rule plan for each Book, real and paper (see The Book engine). It writes the Rule plans, each Book's exposure level and Pool, and the names the Desk must review, with a dossier for each name.
 7. **Feeds** (command, through `pd`). It fetches the Feeds for the Rule plan's names and the holdings, reusing what it has cached.
 8. **Review** (command, through `pd`, Saturdays only). It computes the weekly figures, adds the monthly ones on the first Saturday of a month, and the yearly ones at the yearly review.
 9. **Desk** (Agents: three calls at once, one per analyst). Each analyst gets the Rule plan's names with their dossiers and Feeds, and writes a view of each name.
 10. **Portfolio Manager** (Agent).
     - **Its inputs:**
       - the Rule plans and the Desk's views;
+      - each Book's Playbook, Judgement mode, Market condition, exposure level and Pool;
       - the Data gate's verdict and the Health Agent's diagnosis;
       - on Saturdays, the review figures;
       - the Stages;
       - its Journal and its approved Lessons.
     - **Its output, checked against a schema:**
-      - for each Book, the subtractions from the Rule plan, each with a reason and the analysts' views it follows;
+      - for each Book, its exposure level for the day and its changes from the Rule plan, each with its Decision record and the analysts' views it follows;
       - the early exits, promotions and Lessons it proposes;
       - the Journal's new entries;
       - the Brief's commentary.
 11. **Check** (command, through `pd`). It makes the final Order lists.
-    - It accepts the Portfolio Manager's output only if every change from the Rule plan is a subtraction (a veto, a trim or a dropped buy) and everything stays inside the Mandate.
-    - Otherwise, or when the Portfolio Manager failed, the Rule plan goes out unchanged, and the Brief says why.
+    - It accepts each change from the Rule plan only if the Book's Judgement mode allows it, it is inside its Lever's range, and its Decision record is complete, with every cited figure matching the Run's inputs.
+    - It drops each change that fails, and the Brief says why. If what remains breaks the Mandate, or the Portfolio Manager failed, the Rule plan goes out unchanged.
     - It records the Order lists in ash_new: a paper Book's orders to fill at the next open, a real Book's orders as proposed.
-    - It records each subtraction as an Override, with the Rule plan's order beside it.
+    - It records each accepted change as an Override, with the Rule plan's order and the Decision record beside it.
 12. **Save state** (command). It applies the Journal's entries and queues each proposed Lesson for Saransh's Answer, as the daily Pipeline's Save state does for Memory.
 13. **Brief** (command). It writes the Stocks Brief as a single self-contained HTML file in the Run folder.
 
@@ -309,9 +328,10 @@ A dry run changes nothing in ash_new:
   1. Quarantines and the Data gate;
   2. Stage scaling: in a real Book, a Paper strategy holds nothing, a Real-small one a quarter of its share and a Real-full one all of it. A paper Book holds every strategy from Paper up at its full share;
   3. the breakers, on the Book's drawdown from its high-water mark;
-  4. the position and sector caps across the whole Book, Kept holdings included. A buy is cut to fit, and the part cut waits in the cash fund;
-  5. the order-size guard, at 1% of the stock's 20-day average traded value;
-  6. whole shares, and lot sizes where a market has them.
+  4. the exposure level its market's Market condition sets. While the Book holds more in stocks than that, it makes no new buys, and then trims the weakest holdings first: lowest RS Rating first, with ties going to the one closest to its stop;
+  5. the position and sector caps across the whole Book, Kept holdings included. A buy is cut to fit, and the part cut waits in the cash fund;
+  6. the order-size guard, at 1% of the stock's 20-day average traded value;
+  7. whole shares, and lot sizes where a market has them.
 
   The strategy's own track never sees these rules. So every Override's counterfactual is always at hand.
 - **Sleeve weights:** each strategy's weight is proportional to the inverse of its volatility over the past year, then scaled by its Stage. Gold is fixed at 10%. Whatever no Sleeve uses waits in the cash fund. Weights are set at each yearly review and drift in between.
@@ -325,6 +345,33 @@ A dry run changes nothing in ash_new:
 
   The deflated Sharpe counts every variant tried in a strategy's family as a trial. The Candidate test runs the Book with and without the strategy.
 - **Parity:** the Rule plan is the Book engine's next session, run from the Book's actual holdings and cash. Started from the backtest's own holdings, it gives exactly the backtest's next session.
+
+### The Market condition and the Playbook (ash_new)
+
+ADR 0003 records why the Portfolio Manager judges within a Playbook rather than only subtracting.
+
+- **The Market condition** is read by `pd plan` for each market from the Lake: the index against its 50- and 200-day averages, breadth (the share of the index's members above their 200-day average) and distribution days. Its thresholds are in ash_new's config. MarketSmith's own outlook, from the latest snapshot, is recorded beside it and decides nothing.
+- **The exposure level** for each Market condition is set in each Book's config, and the Book engine applies it (rule 4 above), so the Book backtest includes it.
+- **The Playbook** is in each Book's config beside its Mandate. It gives each Lever its range:
+  - **exposure:** the floor the Portfolio Manager may cut to below the exposure level, never above it. A cut works as the exposure level does: no new buys, then the weakest trimmed first;
+  - **selection:** a buy in the Rule plan swapped for another name in the Pool, in the same Sleeve, for no more than the money the dropped buy had;
+  - **size:** a multiple of the strategy's size, at most 1× until Saransh widens it on the override scorecard's evidence;
+  - **timing:** how many sessions a buy may wait, after which it is bought or dropped;
+  - **trim:** a cut to a holding the strategy keeps, short of an exit. An early exit still needs Saransh's Answer;
+  - **rebalance:** the drift, as a share of the Book, under which no trade is made.
+- **The Pool** of each Book is the names any strategy with a Sleeve in it bought or signalled to buy in the last 2 months, from their live tracks.
+- **The Judgement mode** of each Book is kept in the app database with every change, its date and the Answer that approved it, as Stages are.
+  - **Plan only:** the check accepts no change.
+  - **Subtract only:** it accepts exposure cuts, dropped buys, trims, waits and rebalance skips.
+  - **Playbook:** it also accepts selection swaps and sizes up to the range's top.
+
+  Real Books start in subtract only, paper Books in Playbook.
+- **A Decision record** cites each figure by the input file, the security and the field it came from, with its value. `pd check` looks each one up in the Run's inputs.
+- **Placeholders until Saransh sets them:**
+  - exposure levels of 100%, 80% and 40% for Uptrend, Under pressure and Correction, with floors of 80%, 50% and 0%;
+  - sizes from 0.5× to 1×;
+  - timing up to 5 sessions;
+  - rebalance under 2% of the Book.
 
 ### Data, Corrections and Quarantine (ash_new)
 
@@ -385,7 +432,7 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
   - new Sleeve weights;
   - where new money goes;
   - the India/US split.
-- **The override scorecard** scores each Override against its counterfactual: what the Rule plan's order would have made, taken from the strategy's own track, until that track closed the position. It is tallied per analyst and per Lesson.
+- **The override scorecard** scores each Override against its counterfactual: what the Rule plan's order would have made, taken from the strategy's own track, until that track closed the position. It is tallied per Lever, per analyst and per Lesson.
 
 ### Agents
 
@@ -399,7 +446,7 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
   - **Workers:** Events and Risk run on Claude Code, Chart on Codex. Each falls back to the other Worker.
   - **Access:** all three are read-only in the Run folder. Events and Risk may use their Worker's web search, only to check one item and citing its source. Chart has no web access.
   - **Output**, checked against a schema, for each name: no view, a veto, a trim to a given size, or a proposed exit, with reasons and the evidence cited.
-- **Instructions** tell each analyst what it may and may not do, and state the Mandate. What enforces subtractions only is the final check, not the instructions.
+- **Instructions** tell each Agent what it may and may not do, and state the Mandate and the Playbook. What enforces them is the final check, not the instructions.
 
 ### Answers
 
@@ -408,14 +455,15 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
 
 ### ash_backend
 
-- A new command runs the `fetch` job kind outside the API for India and the US, writing to the raw store as the job does. It exits with 78 when MarketSmith rejects a cookie.
+- Nothing new is built in ash_backend. Its MarketSmith fetch for India and the US moves into ash_new as `pd marketsmith`, writing the raw store that ash_new already reads and a dated snapshot of each fetch. It exits with 78 when MarketSmith rejects a cookie.
 - Its Portfolio Manager agent and Sash's `PM_BUY` alerts are turned off.
+- It is archived once Saransh decides what happens to the Sash app. Until then its own timer keeps the app's data.
 
 ### Secrets and data
 
 - **Credentials:**
   - No broker credentials exist anywhere.
-  - MarketSmith's cookies stay in ash_backend's env file.
+  - MarketSmith's cookies move to ash_new's env file, read only by `pd marketsmith`.
   - Saransh sets the contact for the SEC's required User-Agent in the agents repo's env file.
 - **Where data lives:** the Broker inbox, Answers files, Run data, the Journal and Lessons live in the agents repo's git-ignored data area. ash_new's app database and Lake stay where they are.
 - **Web searches:** the Desk's searches name securities and events only, never Saransh's holdings, sizes or amounts.
@@ -428,7 +476,7 @@ There are two seams, and both are a command with files in and files out.
 
 - **The Step command** (agents repo), as for the daily Pipeline:
   1. A test prepares a Run folder and state.
-  2. It puts stand-in `pd` and ash_backend commands first on PATH, beside the stand-in Worker CLIs.
+  2. It puts a stand-in `pd` command first on PATH, beside the stand-in Worker CLIs.
   3. It runs one Step with the fake Worker.
   4. It checks only the files the Step wrote, what the stand-ins were called with, and the exit code.
 - **The `pd` command** (ash_new):
@@ -466,7 +514,7 @@ There are two seams, and both are a command with files in and files out.
   - each gets its inputs;
   - each falls back to its other Worker;
   - a failure is recorded.
-- **Check:** sends the Rule plan unchanged when the Portfolio Manager failed.
+- **Check:** sends the Rule plan unchanged when the Portfolio Manager failed, and shows each dropped change with its reason in the Brief.
 - **Save state:** applies the Journal and queues Lessons.
 - **Brief:**
   - is written with every section after earlier Steps fail;
@@ -486,10 +534,15 @@ There are two seams, and both are a command with files in and files out.
 - **Stages:** each Stage's scaling is right, and a paper Book holds full shares.
 - **Order-size guard:** an order over 1% of the 20-day average traded value is cut.
 - **Legacy holdings:** they are wound down in the right order, and a winner near long-term waits.
+- **Market condition and exposure level:**
+  - each condition is read right from a fixture Lake at the configured thresholds;
+  - over the exposure level, a Book makes no new buys, then trims the weakest first, with ties to the one closest to its stop.
 - **Check:**
-  - accepts subtractions;
-  - rejects an addition, a size increase, or anything outside the Mandate;
-  - falls back to the Rule plan.
+  - in plan only mode, accepts no change;
+  - in subtract only mode, accepts an exposure cut, a dropped buy, a trim and a wait, and rejects a swap or a size above 1×;
+  - in Playbook mode, accepts a swap to a name in the Pool and rejects one outside it;
+  - rejects a change outside its Lever's range, one without a complete Decision record, and one citing a figure that isn't in the inputs;
+  - drops a failing change and keeps the rest, and falls back to the Rule plan when what remains breaks the Mandate.
 - **Imports:**
   - sample ICICI Direct and moomoo files become the right ledger;
   - fills are matched to orders, including partial fills;
@@ -528,7 +581,11 @@ There are two seams, and both are a command with files in and files out.
   - instruments other than stocks, the gold ETFs and the cash funds.
 - **Tax:** tax filing or reporting, and any tax optimisation beyond tie-breaking and the order in which Legacy holdings are sold.
 - **Moving money between the Books.** Only the yearly review proposes a new split.
-- **Judgement that adds:** the Desk adding size or opening positions, and Lessons that add.
+- **Judgement outside the Playbook:**
+  - any addition in a Book that isn't in Playbook mode;
+  - names outside the Pool, and sizes above a Lever's range;
+  - exposure above the level code sets;
+  - the Desk adding size or opening positions.
 - **Pages for Books in ash_new's web app.** The Brief is the interface for now.
 - **The Sash app's alerts**, which are retired.
 - **Dagu**, as for the daily Pipeline.
@@ -543,26 +600,28 @@ There are two seams, and both are a command with files in and files out.
   1. **The data Pipeline:**
      - the Windows Schedule and the stocks Pipeline with the Lake, MarketSmith and Health Steps;
      - the Data gate, Corrections and Quarantine;
+     - the MarketSmith fetch moved into ash_new, with dated snapshots;
      - ash_new's schedule turned off;
      - the Broker inbox with ICICI Direct's and moomoo's import presets, and Reconciliation;
      - a Stocks Brief showing data status and holdings.
-  2. **The evidence:** activate CW2's variant, load the ash ports, build the Book engine and its backtest, and pick each Book's Candidates.
+  2. **The evidence:** activate CW2's variant, load the ash ports, build the Book engine and its backtest with the exposure level by Market condition, and pick each Book's Candidates.
   3. **Paper Books:**
-     - the Rule plan, the final check and the Portfolio Manager;
+     - the Rule plan, the Playbook, the final check and the Portfolio Manager, in Playbook mode;
      - the Journal, the Order list and Answers;
      - the weekly and monthly reviews.
 
      The 3-month Paper clock starts here.
   4. **The Desk, on the paper Books** within those 3 months: the Feeds, dossiers, override scorecard and Lessons.
-  5. **Real money:** Legacy and Kept holdings, then the first Real-small promotions after 3 months of Paper.
+  5. **Real money:** Legacy and Kept holdings, then the first Real-small promotions after 3 months of Paper. Real Books run in subtract only mode until Saransh moves one to Playbook, after 3 months in which the paper Book's Overrides at least matched the Rule plan alone.
 - **Waiting on Saransh:**
   - each Book's capital;
+  - the Market condition's thresholds, the exposure levels and the Playbook's ranges (placeholders until then);
+  - what happens to the Sash app, before ash_backend is archived;
   - one tradebook and one holdings export from each broker, to build the import presets;
   - the contact for the SEC's User-Agent;
   - later, contract notes, if real brokerage is to enter the costs.
 - **Unconfirmed:**
   - **Codex's read-only sandbox on Windows** is untested here. If it doesn't hold, the Health Agent and the Chart analyst start on Claude Code.
-  - **Node:** the agents repo requires Node 25, but this machine has 24.17.0.
   - **NSE and BSE endpoints** need browser-like headers and cookies, and change without notice. A failing Feed skips itself with a To-do.
   - **Broker charges in exports:** whether ICICI Direct's and moomoo's exports include charges, which would let the reviews check the ₹0 / $0 brokerage.
   - **Web search permission:** how Claude Code's web search is allowed for the Events and Risk analysts, given that the Worker denies every command that isn't read-only.
@@ -595,4 +654,5 @@ There are two seams, and both are a command with files in and files out.
   - **Remittances under the LRS** carry 20% TCS above ₹10 lakh a year. That's one reason the Books never pass money to each other.
 - **The daily Pipeline's PRD** (`prd.md`, beside this one) leaves Windows out of scope. This PRD changes that for the stocks Pipeline only.
 - **The Pipeline's machinery runs only on macOS today.** Its lock and process records use a macOS-only file lock, it stops processes by process group, and the tests' stand-ins are `sh` scripts. Issue 16 makes it run on Windows before anything else is built there.
-- **Issues:** 15–45 in this repo's issues folder. The nine that touch only ash_new are mirrored as ash_new's tickets 50–58.
+- **Issues:** 15–46 in this repo's issues folder. The nine that touch only ash_new are mirrored as ash_new's tickets 50–58; issue 46 and the reworked issue 22 are not mirrored yet.
+- **Research:** `docs/research/portfolio-agent-research.md` holds the sources behind the Playbook, the Decision record and the override scorecard.

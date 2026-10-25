@@ -112,7 +112,7 @@ export function proposalDiff({ agent, name, memory }: MemoryProposal): string {
     const proposed = join(temp, `${name}.md`)
     writeFileSync(proposed, memory)
     const current = existsSync(memoryFile(agent, name)) ? memoryFile(agent, name) : '/dev/null'
-    const { stdout } = spawnSync('git', ['diff', '--no-index', '--no-color', '--no-ext-diff', '--', current, proposed], { encoding: 'utf8' })
+    const { stdout } = spawnSync('git', ['diff', '--no-index', '--no-color', '--no-ext-diff', '--', current, proposed], { encoding: 'utf8', windowsHide: true })
     const hunks = stdout.indexOf('\n@@')
     return hunks < 0 ? '(no change)\n' : stdout.slice(hunks + 1)
   } finally {

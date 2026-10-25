@@ -1,0 +1,370 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio Agent Plan</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --ink: #1d1c1a; --quiet: #5f5c56; --border: #e3e0d8;
+    --edge: #b9b5ab; --accent: #2f6fd6; --accent-tint: rgba(47,111,214,.10); --tint: #f1efe9; --code: #f1efe9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+      --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+    --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; line-height: 1.25; margin: 0 0 6px; }
+  .byline { color: var(--quiet); font-size: 14px; margin-bottom: 28px; }
+  h2 { font-size: 22px; margin: 44px 0 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  nav { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+  nav ol { margin: 0; columns: 2; }
+  @media (max-width: 600px) { nav ol { columns: 1; } }
+  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--tint); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  figure { margin: 8px 0 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { color: var(--quiet); font-size: 13px; padding: 4px 8px 0; }
+  svg text { font-family: inherit; }
+  .t-ink { fill: var(--ink); } .t-quiet { fill: var(--quiet); }
+  .nm { font-weight: 600; } .sm { font-size: 11.5px; } .ttl { font-size: 15px; font-weight: 600; }
+  .box { fill: none; stroke: var(--edge); stroke-width: 1.25; }
+  .box.main { fill: var(--accent-tint); stroke: var(--accent); stroke-width: 2; }
+  .cont { fill: var(--tint); stroke: var(--edge); stroke-width: 1.25; }
+  .line { fill: none; stroke: var(--edge); stroke-width: 1.25; }
+  .arrowhead { fill: var(--edge); }
+  select { font: inherit; font-size: 13px; color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 3px 6px; }
+  .theme { position: fixed; top: 12px; right: 12px; font-size: 13px; }
+</style>
+</head>
+<body>
+<button class="theme" type="button" id="theme" aria-label="Switch light or dark theme">Theme</button>
+<main>
+<h1>Portfolio Agent: one system for ash_backend and ash_new</h1>
+<div class="byline">25 Oct 2026 · Saransh</div>
+
+<nav aria-label="Contents"><ol>
+  <li><a href="#summary">Summary</a></li>
+  <li><a href="#current">Current setup</a></li>
+  <li><a href="#target">Target setup</a></li>
+  <li><a href="#strategy">From strategy output to portfolio</a></li>
+  <li><a href="#evidence">Evidence: the Decision record</a></li>
+  <li><a href="#guardrails">Guardrails and approval</a></li>
+  <li><a href="#research">Research</a></li>
+  <li><a href="#roadmap">Roadmap</a></li>
+  <li><a href="#decisions">Decisions for you</a></li>
+</ol></nav>
+
+<h2 id="summary">Summary</h2>
+<p>The Portfolio Agent should manage each Book the way you would: start from what your approved strategies say, then use judgement on market conditions and the current portfolio. It may only move inside limits you approved, and every decision comes with the data behind it. Before building it, ash_backend and ash_new become one data and portfolio platform, so the agent sees the same data you see.</p>
+<p>The design rests on four ideas:</p>
+<ol>
+  <li><strong>One platform, one data truth.</strong> ash_new is the platform: the Lake, strategies, Books, backtests and the ledger. ash_backend's unique part, the MarketSmith data, moves in as one more source of the Lake. Its old Portfolio Manager and alerts are retired.</li>
+  <li><strong>Strategies propose, the agent composes.</strong> A strategy's output is a list of candidates and exits, not the portfolio. The agent turns it into the portfolio: which candidates to take when there are more than the slots, how much cash to hold in this market, how big each position is, and when to trim.</li>
+  <li><strong>Judgement inside an approved envelope.</strong> You approve the Mandate (hard limits) and a Playbook (the judgements the agent may make, each with a range). Code checks every decision against both before it reaches you. A decision outside them never reaches the Order list.</li>
+  <li><strong>Evidence for every decision.</strong> Each change carries a Decision record: what the strategy said, what the agent did instead, which rule in your Playbook allowed it, the numbers it read, and what it expects to happen. A scorecard later compares the agent's portfolio with the strategies' plain output, so the agent earns or loses latitude on evidence.</li>
+</ol>
+<p>This widens one decision in the current stocks PRD, where the agents may only subtract from the Rule plan. Your ask needs bounded additions too: choosing among candidates, and holding more or less cash by market condition. That is the first item under <a href="#decisions"><em>Decisions for you</em></a>.</p>
+
+<h2 id="current">Current setup</h2>
+<p>Two systems do overlapping jobs, and neither reaches your money. ash_backend fetches MarketSmith and feeds the Sash app. ash_new does the strategies, backtests and portfolios, and reads ash_backend's MarketSmith files from disk. The agents repo has a stocks Pipeline designed (issues 15–45) but not built.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Concern</th><th>ash_backend</th><th>ash_new (portfolio dashboard)</th><th>Verdict</th></tr></thead>
+  <tbody>
+    <tr><td>Market data</td><td>MarketSmith India and Global (cookie login), yfinance prices, earnings calendars</td><td>The Lake: Parquet and DuckDB, 15 years of panels, point-in-time index members, total-return benchmarks; MarketSmith read from ash_backend's <code>data/raw/MS</code></td><td>ash_new keeps the data; only the MarketSmith fetch is unique to ash_backend</td></tr>
+    <tr><td>Data freshness</td><td>About 98% of prices stop at 29 Jun 2026; 85% of fundamentals at late May</td><td>The refresh started 18 Oct is stuck after <code>BrokenProcessPool</code></td><td>Both stale today</td></tr>
+    <tr><td>Strategies</td><td>12 freqtrade-style classes (CW2, CMO, Investor, Super 30s and others)</td><td>44 YAML templates plus every ash strategy ported as a slot-trading plugin, checked bar by bar against ash's code; not ported: <code>vol_delivery</code>, the VAA and BAA rotations</td><td>ash_new is the home; CW2's selected variant still to be switched on</td></tr>
+    <tr><td>Backtests</td><td><code>backtest_v1</code> and a vectorised twin; 10-year research scripts</td><td>Versioned runs keyed by spec and data version, walk-forward, sweeps, deflated Sharpe</td><td>ash_new's is stronger</td></tr>
+    <tr><td>Portfolios</td><td>Real trades from Supabase <code>transactions</code>, matched FIFO</td><td>Model, paper, real and composite portfolios, replayed from a ledger, with imports, XIRR, TWR and drift</td><td>ash_new's is stronger</td></tr>
+    <tr><td>Portfolio management</td><td>8 CANSLIM slots, a breadth reading, and one LLM call writing <code>PM_BUY</code> alerts; the LLM never ran in production, and 8 slots against about 130 holdings meant no buys</td><td>Proposed Order lists only; no portfolio-level caps or breakers yet (tickets 55–56)</td><td>Neither manages a whole Book</td></tr>
+    <tr><td>Evidence</td><td>An <em>Agent Review</em> file per run</td><td>A reason on every engine trade, an audit log per strategy</td><td>No record ties a decision to its data</td></tr>
+    <tr><td>Interface</td><td>Next.js 15 panel, a legacy admin UI, the Sash Flutter app and its push alerts</td><td>Next.js 16 dashboard on 127.0.0.1</td><td>ash_new's dashboard is the one you use for strategies</td></tr>
+    <tr><td>Runs on</td><td>A GCE e2-micro, timer at 01:00 UTC</td><td>This Windows machine, with its own scheduler (to be turned off, ADR 0002)</td><td>Different machines</td></tr>
+  </tbody>
+</table></div>
+<p>Worth keeping from ash_backend beyond the MarketSmith fetch: the pure cores of its Portfolio Manager (<code>breadth</code>, <code>slots</code>, <code>discipline</code>), the dynamic stop rules in <code>backend/portfolio/stop_rules.py</code>, and the <em>Agent Review</em> idea, which becomes the Decision record.</p>
+<p>One gap matters for evidence. ash_new keeps only MarketSmith's latest snapshot, not its history (ticket 49 was parked). So the agent can cite today's ratings, but nothing can later check a decision against the ratings it saw, or backtest a rule that uses them.</p>
+
+<h2 id="target">Target setup</h2>
+<p>ash_new becomes the one platform for data, strategies, Books and checks, and ash_backend is retired once its MarketSmith fetch moves into ash_new. The agents repo keeps the Pipeline and the Agents, and reaches ash_new only through <code>pd</code> commands with JSON in and out, as the stocks PRD already decides.</p>
+<figure>
+<svg viewBox="0 0 760 536" role="img" aria-label="ash_new holds the data and the rules; the agent decides only inside them" font-size="13">
+  <defs><marker id="arch-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" class="arrowhead"/></marker></defs>
+  <text x="24" y="28" class="t-ink ttl">ash_new holds the data and the rules; the agent decides only inside them</text>
+  <rect x="24" y="52" width="200" height="56" rx="8" class="box"/>
+  <text x="124" y="76" text-anchor="middle" class="t-ink nm">MarketSmith</text>
+  <text x="124" y="92" text-anchor="middle" class="t-quiet sm">ratings, fundamentals</text>
+  <rect x="280" y="52" width="200" height="56" rx="8" class="box"/>
+  <text x="380" y="76" text-anchor="middle" class="t-ink nm">Yahoo, NSE, BSE, SEC</text>
+  <text x="380" y="92" text-anchor="middle" class="t-quiet sm">prices, members, filings</text>
+  <rect x="536" y="52" width="200" height="56" rx="8" class="box"/>
+  <text x="636" y="76" text-anchor="middle" class="t-ink nm">Broker exports</text>
+  <text x="636" y="92" text-anchor="middle" class="t-quiet sm">tradebooks, holdings</text>
+  <g class="line">
+    <path d="M124 108V140" marker-end="url(#arch-arrow)"/><path d="M380 108V140" marker-end="url(#arch-arrow)"/><path d="M636 108V140" marker-end="url(#arch-arrow)"/>
+    <path d="M340 260V300" marker-end="url(#arch-arrow)"/><path d="M420 300V260" marker-end="url(#arch-arrow)"/>
+    <path d="M360 420V456" marker-end="url(#arch-arrow)"/><path d="M400 456V420" marker-end="url(#arch-arrow)"/>
+    <path d="M480 484H536" marker-end="url(#arch-arrow)"/>
+  </g>
+  <rect x="24" y="140" width="712" height="120" rx="8" class="cont"/>
+  <text x="40" y="162" class="t-ink nm">ash_new: one platform, reached through pd commands</text>
+  <rect x="40" y="172" width="158" height="72" rx="8" class="box"/>
+  <text x="119" y="196" text-anchor="middle" class="t-ink nm">Lake</text>
+  <text x="119" y="212" text-anchor="middle" class="t-quiet sm">prices, fundamentals,</text>
+  <text x="119" y="228" text-anchor="middle" class="t-quiet sm">dated MS snapshots</text>
+  <rect x="214" y="172" width="158" height="72" rx="8" class="box"/>
+  <text x="293" y="196" text-anchor="middle" class="t-ink nm">Book engine</text>
+  <text x="293" y="212" text-anchor="middle" class="t-quiet sm">Strategy plan,</text>
+  <text x="293" y="228" text-anchor="middle" class="t-quiet sm">Market and Book read</text>
+  <rect x="388" y="172" width="158" height="72" rx="8" class="box"/>
+  <text x="467" y="196" text-anchor="middle" class="t-ink nm">Books ledger</text>
+  <text x="467" y="212" text-anchor="middle" class="t-quiet sm">real and paper Books,</text>
+  <text x="467" y="228" text-anchor="middle" class="t-quiet sm">orders and fills</text>
+  <rect x="562" y="172" width="158" height="72" rx="8" class="box"/>
+  <text x="641" y="196" text-anchor="middle" class="t-ink nm">Check</text>
+  <text x="641" y="212" text-anchor="middle" class="t-quiet sm">Mandate, Playbook,</text>
+  <text x="641" y="228" text-anchor="middle" class="t-quiet sm">cited figures</text>
+  <text x="332" y="284" text-anchor="end" class="t-quiet sm">plans and reads</text>
+  <text x="428" y="284" class="t-quiet sm">decisions to check</text>
+  <rect x="24" y="300" width="712" height="120" rx="8" class="cont"/>
+  <text x="40" y="322" class="t-ink nm">agents repo: the stocks Pipeline, Tue to Sat 07:00 IST</text>
+  <rect x="40" y="332" width="216" height="72" rx="8" class="box"/>
+  <text x="148" y="356" text-anchor="middle" class="t-ink nm">Health Agent</text>
+  <text x="148" y="372" text-anchor="middle" class="t-quiet sm">diagnoses bad data,</text>
+  <text x="148" y="388" text-anchor="middle" class="t-quiet sm">proposes Corrections</text>
+  <rect x="272" y="332" width="216" height="72" rx="8" class="box main"/>
+  <text x="380" y="356" text-anchor="middle" class="t-ink nm">Portfolio Agent</text>
+  <text x="380" y="372" text-anchor="middle" class="t-ink sm">Playbook judgement,</text>
+  <text x="380" y="388" text-anchor="middle" class="t-ink sm">a Decision record each</text>
+  <rect x="504" y="332" width="216" height="72" rx="8" class="box"/>
+  <text x="612" y="356" text-anchor="middle" class="t-ink nm">Stocks Brief</text>
+  <text x="612" y="372" text-anchor="middle" class="t-quiet sm">Order lists, evidence,</text>
+  <text x="612" y="388" text-anchor="middle" class="t-quiet sm">your Answers back</text>
+  <text x="352" y="442" text-anchor="end" class="t-quiet sm">Brief</text>
+  <text x="408" y="442" class="t-quiet sm">Answers</text>
+  <rect x="280" y="456" width="200" height="56" rx="8" class="box"/>
+  <text x="380" y="480" text-anchor="middle" class="t-ink nm">You</text>
+  <text x="380" y="496" text-anchor="middle" class="t-quiet sm">read, answer, place orders</text>
+  <rect x="536" y="456" width="200" height="56" rx="8" class="box"/>
+  <text x="636" y="480" text-anchor="middle" class="t-ink nm">ICICI Direct, moomoo</text>
+  <text x="636" y="496" text-anchor="middle" class="t-quiet sm">orders placed by hand</text>
+</svg>
+<figcaption>Target setup · ash_new platform, agents Pipeline, you</figcaption>
+</figure>
+<p>Data flows down and decisions flow back up to the Check before anything reaches you. The agent never touches the Lake or the ledger directly.</p>
+<p><strong>What moves where:</strong></p>
+<div class="table-wrap"><table>
+  <thead><tr><th>From ash_backend</th><th>Goes to</th><th>Why</th></tr></thead>
+  <tbody>
+    <tr><td>MarketSmith fetch (India and Global)</td><td>ash_new, as a <code>pd marketsmith</code> step that also keeps dated snapshots</td><td>One owner for all data; dated snapshots make ratings citable and testable later</td></tr>
+    <tr><td>Breadth, slots and discipline cores</td><td>ash_new's Market read and Book read, rewritten against the Lake</td><td>Reuse the logic, drop the Supabase coupling</td></tr>
+    <tr><td>Dynamic stop rules</td><td>ash_new's Disaster stop options</td><td>The PRD's stops need a home in the Book engine</td></tr>
+    <tr><td>Agent Review</td><td>The Decision record</td><td>Becomes the evidence format</td></tr>
+    <tr><td>Supabase writes, <code>PM_BUY</code> alerts, the panel, the GCE box</td><td>Retired</td><td>The Brief replaces them; see <em>Decisions for you</em> on the Sash app</td></tr>
+  </tbody>
+</table></div>
+<p>Until the MarketSmith move lands, ash_backend stays on as a fetch-only command, which is exactly where the current PRD leaves it. So consolidation can happen after the agent work starts, not before it.</p>
+
+<h2 id="strategy">From strategy output to portfolio</h2>
+<p>The agent's job is the step between what the strategies say and what you hold. That step is written down as a <strong>Playbook</strong>: a short list of the judgements the agent may make, each with the data it must read and the range you approve. The Mandate's hard limits sit above it and never move.</p>
+<p>Each Run works in five steps:</p>
+<ol>
+  <li><strong>Strategy plan (code).</strong> Each approved strategy runs as it was backtested and gives its buys, sells and sizes. This is today's Rule plan, kept unchanged as the baseline.</li>
+  <li><strong>Market read (code).</strong> Code classifies each market's condition from fixed measures, so the label is reproducible: index against its 50- and 200-day averages, breadth (share of the index above its 200-day average), distribution days, and MarketSmith's market outlook. The result is one of a few named Market conditions, such as <em>Uptrend</em>, <em>Under pressure</em> or <em>Correction</em>.</li>
+  <li><strong>Portfolio read (code).</strong> Code lays out the current Book: exposure, cash, each position's weight and profit, sector and theme concentration, the drawdown against the breakers, upcoming results dates, and correlation between holdings.</li>
+  <li><strong>Judgement (the agent).</strong> The agent reads all three, plus each name's dossier, and composes the Order list using only the Playbook's levers below.</li>
+  <li><strong>Check (code).</strong> Code verifies each decision against the Mandate and the Playbook ranges. Anything outside them is dropped, and that part falls back to the Strategy plan. The Brief says what was dropped and why.</li>
+</ol>
+<p><strong>The Playbook's levers</strong>, with example ranges for you to set:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Lever</th><th>What the agent may decide</th><th>Must read</th><th>Example range (you set)</th></tr></thead>
+  <tbody>
+    <tr><td>Exposure</td><td>How far to cut exposure below code's level, never above it</td><td>Market condition only, for now</td><td>Code sets 100%, 80% or 40% by condition; the agent may cut to 80%, 50% or 0%</td></tr>
+    <tr><td>Selection</td><td>Which candidates to take when strategies offer more than the room</td><td>Each candidate's strategy rank, RS, sector strength, overlap with holdings</td><td>Only names an approved strategy surfaced in the last 2 months</td></tr>
+    <tr><td>Size</td><td>Scale a strategy's size up or down</td><td>Volatility, conviction from the dossier, liquidity</td><td>0.5× to 1.25× the strategy's size, never above the caps</td></tr>
+    <tr><td>Timing</td><td>Wait before buying</td><td>Results within 5 sessions, extension above base</td><td>Defer up to 5 sessions, then buy or drop</td></tr>
+    <tr><td>Trim</td><td>Cut a position early</td><td>Weight drift, event risk, concentration</td><td>Down to the strategy's size; an early exit needs your Answer</td></tr>
+    <tr><td>Rebalance</td><td>Ignore small drifts to save cost</td><td>Drift from target weight</td><td>No trade under 2% of the Book</td></tr>
+  </tbody>
+</table></div>
+<p><strong>How an exposure cut is carried out</strong> (decided 25 Oct): it first stops new buys. If exposure is still above the agent's level, it trims the weakest holdings first, by lowest RS Rating, with ties going to the one closest to its stop. The Book's own drawdown doesn't move the level for now; the breakers still apply at −10% and −18%.</p>
+<p>Two rules keep the judgement honest. The agent never picks a stock no approved strategy surfaced, so every position traces back to a strategy you approved. And the agent's portfolio is always measured against the Strategy plan run alone, so its added value is a number, not a claim.</p>
+
+<h2 id="evidence">Evidence: the Decision record</h2>
+<p>Every place where the Order list differs from the Strategy plan gets one Decision record, and so does every Run's exposure level. A decision without a complete record fails the check and falls back to the Strategy plan. So <em>no evidence, no change</em> is enforced by code, not by asking the agent nicely.</p>
+<p>Each record holds, in words you already use:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Field</th><th>What it says</th><th>Example</th></tr></thead>
+  <tbody>
+    <tr><td>Strategy said</td><td>The Strategy plan's order</td><td>CW2 India: buy 120 ABC at the open, 6% of the Book</td></tr>
+    <tr><td>Agent did</td><td>The order that went out instead</td><td>Wait; no order today</td></tr>
+    <tr><td>Lever and rule</td><td>The Playbook line that allowed it</td><td>Timing: defer up to 5 sessions when results fall within 5</td></tr>
+    <tr><td>Evidence</td><td>The numbers and sources read, each with its value and date</td><td>Results on 29 Oct (NSE board meeting notice); 9% above its base</td></tr>
+    <tr><td>Expectation</td><td>What should happen if the call is right, and when to judge it</td><td>Decide after results; buy if it holds above the pivot</td></tr>
+    <tr><td>Review by</td><td>The session when the decision is scored</td><td>7 Nov</td></tr>
+  </tbody>
+</table></div>
+<p>Evidence must come from the Run's own inputs: the Lake, MarketSmith's snapshot, the Feeds and the dossiers. A figure that isn't in the inputs can't be cited, so the agent can't invent a number. Code checks each cited value against the inputs.</p>
+<p>The Brief shows the records as short sentences under each Order list, with the numbers beside them. The Journal keeps them, and the weekly review scores each one against its Strategy plan order: money made or saved, and whether the expectation came true. The scorecard groups those scores by lever. A lever that keeps losing against the plain strategies has its range narrowed, as a proposal for you. A lever that keeps adding can earn a wider range, also only with your approval.</p>
+
+<h2 id="guardrails">Guardrails and approval</h2>
+<p>The agent proposes, code checks, and you place the orders. That split stays even as the agent gets more latitude: the agent's latitude grows inside the Playbook, never around the check.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Action</th><th>Agent alone</th><th>Needs your Answer</th><th>Never</th></tr></thead>
+  <tbody>
+    <tr><td>Exposure, selection, size, timing, rebalance within the Playbook ranges</td><td>Yes, on the Order list</td><td></td><td></td></tr>
+    <tr><td>An early exit the strategy didn't call</td><td></td><td>Yes</td><td></td></tr>
+    <tr><td>A promotion or demotion of a strategy</td><td>Proposes</td><td>Yes</td><td></td></tr>
+    <tr><td>A change to a Playbook range, or a Lesson</td><td>Proposes</td><td>Yes</td><td></td></tr>
+    <tr><td>A Correction to the Lake's data</td><td>Proposes (Health Agent)</td><td>Yes</td><td></td></tr>
+    <tr><td>A stock no approved strategy surfaced</td><td></td><td></td><td>Never</td></tr>
+    <tr><td>Anything outside the Mandate: caps, breakers, cash fund, leverage, shorts, derivatives</td><td></td><td></td><td>Never</td></tr>
+    <tr><td>Moving money between the India and US Books</td><td></td><td></td><td>Never; the yearly review proposes it</td></tr>
+    <tr><td>Placing orders or holding broker credentials</td><td></td><td></td><td>Never in this design</td></tr>
+  </tbody>
+</table></div>
+<p><strong>What code enforces, whatever the agent writes:</strong></p>
+<ul>
+  <li>the Data gate and Hold mode: on bad data, nothing new opens;</li>
+  <li>the Mandate's caps and breakers, on the Order list as finally sent;</li>
+  <li>every decision inside its lever's range, with a complete Decision record;</li>
+  <li>every cited figure matching the Run's inputs;</li>
+  <li>on any failure, the Strategy plan goes out unchanged, with a note.</li>
+</ul>
+<p><strong>A switch per Book</strong> sets how much judgement is used: <em>plan only</em> (the Strategy plan goes out as is), <em>subtract only</em> (today's PRD), or <em>Playbook</em> (this design). A new Book, or a Book after a losing quarter for the agent, starts lower. The paper Book always runs on <em>Playbook</em>, so the agent's judgement builds a track record before it touches real money.</p>
+<p>The agents stay read-only, with no broker credentials. Web searches name securities and events only, never your holdings or amounts, as the PRD already requires.</p>
+
+<h2 id="research">Research</h2>
+<p>The research backs a manager who works inside written limits, trades less than the signals ask, and logs and scores every judgement separately from the model. It is also blunt that a language model's trading record can't be trusted in a backtest. The full notes, with 30 sources, are in the agents repo at <code>docs/research/portfolio-agent-research.md</code>.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Finding</th><th>What it means here</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td>An investment policy lists target weights with allowed ranges, a loss that triggers set procedures, exclusions, reconciliation to the broker, and a yearly review</td><td>The Mandate plus the Playbook is that policy; the PRD already has the breakers, Reconciliation and yearly review</td><td><a href="https://rpc.cfainstitute.org/-/media/documents/article/position-paper/investment-policy-statement-individual-investors.pdf">CFA Institute, IPS for individual investors</a></td></tr>
+    <tr><td>Constraints reduce how much of a signal reaches the portfolio</td><td>Expect the managed Book to differ from each strategy; measure it rather than avoid it</td><td><a href="https://rpc.cfainstitute.org/research/financial-analysts-journal/2002/portfolio-constraints-and-the-fundamental-law-of-active-manag">Clarke, de Silva, Thorley (2002)</a></td></tr>
+    <tr><td>Trading costs erase most high-turnover strategies; under costs, the best policy trades only partway to its target</td><td>The Rebalance lever's no-trade band, and Timing that waits rather than chases</td><td><a href="https://www.nber.org/papers/w20721">Novy-Marx and Velikov</a>; <a href="https://www.nber.org/papers/w15205">Garleanu and Pedersen</a></td></tr>
+    <tr><td>Trend filters and volatility targeting cut drawdowns, at a cost in strong bull markets</td><td>Exposure by Market condition is the right first lever for the 25% drawdown limit; backtest it in Phase 2</td><td><a href="https://mebfaber.com/wp-content/uploads/2016/05/SSRN-id962461.pdf">Faber</a>; <a href="https://people.duke.edu/~charvey/Research/Published_Papers/P135_The_impact_of.pdf">Harvey et al. (2018)</a></td></tr>
+    <tr><td>Banking model rules say who may override, when and how far, and require overrides tracked separately</td><td>Each Playbook lever has an owner, a range and its own scorecard line</td><td><a href="https://www.bis.org/committees/bcbs/basel-framework/standard/cre/36/inforce/2023-01-01/published/2022-12-08">Basel CRE36.44</a></td></tr>
+    <tr><td>Model plus judgement beats either alone; but in 60,000 forecasts, small adjustments often hurt and cuts beat increases</td><td>Start judgement with cuts; let increases earn their place on the scorecard (decisions 1 and 4)</td><td><a href="https://ideas.repec.org/a/inm/ormnsc/v36y1990i8p887-899.html">Blattberg and Hoch (1990)</a>; <a href="https://eprints.lancs.ac.uk/id/eprint/45487/">Fildes et al. (2009)</a></td></tr>
+    <tr><td>An adviser keeps a memo per order naming who recommended it, flags discretionary orders, and keeps records behind every performance figure</td><td>The Decision record's fields, and keeping the Journal for years</td><td><a href="https://www.law.cornell.edu/cfr/text/17/275.204-2">SEC Rule 204-2</a></td></tr>
+    <tr><td>Orders are checked before they go out, with a kill switch and small pilots</td><td>The Check, the per-Book switch, and Real-small</td><td><a href="https://www.law.cornell.edu/cfr/text/17/240.15c3-5">SEC Rule 15c3-5</a>; <a href="https://www.finra.org/rules-guidance/notices/15-09">FINRA 15-09</a></td></tr>
+    <tr><td>Multi-agent trading designs (analysts, a bull/bear debate, a risk team, a manager) are popular, but tested on short windows</td><td>The Desk's shape is reasonable; its value must be shown live, not claimed</td><td><a href="https://arxiv.org/html/2412.20138v4">TradingAgents</a></td></tr>
+    <tr><td>Reported LLM trading gains shrink over 20 years and 100+ stocks, and vanish after the model's training cutoff because it memorised the past</td><td>Never trust a backtest of the agent's judgement; earn its record forward on paper</td><td><a href="https://arxiv.org/abs/2505.07078">FINSABER</a>; <a href="https://arxiv.org/abs/2510.07920">Profit Mirage</a></td></tr>
+    <tr><td>Hiding company names in prompts reduces the model's look-ahead bias</td><td>A cheap test: score some decisions with names hidden and compare</td><td><a href="https://arxiv.org/abs/2309.17322">Glasserman and Lin</a></td></tr>
+    <tr><td>Keep the model as a proposer of structured output and put limits in code; structured outputs don't enforce numeric bounds</td><td>Every range and cap is checked in code, never trusted to the schema</td><td><a href="https://www.anthropic.com/engineering/building-effective-agents">Anthropic, Building effective agents</a>; <a href="https://platform.claude.com/docs/en/build-with-claude/structured-outputs">Structured outputs</a></td></tr>
+  </tbody>
+</table></div>
+<p><strong>If orders are ever placed by API</strong> (out of scope today): SEBI's retail algo framework applies to all brokers from 1 Apr 2026, with a static IP, an exchange algo tag and daily logout. ICICI's Breeze API takes no market orders, which clashes with the PRD's pre-open market orders. moomoo's API defaults to the real account, so code would have to default to simulation. Sources: <a href="https://www.sebi.gov.in/sebi_data/attachdocs/feb-2025/1738665456458.pdf">SEBI, 4 Feb 2025</a>, <a href="https://www.sebi.gov.in/sebi_data/attachdocs/sep-2025/1759232056254.pdf">SEBI, 30 Sep 2025</a>, <a href="https://nsearchives.nseindia.com/content/circulars/INVG67858.pdf">NSE standards</a>, <a href="https://api.icicidirect.com/breezeapi/documents/index.html">Breeze API</a>, <a href="https://openapi.moomoo.com/moomoo-api-doc/en/trade/place-order.html">moomoo place_order</a>.</p>
+<p>Not confirmed: MarketSmith's exact rules for market direction (distribution-day and follow-through counts). The Market condition should use thresholds you set, with MarketSmith's label shown beside it.</p>
+
+<h2 id="roadmap">Roadmap</h2>
+<p>The stocks PRD's build order mostly stands. Consolidation folds into its data phase, and the Playbook replaces the subtract-only Portfolio Manager in its paper phase.</p>
+<figure>
+<svg viewBox="0 0 760 596" role="img" aria-label="The agent touches real money only after data, evidence and paper each pass a gate" font-size="13">
+  <text x="24" y="28" class="t-ink ttl">The agent touches real money only after data, evidence and paper each pass a gate</text>
+  <rect x="24" y="52" width="712" height="72" rx="8" class="box"/>
+  <text x="40" y="76" class="t-ink nm">Phase 0: Fix the Lake</text>
+  <text x="40" y="92" class="t-quiet sm">Clear the stuck refresh, fix BrokenProcessPool, bring the Lake up to date (issue 15).</text>
+  <line x1="60" y1="124" x2="60" y2="164" class="line"/><polygon points="60,135 69,144 60,153 51,144" class="cont"/>
+  <text x="80" y="148" class="t-quiet sm">Gate: the Lake is current and its Health report is clean</text>
+  <rect x="24" y="164" width="712" height="72" rx="8" class="box"/>
+  <text x="40" y="188" class="t-ink nm">Phase 1: One data platform</text>
+  <text x="40" y="204" class="t-quiet sm">MarketSmith fetch and dated snapshots move into ash_new; the ash_backend PM and PM_BUY alerts go off;</text>
+  <text x="40" y="220" class="t-quiet sm">the stocks Pipeline with the Data gate, Broker inbox and Reconciliation (issues 16 to 24).</text>
+  <line x1="60" y1="236" x2="60" y2="276" class="line"/><polygon points="60,247 69,256 60,265 51,256" class="cont"/>
+  <text x="80" y="260" class="t-quiet sm">Gate: two weeks of Runs with a passing Data gate and reconciled holdings</text>
+  <rect x="24" y="276" width="712" height="72" rx="8" class="box"/>
+  <text x="40" y="300" class="t-ink nm">Phase 2: Evidence</text>
+  <text x="40" y="316" class="t-quiet sm">The Book engine and Book backtest, the Strategy plan, the Market read and the Book read;</text>
+  <text x="40" y="332" class="t-quiet sm">backtest the rule-shaped Playbook levers, such as exposure by Market condition (issues 25 to 31).</text>
+  <line x1="60" y1="348" x2="60" y2="388" class="line"/><polygon points="60,359 69,368 60,377 51,368" class="cont"/>
+  <text x="80" y="372" class="t-quiet sm">Gate: a Book backtest within the objective, max drawdown 25% or less and holdout CAGR 20% or more</text>
+  <rect x="24" y="388" width="712" height="72" rx="8" class="box main"/>
+  <text x="40" y="412" class="t-ink nm">Phase 3: The agent on paper Books</text>
+  <text x="40" y="428" class="t-ink sm">The Playbook, the Portfolio Agent, Decision records and the Check, on paper only;</text>
+  <text x="40" y="444" class="t-ink sm">a weekly scorecard against the plain strategies (issues 32 to 41, reworked).</text>
+  <line x1="60" y1="460" x2="60" y2="500" class="line"/><polygon points="60,471 69,480 60,489 51,480" class="cont"/>
+  <text x="80" y="484" class="t-quiet sm">Gate: 3 months of paper, with the agent at least matching the plain strategies</text>
+  <rect x="24" y="500" width="712" height="72" rx="8" class="box"/>
+  <text x="40" y="524" class="t-ink nm">Phase 4: Real money</text>
+  <text x="40" y="540" class="t-quiet sm">Real-small promotions; each Book switched from plan only to Playbook;</text>
+  <text x="40" y="556" class="t-quiet sm">Playbook ranges widen or narrow on the scorecard, with your approval (issues 42 to 45).</text>
+</svg>
+<figcaption>Roadmap · 5 phases, 4 gates</figcaption>
+</figure>
+<p>The agent's judgement can't be backtested honestly, because a language model already knows how most past market moves turned out. So the rule-shaped levers are backtested in Phase 2, and the judgement itself earns its record forward, on paper, in Phase 3.</p>
+<p><strong>Changes to the existing issues</strong> if you take this design:</p>
+<ul>
+  <li><strong>22 (MarketSmith):</strong> the fetch moves into ash_new and keeps dated snapshots, instead of calling ash_backend.</li>
+  <li><strong>32 (Rule plan):</strong> renamed the Strategy plan; it adds the Market read and the Book read as outputs.</li>
+  <li><strong>34 (Portfolio Manager):</strong> the Check accepts Playbook decisions within their ranges, not only subtractions, and requires a Decision record for each.</li>
+  <li><strong>39 (Desk):</strong> the analysts feed evidence into Decision records; they still can't add positions on their own.</li>
+  <li><strong>40 (Override scorecard):</strong> scores every Decision record by lever, not only subtractions.</li>
+  <li><strong>41 (Lessons):</strong> a Lesson may now adjust a Playbook range, still only with your approval.</li>
+  <li><strong>New issue:</strong> the Playbook file, its schema, and its ranges per Book.</li>
+</ul>
+
+<h2 id="decisions">Decisions for you</h2>
+<p>The first decision changes the stocks PRD. The rest set the Playbook and the consolidation. Your calls as of 25 Oct are filled in; a change you make here is remembered in this browser only.</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>Decision</th><th>Options</th><th>Recommendation</th><th>Your call</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>How much may the agent change the strategies' output?</td><td>Subtract only (today's PRD); or the Playbook, which may also choose among candidates, hold more or less cash and resize</td><td>The Playbook on the paper Books from the start; real Books stay <em>subtract only</em> until the Phase 3 gate passes</td><td data-call="1" data-default="Agree"></td></tr>
+    <tr><td>2</td><td>Who sets exposure?</td><td>A: code sets one level; B: code sets a band and the agent picks within it; C: code sets the level and the agent may only cut it</td><td>Decided 25 Oct: C, on the Market condition alone for now; a cut stops new buys, then trims the weakest first</td><td data-call="2" data-default="Change"></td></tr>
+    <tr><td>3</td><td>Where may the agent find stocks?</td><td>Only names an approved strategy surfaced; or also your watchlists and MarketSmith lists</td><td>Decided 25 Oct: only names a strategy surfaced in the last 2 months, so every position traces to a strategy you approved</td><td data-call="3" data-default="Change"></td></tr>
+    <tr><td>4</td><td>May the agent size above a strategy's size?</td><td>Down only; or within a band such as 0.5× to 1.25×</td><td>Down freely; above 1× only once the scorecard shows its upsizing adds</td><td data-call="4" data-default="Agree"></td></tr>
+    <tr><td>5</td><td>How is the Market condition defined?</td><td>MarketSmith's market outlook as is; or code from the Lake (index trend, breadth, distribution days) with MarketSmith as one input</td><td>Code from the Lake, so it can be backtested; MarketSmith's outlook shown beside it</td><td data-call="5" data-default="Agree"></td></tr>
+    <tr><td>6</td><td>What happens to ash_backend?</td><td>Keep as a fetch-only command (today's PRD); or move the MarketSmith fetch into ash_new and archive the repo</td><td>Move the fetch, then archive; keep it fetch-only until then</td><td data-call="6" data-default="Agree"></td></tr>
+    <tr><td>7</td><td>Keep dated MarketSmith snapshots?</td><td>No (ticket 49 parked); or yes, one per fetch</td><td>Yes: without them a decision citing a rating can't be checked later</td><td data-call="7" data-default="Agree"></td></tr>
+    <tr><td>8</td><td>What happens to the Sash app and its Supabase data?</td><td>Retire both; or keep the app as a read-only viewer fed from ash_new</td><td>Retire the alerts now (as the PRD says); decide on the app after Phase 1</td><td data-call="8" data-default="Agree"></td></tr>
+    <tr><td>9</td><td>Which Playbook ranges?</td><td>The example ranges in <em>From strategy output to portfolio</em>, or your own</td><td>Your own: the examples are placeholders, not tested numbers</td><td data-call="9" data-default="Agree"></td></tr>
+  </tbody>
+</table></div>
+</main>
+<script>
+  (function () {
+    var store = {
+      get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+      set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    };
+    document.querySelectorAll('td[data-call]').forEach(function (cell) {
+      var key = 'portfolio-agent-call-' + cell.getAttribute('data-call');
+      var select = document.createElement('select');
+      select.setAttribute('aria-label', 'Your call on decision ' + cell.getAttribute('data-call'));
+      ['', 'Agree', 'Change', 'Discuss'].forEach(function (name) {
+        var option = document.createElement('option');
+        option.value = name; option.textContent = name || 'Pick';
+        select.appendChild(option);
+      });
+      select.value = store.get(key) || cell.getAttribute('data-default') || '';
+      select.addEventListener('change', function () { store.set(key, select.value); });
+      cell.appendChild(select);
+    });
+    var root = document.documentElement;
+    var saved = store.get('portfolio-agent-theme');
+    if (saved) root.setAttribute('data-theme', saved);
+    document.getElementById('theme').addEventListener('click', function () {
+      var dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      var next = dark ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      store.set('portfolio-agent-theme', next);
+    });
+  })();
+</script>
+</body>
+</html>

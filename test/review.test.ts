@@ -373,7 +373,7 @@ test("an Agent's Tools and skills reach each Worker without a file being added o
   const [claude] = ws.workerCliCalls('claude')
   for (const call of [codex, claude]) {
     assert.equal(call.cwdChanges, '')
-    assert.match(call.stdin, new RegExp(`- \`/[^\`]+/reviewer/tools/blame\`: ${usage}\n`))
+    assert.match(call.stdin, new RegExp(`- \`[^\`]+[\\\\/]reviewer[\\\\/]tools[\\\\/]blame\`: ${usage}\n`))
   }
   assert.ok(codex.stdin.includes(skill.trim()), codex.stdin)
   assert.deepEqual(claude.pluginFiles, {
@@ -413,10 +413,13 @@ test("Codex can't read or run a Tool the Agent doesn't declare, and gets no skil
   const [{ args }] = ws.workerCliCalls('codex')
   const settings = args.flatMap((arg, i) => (args[i - 1] === '--config' ? [arg] : []))
   const profile = settings.find((setting) => setting.startsWith('permissions.agent='))!
-  const denied = [...profile.matchAll(/"([^"]+)"="deny"/g)].map(([, path]) => path.replace(/^.*\/agents\//, ''))
+  // Each path is a TOML string, so a Windows path has its backslashes escaped.
+  const denied = [...profile.matchAll(/"([^"]+)"="deny"/g)].map(([, path]) => JSON.parse(`"${path}"`).replaceAll('\\', '/').replace(/^.*\/agents\//, ''))
   assert.deepEqual(denied, ['docs/tools/commit', 'reviewer/tools/secret'])
   const skills = settings.find((setting) => setting.startsWith('skills.config='))!
-  const turnedOff = [...skills.matchAll(/path="([^"]+)"/g)].map(([, path]) => path)
+  // Skills in the folders above the test's own are the machine's, which on Windows include the real home's.
+  const workspace = join(ws.dataDir, '..')
+  const turnedOff = [...skills.matchAll(/path="([^"]+)"/g)].map(([, path]): string => JSON.parse(`"${path}"`)).filter((path) => path.startsWith(workspace))
   const worktree = args[args.indexOf('--cd') + 1]
   assert.deepEqual(turnedOff, [
     join(ownSkill, 'SKILL.md'),
@@ -487,16 +490,16 @@ test("a review can fall back to Antigravity, which runs on the Pipeline's own An
   // Commands run only inside the sandbox, so no rule allows one.
   assert.equal(toolPermission, 'proceed-in-sandbox')
   assert.ok(![...permissions.allow, ...permissions.deny].some((rule: string) => rule.startsWith('command(')), permissions.allow.join('\n'))
-  const readable = permissions.allow.map((rule: string) => rule.replace(/^read_file\((.*)\)$/, '$1').replace(/^.*\/(clones|agents)\//, ''))
+  const readable = permissions.allow.map((rule: string) => rule.replace(/^read_file\((.*)\)$/, '$1').replaceAll('\\', '/').replace(/^.*\/(clones|agents)\//, ''))
   assert.deepEqual(readable, ['crux_flutter/.git', 'reviewer/tools/blame', 'reviewer/skills/checklist'])
-  assert.ok(permissions.deny.some((rule: string) => /^read_file\(\/.*\/reviewer\/tools\/secret\)$/.test(rule)), permissions.deny.join('\n'))
+  assert.ok(permissions.deny.some((rule: string) => /^read_file\(.*[\\/]reviewer[\\/]tools[\\/]secret\)$/.test(rule)), permissions.deny.join('\n'))
   assert.ok(permissions.deny.includes('write_file(*)'), permissions.deny.join('\n'))
   // It runs as an agent with only the tools to read, run commands and finish, which takes on no skills, rules or plugins.
   const agentName = call.args[call.args.indexOf('--agent') + 1]
   assert.equal(agentName, 'pipeline-reviewer')
   assert.match(call.antigravityCustomAgent!, /^---\nname: pipeline-reviewer\n.*\ntools: \[read_file, run_command, finish\]\ninheritCustomizations: false\n---\n/s)
   const prompt = antigravityPrompt(call)
-  assert.match(prompt, new RegExp(`- \`/[^\`]+/reviewer/tools/blame\`: ${usage}\n`))
+  assert.match(prompt, new RegExp(`- \`[^\`]+[\\\\/]reviewer[\\\\/]tools[\\\\/]blame\`: ${usage}\n`))
   assert.ok(prompt.includes(skill.trim()), prompt)
 })
 
@@ -549,7 +552,7 @@ test("an Antigravity call fails, saying why, when it was refused something it tr
     ],
     [
       { stdout: JSON.stringify({ conversation_id: '', status: 'ERROR', response: '', error: 'authentication failed or timed out', num_turns: 0 }), exitCode: 1 },
-      /then antigravity failed: authentication failed or timed out; log in once with HOME=\/.*\/antigravity-home agy$/,
+      /then antigravity failed: authentication failed or timed out; log in once with HOME=.*[\\/]antigravity-home agy$/,
     ],
     [{ hang: true }, /then antigravity failed: timed out after 1s$/, { timeoutSeconds: 1 }],
   ]

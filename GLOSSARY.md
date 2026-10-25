@@ -71,7 +71,7 @@ One simulated run of a strategy over past data in ash_new, which ash_new itself 
 _Avoid_: Run (here, a Run is a Pipeline's), simulation
 
 **Portfolio Manager**:
-The Agent that manages Saransh's portfolios, real and paper, end to end: what to buy, sell and hold, and at what size, within the Mandate. It advises; Saransh places every order.
+The Agent that manages Saransh's portfolios, real and paper, end to end: starting from the Rule plan, what to buy, sell and hold, and at what size, within the Mandate and its Book's Playbook. It advises; Saransh places every order.
 _Avoid_: PM (that is the daily Pipeline's PM Agent), fund manager, advisor, trader
 
 **Book**:
@@ -99,23 +99,39 @@ Where a strategy stands on its way to real money: Candidate, Paper (held only in
 _Avoid_: status, tier, level
 
 **Rule plan**:
-The Order list as code makes it, before any Agent sees it: what the strategies trade, sized and capped by the Mandate, with the Data gate, Quarantines, breakers and Stages applied. The Agents may only subtract from it, and a last check holds them to that.
-_Avoid_: draft, signals
+The Order list as code makes it, before any Agent sees it: what the strategies trade, sized and capped by the Mandate, with the Data gate, Quarantines, breakers, the exposure level and Stages applied. It is where the Portfolio Manager starts, and what every Override is scored against.
+_Avoid_: draft, signals, Strategy plan
+
+**Market condition**:
+A market's state as code reads it from the Lake each Run: Uptrend, Under pressure or Correction, from the index against its 50- and 200-day averages, breadth and distribution days, at thresholds Saransh sets. It sets each Book's **exposure level**, the most of the Book held in stocks, with the rest in the cash fund. MarketSmith's own outlook is shown beside it but decides nothing.
+_Avoid_: regime, market direction (MarketSmith's), market-trend filter (a strategy's own, in ash_new)
+
+**Playbook**:
+The judgements the Portfolio Manager may make in one Book beyond the Rule plan. Each is a **Lever** with the data it must read and a range Saransh approves: exposure (cut below the exposure level, never above it), selection (swap a buy for another name in the Pool), size (down, and up only once the override scorecard shows it adds), timing (wait a few sessions before a buy), trim, and rebalance (skip small drifts). The Book's **Judgement mode** says how much of it applies: *plan only* (the Rule plan goes out as is), *subtract only* (cuts, vetoes, trims and waits), or *Playbook*. Real Books start in subtract only and paper Books in Playbook. A mode or a range changes only by Saransh's Answer.
+_Avoid_: policy, rulebook, strategy (a strategy is ash_new's)
+
+**Pool**:
+The names the Portfolio Manager may buy in a Book: those a strategy with a Sleeve in that Book bought or signalled to buy in the last 2 months. So every position traces back to a strategy Saransh approved.
+_Avoid_: universe (a strategy's), watchlist, candidates (a Candidate is a Stage)
+
+**Decision record**:
+What the Portfolio Manager writes for each difference from the Rule plan, and for each Run's exposure level: the Rule plan's order, what went out instead, the Lever and Playbook line that allowed it, the figures it read with their sources, what it expects and when to judge it. A difference without one, or citing a figure that isn't in the Run's inputs, fails the final check.
+_Avoid_: rationale, explanation, reason (a sale's reason is ash_new's)
 
 **Desk**:
-The analyst Agents, one each for events, the chart and risk, that read what rules can't (results, news and announcements, pledges and governance, the chart) in the Lake and the Feeds, and argue over the Rule plan. They search the web only to check one item, and cite what they find. They can only subtract: veto a new position, trim a size, or propose an early exit for Saransh to approve. They never add size or break the Mandate.
+The analyst Agents, one each for events, the chart and risk, that read what rules can't (results, news and announcements, pledges and governance, the chart) in the Lake and the Feeds, and argue over the Rule plan. They search the web only to check one item, and cite what they find. They can only subtract: veto a new position, trim a size, or propose an early exit for Saransh to approve. They never add size or break the Mandate. Their views are evidence in the Portfolio Manager's Decision records.
 _Avoid_: committee, analysts' team (a Team is a Repo's discipline), advisors
 
 **Override**:
-One subtraction the Desk made from the Rule plan, scored afterwards against what the Rule plan alone would have done. The **override scorecard** is their running tally, which decides whether the Desk earns more say.
+One difference from the Rule plan that the final check accepted, made under a Lever and carried by its Decision record, scored afterwards against what the Rule plan alone would have done. The **override scorecard** is their running tally by Lever, by analyst and by Lesson, which decides whether a Lever's range widens or narrows.
 _Avoid_: exception, manual change
 
 **Journal**:
-The Portfolio Manager's Memory: why each order and each subtraction was made, the Desk's views, what each was expected to do, and what is still open.
+The Portfolio Manager's Memory: its Decision records, the Desk's views, what each was expected to do, and what is still open.
 _Avoid_: log, history
 
 **Lesson**:
-A rule of thumb the Portfolio Manager draws from its Journal and proposes in the Stocks Brief. It applies to later decisions only once Saransh approves it, and like every judgement here it can only subtract.
+A rule of thumb the Portfolio Manager draws from its Journal and proposes in the Stocks Brief, such as a narrower range for a Lever. It applies to later decisions only once Saransh approves it, and a Lesson that widens a range needs the override scorecard's support.
 _Avoid_: learning, insight, rule (a rule is a strategy's)
 
 **Review**:

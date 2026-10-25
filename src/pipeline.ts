@@ -69,7 +69,7 @@ async function runStep(runId: string, name: string, { force = false } = {}): Pro
   writeSync(log, `--- ${name} started ${step.startedAt}${force ? ' (forced)' : ''}\n`)
   const args = [script, '--run', runId, ...(force ? ['--force'] : [])]
   const record = recordProcess({ group: false })
-  const child = spawn(process.execPath, args, { stdio: ['ignore', log, log, record.fd] })
+  const child = spawn(process.execPath, args, { stdio: ['ignore', log, log, record.fd], windowsHide: true })
   record.started(child.pid)
   const exitCode = await new Promise<number | null>((resolve) => {
     child.on('error', (error) => {

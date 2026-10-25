@@ -1,6 +1,7 @@
 // Command-line tests: each real Worker builds the right command line for an Agent's config. They
 // never start a CLI.
 import assert from 'node:assert/strict'
+import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import reviewer from '../agents/reviewer/config.ts'
 import type { Agent, AgentConfig, Skill, Tool } from '../src/agent.ts'
@@ -9,7 +10,14 @@ import { claudeCodeCommandLine } from '../src/workers/claude-code.ts'
 import type { CommandLine } from '../src/workers/cli.ts'
 import { codexCommandLine } from '../src/workers/codex.ts'
 
-const cwd = '/data/worktrees/crux_flutter-x1Yz'
+// Absolute paths as this platform spells them: on Windows, on the current drive.
+const cwd = resolve('/data/worktrees/crux_flutter-x1Yz')
+const wiki = join(cwd, 'wiki')
+const notes = resolve('/Users/saransh/notes')
+// Claude Code's rules spell a Windows path in its POSIX form, with its drive as the first folder.
+const drive = process.platform === 'win32' ? `/${process.cwd()[0].toLowerCase()}` : ''
+const wikiEdit = `Edit(/${drive}/data/worktrees/crux_flutter-x1Yz/wiki/**)`
+const notesEdit = `Edit(/${drive}/Users/saransh/notes/**)`
 // Tools in the Agents folder: two of the Reviewer's and one of the Docs Agent's. Only blame is ever declared.
 const blame = '/agents/reviewer/tools/blame'
 const secret = '/agents/reviewer/tools/secret'
@@ -86,7 +94,7 @@ test('the Codex Worker runs a read-only Agent through codex exec with only its b
     '--config',
     `permissions.agent={extends=":read-only",filesystem={"${commit}"="deny","${blame}"="deny","${secret}"="deny"}}`,
     '--config',
-    `skills.config=[${foundSkills.map((file) => `{path="${file}",enabled=false}`).join(',')}]`,
+    `skills.config=[${foundSkills.map((file) => `{path=${JSON.stringify(file)},enabled=false}`).join(',')}]`,
     '--cd',
     cwd,
     '--skip-git-repo-check',
@@ -106,7 +114,7 @@ test('the Codex Worker lets an Agent write its named folders and nowhere else, n
 
   assert.equal(
     profileOf(args),
-    `permissions.agent={extends=":read-only",filesystem={"${cwd}/wiki"="write","/Users/saransh/notes"="write","${commit}"="deny","${blame}"="deny","${secret}"="deny"}}`,
+    `permissions.agent={extends=":read-only",filesystem={${JSON.stringify(wiki)}="write",${JSON.stringify(notes)}="write","${commit}"="deny","${blame}"="deny","${secret}"="deny"}}`,
   )
   assert.ok(!args.includes('--sandbox'))
   assert.ok(!args.includes('--add-dir'))
@@ -144,8 +152,8 @@ test('the Claude Code Worker lets an Agent edit only inside its named folders, a
   const { args } = claudeCodeCommandLine(agent(writer), inputs, claudeCodeOptions)
 
   assert.deepEqual(valuesOf(args, '--tools'), ['Read,Grep,Glob,Bash,Edit,Write'])
-  assert.deepEqual(valuesOf(args, '--add-dir'), [`${cwd}/wiki`, '/Users/saransh/notes'])
-  assert.deepEqual(args.slice(args.indexOf('--allowedTools') + 1), [`Edit(/${cwd}/wiki/**)`, 'Edit(//Users/saransh/notes/**)'])
+  assert.deepEqual(valuesOf(args, '--add-dir'), [wiki, notes])
+  assert.deepEqual(args.slice(args.indexOf('--allowedTools') + 1), [wikiEdit, notesEdit])
   assert.deepEqual(valuesOf(args, '--permission-mode'), ['dontAsk'])
   assert.ok(!args.includes('--json-schema'))
 })
@@ -153,7 +161,7 @@ test('the Claude Code Worker lets an Agent edit only inside its named folders, a
 test('the Claude Code Worker allows the Tools the Agent declares by their full paths, and denies every other command that is more than reading', () => {
   const { args } = claudeCodeCommandLine(agent(writer, { tools: [blameTool] }), inputs, claudeCodeOptions)
 
-  assert.deepEqual(args.slice(args.indexOf('--allowedTools') + 1), [`Bash(${blame}:*)`, `Edit(/${cwd}/wiki/**)`, 'Edit(//Users/saransh/notes/**)'])
+  assert.deepEqual(args.slice(args.indexOf('--allowedTools') + 1), [`Bash(${blame}:*)`, wikiEdit, notesEdit])
   assert.deepEqual(valuesOf(args, '--permission-mode'), ['dontAsk'])
 })
 
@@ -221,7 +229,7 @@ test('the Antigravity Worker lets an Agent write its named folders, by their ful
   const { allow, deny } = antigravityPermissions(agent(writer), { cwd, undeclaredTools: [] })
   const { args } = antigravityCommandLine(agent(writer), inputs, antigravityOptions)
 
-  assert.deepEqual(allow, [`write_file(${cwd}/wiki)`, 'write_file(/Users/saransh/notes)'])
+  assert.deepEqual(allow, [`write_file(${wiki})`, `write_file(${notes})`])
   assert.ok(!deny.includes('write_file(*)'))
   assert.ok(!args.includes('--json-schema'))
 })

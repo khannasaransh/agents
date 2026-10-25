@@ -4,13 +4,13 @@
 
 **Repos:** ash_new, agents
 
-**Blocked by:** 31: Stages, promotions and launching; 20: Corrections and Quarantine
+**Blocked by:** 31: Stages, promotions and launching; 20: Corrections and Quarantine; 46: Market condition and the exposure level
 
 **Status:** ready-for-agent
 
 - [ ] `pd plan` makes each paper Book's Rule plan as of each market's last session. It applies the Data gate and Quarantines, then runs the Book engine's next session from the paper Book's holdings and cash (all cash at first). That session includes:
   - the strategies' live-track orders at their Sleeves' weights;
-  - the caps, the breakers and the Stages;
+  - the caps, the breakers, the exposure level and the Stages;
   - the order-size guard, in whole shares;
   - Disaster stops for new positions, and on Saturdays the raises.
 - [ ] When the Data gate fails, the plan is in Hold mode: no buys, and exits only through Disaster stops.

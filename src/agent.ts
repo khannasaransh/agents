@@ -119,17 +119,27 @@ export async function loadAgent(name: string): Promise<Agent> {
   return { name, folder, config, instructions: readFileSync(instructionsFile, 'utf8'), tools: declaredTools(name, folder, config), skills: skillsIn(name, folder) }
 }
 
+/**
+ * Whether a file runs as a command. Windows has no executable bit, and a Worker runs a Tool there
+ * through Git Bash, which runs a file by its #! line.
+ */
+function executable(path: string): boolean {
+  if (process.platform === 'win32') return readFileSync(path, 'utf8').startsWith('#!')
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** The Tools `config` declares, each checked to be a command in the Agent's tools folder. */
 function declaredTools(name: string, folder: string, config: AgentConfig): Tool[] {
   return Object.entries(config.tools ?? {}).map(([tool, usage]) => {
     const path = join(folder, 'tools', tool)
     if (basename(tool) !== tool) throw new Error(`The ${name} Agent's config declares the Tool ${tool}, which isn't a file name in its tools folder`)
     if (!existsSync(path)) throw new Error(`The ${name} Agent's config declares the Tool ${tool}, but there is no ${path}`)
-    try {
-      accessSync(path, constants.X_OK)
-    } catch {
-      throw new Error(`The ${name} Agent's Tool ${path} isn't executable`)
-    }
+    if (!executable(path)) throw new Error(`The ${name} Agent's Tool ${path} isn't executable`)
     return { name: tool, path, usage }
   })
 }

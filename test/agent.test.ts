@@ -46,14 +46,14 @@ test("an Agent's Tools must be commands in its tools folder, and its skills can'
   const withTools = (tools: unknown) => configModule({ ...reviewer, tools })
   const skill = (frontmatter: string) => `---\nname: checklist\ndescription: What to check.\n${frontmatter}---\n\nCheck it.\n`
   const cases: [Record<string, string>, RegExp][] = [
-    [{ 'config.ts': withTools({ blame: 'blame <file> <line>' }) }, /The reviewer Agent's config declares the Tool blame, but there is no \/.*\/reviewer\/tools\/blame/],
-    [{ 'config.ts': withTools({ blame: 'blame <file> <line>' }), 'tools/blame': 'git log -1\n' }, /The reviewer Agent's Tool \/.*\/reviewer\/tools\/blame isn't executable/],
+    [{ 'config.ts': withTools({ blame: 'blame <file> <line>' }) }, /The reviewer Agent's config declares the Tool blame, but there is no .*[\\/]reviewer[\\/]tools[\\/]blame/],
+    [{ 'config.ts': withTools({ blame: 'blame <file> <line>' }), 'tools/blame': 'git log -1\n' }, /The reviewer Agent's Tool .*[\\/]reviewer[\\/]tools[\\/]blame isn't executable/],
     [{ 'config.ts': withTools({ '../../bin/rm': 'rm <file>' }) }, /The reviewer Agent's config declares the Tool \.\.\/\.\.\/bin\/rm, which isn't a file name in its tools folder/],
     [{ 'config.ts': withTools({ blame: 42 }) }, /config\.tools\.blame must be string/],
-    [{ 'config.ts': configModule(reviewer), 'skills/checklist/list.md': '- mounted\n' }, /The reviewer Agent's skill checklist has no SKILL\.md in \/.*\/reviewer\/skills\/checklist/],
+    [{ 'config.ts': configModule(reviewer), 'skills/checklist/list.md': '- mounted\n' }, /The reviewer Agent's skill checklist has no SKILL\.md in .*[\\/]reviewer[\\/]skills[\\/]checklist/],
     [
       { 'config.ts': configModule(reviewer), 'skills/checklist/SKILL.md': skill('allowed-tools: Bash(rm:*)\n') },
-      /The reviewer Agent's skill checklist sets allowed-tools in \/.*\/SKILL\.md; declare the Tools it needs in the Agent's config instead/,
+      /The reviewer Agent's skill checklist sets allowed-tools in .*[\\/]SKILL\.md; declare the Tools it needs in the Agent's config instead/,
     ],
     [
       { 'config.ts': configModule(reviewer), 'skills/checklist/SKILL.md': skill('"allowed-tools": Bash(rm:*)\n').replaceAll('\n', '\r\n') },

@@ -1,10 +1,10 @@
 # 39: The Desk
 
-**What to build:** Three analysts, Events, Chart and Risk, each write their own view of the names the Desk reviews. The Portfolio Manager decides its subtractions from those views. An early exit the Desk proposes waits for Saransh's approval and then lands on the next Rule plan. See the stocks Pipeline PRD's Desk Step and "Agents".
+**What to build:** Three analysts, Events, Chart and Risk, each write their own view of the names the Desk reviews. The analysts can only subtract; their views are evidence in the Portfolio Manager's Decision records. An early exit the Desk proposes waits for Saransh's approval and then lands on the next Rule plan. See the stocks Pipeline PRD's Desk Step and "Agents".
 
 **Repos:** agents, ash_new
 
-**Blocked by:** 34: The Portfolio Manager and the final check; 37: India Feeds and the dossiers
+**Blocked by:** 34: The Portfolio Manager, the Playbook and the final check; 37: India Feeds and the dossiers
 
 **Status:** ready-for-agent
 
@@ -20,9 +20,9 @@
   - Chart has no web access;
   - no search ever contains Saransh's holdings, sizes or amounts.
 - [ ] Each analyst's output is checked against a schema. For each name it gives no view, a veto, a trim to a given size, or a proposed exit, with reasons and the evidence cited.
-- [ ] The Portfolio Manager gets the views, and each of its subtractions names the views it follows.
+- [ ] The Portfolio Manager gets the views, and each of its Decision records names the views it follows.
 - [ ] A proposed early exit becomes a Brief item. An approving Answer puts the sale on the next Rule plan.
-- [ ] The Brief shows the analysts' views behind each subtraction.
+- [ ] The Brief shows the analysts' views behind each change.
 - [ ] Tests:
   - the three get their inputs;
   - each falls back to the other Worker;

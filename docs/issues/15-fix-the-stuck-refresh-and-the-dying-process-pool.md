@@ -8,9 +8,9 @@
 
 **Status:** ready-for-agent
 
-- [ ] The cause of the 16 Oct refresh's `BrokenProcessPool: A process in the process pool was terminated abruptly` is found, written up, and fixed. Where it can be reproduced, a test reproduces it.
-- [ ] A `pd` command clears a refresh job marked running whose process no longer exists. It marks the job failed with a reason, frees the refresh lock, and writes its result as JSON. While the job's process is alive, it refuses.
-- [ ] The 18 Oct job is cleared this way. `pd daily` then completes and brings every region's prices, fundamentals, panels and Health report up to date.
-- [ ] Tests:
+- [x] The cause of the 16 Oct refresh's `BrokenProcessPool: A process in the process pool was terminated abruptly` is found, written up, and fixed. Where it can be reproduced, a test reproduces it.
+- [x] A `pd` command clears a refresh job marked running whose process no longer exists. It marks the job failed with a reason, frees the refresh lock, and writes its result as JSON. While the job's process is alive, it refuses.
+- [x] The 18 Oct job is cleared this way. `pd daily` then completes and brings every region's prices, fundamentals, panels and Health report up to date.
+- [x] Tests:
   - a refresh whose process is gone is cleared;
   - a refresh whose process is running is left alone.
