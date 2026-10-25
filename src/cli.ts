@@ -5,21 +5,25 @@ import { parseArgs } from 'node:util'
 import { acquireLock } from './lock.ts'
 import { decideProposal, memoryFile, pendingProposals, proposalDiff } from './memory.ts'
 import { runDir } from './paths.ts'
-import { runPipeline, runSingleStep } from './pipeline.ts'
+import { loadPipeline, runPipeline, runSingleStep } from './pipeline.ts'
 import { installSchedules, recordScheduledStart } from './schedule.ts'
 import { captureConfig, defaultRoot, setupMachine } from './setup.ts'
 
 const usage = `Usage:
-  agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily; a dry run
-             [--scheduled]                  runs every Agent on the fake Worker; a scheduled one,
-                                            as a Schedule starts it, records in the data area's
-                                            scheduled-starts.log how it ended or why it didn't start
+  agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily or stocks; a
+             [--scheduled]                  dry run runs every Agent on the fake Worker and changes
+             [--env <name>=<value>]         nothing in ash_new; a scheduled one, as a Schedule
+                                            starts it, records in the data area's scheduled-starts.log
+                                            how it ended or why it didn't start; --env sets an
+                                            environment variable for the Run, as a Task Scheduler
+                                            entry does, which can't set one itself
   agents step <name> --run <id> [--force]   Run one Step inside an existing Run
   agents memory                             List the Memory changes Agents proposed, waiting for you
   agents memory accept <agent> <name>       Make a proposed change the Memory the next Run reads
   agents memory reject <agent> <name>       Drop a proposed change, leaving the Memory as it is
-  agents schedule install                   Install every Schedule into launchd, replacing what an
-                                            earlier install wrote; it runs with this shell's PATH
+  agents schedule install                   Install this machine's Schedules, into launchd on the
+                                            Mac and Task Scheduler on Windows, replacing what an
+                                            earlier install wrote; they run with this shell's PATH
   agents setup [--team <team,...>]          Prepare this machine: clone each Repo of the named Teams
                [--root <folder>]            (all of them by default) into a folder named for its
                                             Team, in the folder holding this repo unless given one;
@@ -37,17 +41,19 @@ async function main(argv: string[]): Promise<number> {
       const { values, positionals } = parseArgs({
         args: rest,
         allowPositionals: true,
-        options: { 'dry-run': { type: 'boolean', default: false }, scheduled: { type: 'boolean', default: false } },
+        options: { 'dry-run': { type: 'boolean', default: false }, scheduled: { type: 'boolean', default: false }, env: { type: 'string', multiple: true, default: [] } },
       })
       const [pipeline] = positionals
-      if (!pipeline) return fail(usage)
+      const env = values.env.map((setting) => /^([^=]+)=(.*)$/s.exec(setting))
+      if (!pipeline || env.some((match) => !match)) return fail(usage)
+      for (const [, name, value] of env as RegExpExecArray[]) process.env[name] = value
       const run = await runPipeline(pipeline, { dryRun: values['dry-run'] }).catch((error: unknown) => {
         if (values.scheduled) recordScheduledStart(pipeline, { error })
         throw error
       })
       if (values.scheduled) recordScheduledStart(pipeline, { run })
       console.log(`Run ${run.id} ${run.status}${run.dryRun ? ' (dry run)' : ''}: ${runDir(run.id)}`)
-      console.log(`Brief: ${join(runDir(run.id), 'brief.md')}`)
+      console.log(`Brief: ${join(runDir(run.id), (await loadPipeline(pipeline)).brief)}`)
       return run.status === 'succeeded' ? 0 : 2
     }
     case 'step': {
@@ -93,8 +99,9 @@ async function main(argv: string[]): Promise<number> {
     }
     case 'schedule': {
       if (rest.length !== 1 || rest[0] !== 'install') return fail(usage)
-      const { files, missing } = await installSchedules()
-      for (const file of files) console.log(`Installed ${file}`)
+      const { installed, missing, warnings } = await installSchedules()
+      for (const entry of installed) console.log(`Installed ${entry}`)
+      for (const warning of warnings) console.error(warning)
       if (missing.length) console.error(`Not found on the Schedule's PATH, so a scheduled Run can't use them: ${missing.join(', ')}`)
       return 0
     }

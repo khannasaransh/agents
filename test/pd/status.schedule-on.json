@@ -1,0 +1,125 @@
+{
+  "checked_at": "2026-10-27T01:41:12.512330+00:00",
+  "markets": [
+    {
+      "market": "IN",
+      "name": "India",
+      "gated": true,
+      "latest_session": "2026-10-26",
+      "last_finished_session": "2026-10-26",
+      "sessions_behind": 0
+    },
+    {
+      "market": "US",
+      "name": "United States",
+      "gated": true,
+      "latest_session": "2026-10-26",
+      "last_finished_session": "2026-10-26",
+      "sessions_behind": 0
+    },
+    {
+      "market": "HK",
+      "name": "Hong Kong",
+      "gated": false,
+      "latest_session": "2026-10-23",
+      "last_finished_session": "2026-10-27",
+      "sessions_behind": 1
+    }
+  ],
+  "refresh": {
+    "job": 481,
+    "daily": true,
+    "source": "cli",
+    "status": "succeeded",
+    "started_at": "2026-10-27T01:12:03.004512+00:00",
+    "finished_at": "2026-10-27T01:40:57.881020+00:00",
+    "error": null
+  },
+  "health": {
+    "date": "2026-10-27",
+    "checked_at": "2026-10-27T01:40:31.120934+00:00",
+    "status": "ok",
+    "markets": [
+      {
+        "market": "IN",
+        "status": "ok",
+        "data_as_of": "2026-10-26",
+        "problems": [],
+        "flags": {
+          "cross_source": 2,
+          "dividend": 1
+        }
+      },
+      {
+        "market": "US",
+        "status": "ok",
+        "data_as_of": "2026-10-26",
+        "problems": [],
+        "flags": {
+          "jump": 1
+        }
+      },
+      {
+        "market": "HK",
+        "status": "warn",
+        "data_as_of": "2026-10-23",
+        "problems": [
+          "The data is 1 session behind its last finished session, 2026-10-27"
+        ],
+        "flags": {
+          "stale": 1
+        }
+      }
+    ],
+    "flags": [
+      {
+        "market": "IN",
+        "security_id": "IN:DBEIL",
+        "name": "Deepak Builders & Engineers India Ltd",
+        "check": "cross_source",
+        "date": "2026-08-18",
+        "detail": "MarketSmith closed at 178.08, Yahoo at 6.68 (+2565.9%)"
+      },
+      {
+        "market": "IN",
+        "security_id": "IN:MBECL",
+        "name": "Mcnally Bharat Engr.Co",
+        "check": "cross_source",
+        "date": "2026-08-27",
+        "detail": "MarketSmith closed at 3.27, Yahoo at 65.40 (-95.0%)"
+      },
+      {
+        "market": "US",
+        "security_id": "US:NFE",
+        "name": "New Fortress Energy Inc",
+        "check": "jump",
+        "date": "2026-10-22",
+        "detail": "Rose 46.2% in a day with no split recorded"
+      },
+      {
+        "market": "IN",
+        "security_id": "IN:BHAGYAPROP",
+        "name": "Bhagyanagar India <Ltd>",
+        "check": "dividend",
+        "date": "2025-03-12",
+        "detail": "A dividend of 12.00 on a close of 9.80"
+      },
+      {
+        "market": "HK",
+        "security_id": "HK:0083",
+        "name": null,
+        "check": "stale",
+        "date": "2026-10-16",
+        "detail": "6 sessions behind"
+      }
+    ]
+  },
+  "gate": {
+    "verdict": "pass",
+    "reasons": []
+  },
+  "own_schedule": {
+    "enabled": true,
+    "task_registered": true
+  }
+}

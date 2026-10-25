@@ -8,9 +8,19 @@ import { recordProcess, stopRecordedProcesses } from './processes.ts'
 import { createRun, finalStatus, readRun, writeRun, type RunRecord, type StepRecord } from './run.ts'
 import { skippedExitCode } from './step.ts'
 
-/** A Pipeline definition: the Steps it runs, in order. */
+/**
+ * A Pipeline definition: the Steps it runs, in order, and the file its Brief writes in the Run
+ * folder. A Step is steps/<pipeline>/<name>.ts when the Pipeline has its own of that name, such as
+ * the stocks Pipeline's Brief, else steps/<name>.ts, where the daily Pipeline's Steps are.
+ */
 export interface Pipeline {
   steps: string[]
+  brief: string
+}
+
+/** The named Pipeline's definition, from the pipelines folder. */
+export async function loadPipeline(name: string): Promise<Pipeline> {
+  return (await import(pathToFileURL(definitionFile('pipelines', name)).href)).default
 }
 
 /**
@@ -18,7 +28,7 @@ export interface Pipeline {
  * Refuses to start while another Run is active. A dry run runs every Agent Step on the fake Worker.
  */
 export async function runPipeline(name: string, { dryRun = false } = {}): Promise<RunRecord> {
-  const pipeline: Pipeline = (await import(pathToFileURL(definitionFile('pipelines', name)).href)).default
+  const pipeline = await loadPipeline(name)
   const release = acquireLock()
   try {
     const run = createRun(name, pipeline.steps, { dryRun })
@@ -56,7 +66,7 @@ async function runStep(runId: string, name: string, { force = false } = {}): Pro
   const run = readRun(runId)
   const step = run.steps.find((s) => s.name === name)
   if (!step) throw new Error(`Step ${name} is not part of Run ${runId} (${run.pipeline} Pipeline)`)
-  const script = definitionFile('steps', name)
+  const script = stepFile(run.pipeline, name)
 
   step.status = 'running'
   step.startedAt = new Date().toISOString()
@@ -92,10 +102,16 @@ async function runStep(runId: string, name: string, { force = false } = {}): Pro
   return step
 }
 
-/** The file defining the named Pipeline or Step. */
+/** The file defining the named Pipeline, or a Step in the top steps folder. */
 function definitionFile(folder: 'pipelines' | 'steps', name: string): string {
   const file = join(agentsRoot, folder, `${name}.ts`)
   const kind = folder === 'pipelines' ? 'Pipeline' : 'Step'
   if (!/^[a-z][a-z0-9-]*$/.test(name) || !existsSync(file)) throw new Error(`Unknown ${kind}: ${name}`)
   return file
+}
+
+/** The file defining a Step of the named Pipeline: the Pipeline's own, else the one in the top steps folder. */
+function stepFile(pipeline: string, name: string): string {
+  const own = join(agentsRoot, 'steps', pipeline, `${name}.ts`)
+  return /^[a-z][a-z0-9-]*$/.test(name) && existsSync(own) ? own : definitionFile('steps', name)
 }

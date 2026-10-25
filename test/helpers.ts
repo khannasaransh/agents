@@ -143,6 +143,27 @@ export interface WorkerCliCall {
 
 const workerClis = ['codex', 'claude', 'agy'] as const
 
+/** The folder of example files the stand-in `pd` answers with, each valid against ash_new's schema for its command. */
+export const pdExamples = fileURLToPath(new URL('./pd/', import.meta.url))
+
+/**
+ * How the stand-in `pd` answers one call: with an example file from test/pd (its name, such as
+ * status.healthy.json) or given output, and an exit code. A process killed partway prints its
+ * output and exits non-zero, as a failed refresh does.
+ */
+export interface PdAnswer {
+  example?: string
+  stdout?: string
+  stderr?: string
+  exitCode?: number
+}
+
+/** A call the stand-in `pd` received. */
+export interface PdCall {
+  args: string[]
+  cwd: string
+}
+
 export interface Workspace {
   dataDir: string
   /** Saransh's home and Codex's home, as the CLI sees them: empty folders, unless a test writes there. */
@@ -158,8 +179,8 @@ export interface Workspace {
   addWiki(): TestWiki
   /** Writes the Repo list: every Repo added so far, unless given entries. */
   writeRepoList(entries?: RepoEntry[]): void
-  /** Prepares a Run folder holding just a Run record, as a Step's input. */
-  prepareRun(id: string, options?: { steps?: { name: string; status: string }[]; dryRun?: boolean }): void
+  /** Prepares a Run folder holding just a Run record, as a Step's input: of the daily Pipeline and its Steps unless given others. */
+  prepareRun(id: string, options?: { pipeline?: string; steps?: { name: string; status: string }[]; dryRun?: boolean }): void
   /** Writes a file into a Run folder, as a Step's input. */
   writeRunFile(id: string, path: string, content: unknown): void
   writeRepoState(state: Record<string, { lastReviewed: string }>): void
@@ -200,6 +221,14 @@ export interface Workspace {
   /** The calls the stand-in for a Worker's CLI received, oldest first. */
   workerCliCalls(command: (typeof workerClis)[number]): WorkerCliCall[]
   /**
+   * Sets how the stand-in `pd` answers, by its command (status, daily, clear-refresh): one answer
+   * for every call, or one per call in turn, the last repeating. Every workspace puts it first on
+   * PATH, failing every command it isn't told about, so no test touches ash_new.
+   */
+  setPd(answers: Record<string, PdAnswer | PdAnswer[]>): void
+  /** The calls the stand-in `pd` received, oldest first. */
+  pdCalls(): PdCall[]
+  /**
    * Writes an Agent folder, by path within it. A script (a file starting with #!) is made executable,
    * as a Tool is. From then on the CLI uses the workspace's Agents, not this repo's.
    */
@@ -234,6 +263,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
   let ownAgents = false
   for (const folder of [binDir, homeDir, codexHomeDir]) mkdirSync(folder)
   for (const command of workerClis) writeWorkerCliStandIn(binDir, command)
+  writePdStandIn(binDir)
 
   const ws: Workspace = {
     dataDir,
@@ -332,10 +362,10 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       writeFileSync(repoListFile, `export default ${JSON.stringify(list, null, 2)}\n`)
     },
 
-    prepareRun(id, { steps = ['fetch', 'review', 'discord', 'pm', 'docs', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
+    prepareRun(id, { pipeline = 'daily', steps = ['fetch', 'review', 'discord', 'pm', 'docs', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
       ws.writeRunFile(id, 'run.json', {
         id,
-        pipeline: 'daily',
+        pipeline,
         status: 'running',
         dryRun,
         startedAt: new Date().toISOString(),
@@ -438,6 +468,19 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
 
     workerCliCalls(command) {
       const file = join(binDir, `${command}.calls.jsonl`)
+      if (!existsSync(file)) return []
+      return readFileSync(file, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line))
+    },
+
+    setPd(answers) {
+      writeFileSync(join(binDir, 'pd.json'), JSON.stringify(answers))
+    },
+
+    pdCalls() {
+      const file = join(binDir, 'pd.calls.jsonl')
       if (!existsSync(file)) return []
       return readFileSync(file, 'utf8')
         .split('\n')
@@ -570,6 +613,35 @@ if (behavior.hang) {
     process.stderr.write(behavior.stderr ?? '')
     process.exitCode = behavior.exitCode ?? 0
   }, behavior.answerAfterMs ?? 0)
+`,
+  )
+}
+
+/**
+ * Writes an executable standing in for ash_new's `pd`. It records each call, then answers as pd.json
+ * beside it says for the call's command, counting that command's earlier calls to pick its answer.
+ */
+function writePdStandIn(binDir: string) {
+  const answersFile = JSON.stringify(join(binDir, 'pd.json'))
+  const callsFile = JSON.stringify(join(binDir, 'pd.calls.jsonl'))
+  writeCommand(
+    binDir,
+    'pd',
+    `const { appendFileSync, existsSync, readFileSync } = require('node:fs')
+const { join } = require('node:path')
+const args = process.argv.slice(2)
+const earlier = existsSync(${callsFile})
+  ? readFileSync(${callsFile}, 'utf8').split('\\n').filter(Boolean).filter((line) => JSON.parse(line).args[0] === args[0]).length
+  : 0
+appendFileSync(${callsFile}, JSON.stringify({ args, cwd: process.cwd() }) + '\\n')
+const answers = existsSync(${answersFile}) ? JSON.parse(readFileSync(${answersFile}, 'utf8')) : {}
+const given = answers[args[0]]
+const answer = given === undefined
+  ? { stderr: 'pd stand-in: this test expects no pd ' + args[0] + ' call', exitCode: 1 }
+  : [given].flat()[Math.min(earlier, [given].flat().length - 1)]
+process.stdout.write(answer.example ? readFileSync(join(${JSON.stringify(pdExamples)}, answer.example), 'utf8') : answer.stdout ?? '')
+process.stderr.write(answer.stderr ?? '')
+process.exitCode = answer.exitCode ?? 0
 `,
   )
 }

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { agentsRoot } from '../src/paths.ts'
-import { launchdEntry, loadSchedules, type NamedSchedule } from '../src/schedule.ts'
+import { allowsWakeTimers, launchdEntry, loadSchedules, machineSchedules, taskSchedulerEntry, type NamedSchedule } from '../src/schedule.ts'
 import { makeWorkspace } from './helpers.ts'
 
 const install = { node: '/opt/homebrew/bin/node', shellPath: '/opt/homebrew/bin:/usr/bin:/bin', dataDir: '/Users/saransh/agents/data' }
@@ -28,8 +30,33 @@ async function dailySchedule(): Promise<NamedSchedule> {
   return daily
 }
 
-test('the daily Schedule runs the daily Pipeline Monday to Friday at 05:30', async () => {
-  assert.deepEqual(await dailySchedule(), { name: 'daily', pipeline: 'daily', days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], time: '05:30' })
+/** The stocks Schedule, from this repo's Schedule definitions. */
+async function stocksSchedule(): Promise<NamedSchedule> {
+  const stocks = (await loadSchedules()).find((schedule) => schedule.name === 'stocks')
+  assert.ok(stocks, 'there is a stocks Schedule')
+  return stocks
+}
+
+test('the daily Schedule runs the daily Pipeline on the Mac, Monday to Friday at 05:30', async () => {
+  assert.deepEqual(await dailySchedule(), { name: 'daily', pipeline: 'daily', machine: 'mac', days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], time: '05:30' })
+})
+
+test('the stocks Schedule runs the stocks Pipeline on the Windows machine, Tuesday to Saturday at 09:30 Singapore time, 07:00 IST', async () => {
+  assert.deepEqual(await stocksSchedule(), { name: 'stocks', pipeline: 'stocks', machine: 'windows', days: ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], time: '09:30' })
+})
+
+test('each machine installs only its own Schedules', async () => {
+  const schedules = await loadSchedules()
+
+  assert.deepEqual(
+    machineSchedules(schedules, 'darwin').map((s) => s.name),
+    ['daily'],
+  )
+  assert.deepEqual(
+    machineSchedules(schedules, 'win32').map((s) => s.name),
+    ['stocks'],
+  )
+  assert.throws(() => machineSchedules(schedules, 'linux'), /Schedules install on the Mac \(launchd\) and on Windows \(Task Scheduler\), not on linux/)
 })
 
 test("the daily Schedule's launchd entry starts a scheduled Run of the daily Pipeline Monday to Friday at 05:30", async () => {
@@ -94,7 +121,7 @@ test('a launchd entry starts only at its calendar times, so a time missed while 
 })
 
 test("a launchd entry names launchd's weekdays and the Schedule's hour and minute", () => {
-  const weekend: NamedSchedule = { name: 'weekend', pipeline: 'daily', days: ['saturday', 'sunday'], time: '09:05' }
+  const weekend: NamedSchedule = { name: 'weekend', pipeline: 'daily', machine: 'mac', days: ['saturday', 'sunday'], time: '09:05' }
 
   const { label, plist } = launchdEntry(weekend, install)
 
@@ -107,7 +134,8 @@ test("a launchd entry names launchd's weekdays and the Schedule's hour and minut
 
 test('a Schedule whose time is not a time of day has no launchd entry', () => {
   for (const time of ['5:30', '24:00', '05:60', '05:30pm']) {
-    assert.throws(() => launchdEntry({ name: 'daily', pipeline: 'daily', days: ['monday'], time }, install), /Schedule daily: time .* is not HH:MM/)
+    assert.throws(() => launchdEntry({ name: 'daily', pipeline: 'daily', machine: 'mac', days: ['monday'], time }, install), /Schedule daily: time .* is not HH:MM/)
+    assert.throws(() => taskSchedulerEntry({ name: 'stocks', pipeline: 'stocks', machine: 'windows', days: ['monday'], time }, windowsInstall), /Schedule stocks: time .* is not HH:MM/)
   }
 })
 
@@ -136,4 +164,114 @@ test('a Run started by hand records no scheduled start', async () => {
   } finally {
     ws.cleanup()
   }
+})
+
+const windowsInstall = {
+  node: 'C:\\Program Files\\nodejs\\node.exe',
+  shellPath: 'C:\\Users\\saransh\\.local\\bin;C:\\Program Files\\nodejs;C:\\Users\\saransh\\AppData\\Roaming\\npm;C:\\WINDOWS\\system32',
+  dataDir: 'D:\\Saransh\\agents\\data',
+  systemRoot: 'C:\\WINDOWS',
+  today: '2026-10-25',
+}
+
+/** The text of each element named `tag` in a Task Scheduler entry. */
+function elements(xml: string, tag: string): string[] {
+  return [...xml.matchAll(new RegExp(`<${tag}>([\\s\\S]*?)</${tag}>`, 'g'))].map(([, text]) => text)
+}
+
+const unescape = (text: string) => text.replaceAll('&quot;', '"').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
+
+test("the stocks Schedule's Task Scheduler entry starts a scheduled Run of the stocks Pipeline Tuesday to Saturday at 09:30 on the machine's clock", async () => {
+  const entry = taskSchedulerEntry(await stocksSchedule(), windowsInstall)
+
+  assert.equal(entry.name, '\\agents\\stocks')
+  assert.deepEqual(elements(entry.xml, 'URI'), ['\\agents\\stocks'])
+  // A time with no offset is the machine's own clock, whatever its time zone.
+  assert.deepEqual(elements(entry.xml, 'StartBoundary'), ['2026-10-25T09:30:00'])
+  assert.deepEqual(elements(entry.xml, 'DaysOfWeek'), ['<Tuesday /><Wednesday /><Thursday /><Friday /><Saturday />'])
+  assert.deepEqual(elements(entry.xml, 'WeeksInterval'), ['1'])
+  assert.deepEqual(elements(entry.xml, 'Command'), ['C:\\Program Files\\nodejs\\node.exe'])
+  assert.deepEqual(elements(entry.xml, 'WorkingDirectory'), [agentsRoot.replace(/[\\/]$/, '')])
+  assert.equal(entry.args.slice(0, 4).join(' '), `${join(agentsRoot, 'src', 'cli.ts')} run stocks --scheduled`)
+})
+
+test('a Task Scheduler entry wakes the machine, starts a missed time once it is available, and runs only while Saransh is logged on', async () => {
+  const { xml } = taskSchedulerEntry(await stocksSchedule(), windowsInstall)
+
+  assert.deepEqual(elements(xml, 'WakeToRun'), ['true'])
+  assert.deepEqual(elements(xml, 'StartWhenAvailable'), ['true'])
+  // Logged on only, so no password is stored.
+  assert.deepEqual(elements(xml, 'LogonType'), ['InteractiveToken'])
+  assert.deepEqual(elements(xml, 'RunLevel'), ['LeastPrivilege'])
+  assert.deepEqual(elements(xml, 'DisallowStartIfOnBatteries'), ['false'])
+  // Every start reaches the Run lock, which refuses one while a Run is active and records it.
+  assert.deepEqual(elements(xml, 'MultipleInstancesPolicy'), ['Parallel'])
+})
+
+test("a Task Scheduler entry sets its own PATH, with node's folder first and Windows' own after, each once, and pins the data area", async () => {
+  const { args, path } = taskSchedulerEntry(await stocksSchedule(), windowsInstall)
+
+  assert.equal(
+    path,
+    'C:\\Program Files\\nodejs;C:\\Users\\saransh\\.local\\bin;C:\\Users\\saransh\\AppData\\Roaming\\npm;C:\\WINDOWS\\system32;C:\\WINDOWS;C:\\WINDOWS\\System32\\Wbem;C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0',
+  )
+  assert.deepEqual(args.slice(4), ['--env', `PATH=${path}`, '--env', 'AGENTS_DATA_DIR=D:\\Saransh\\agents\\data'])
+})
+
+test("a Task Scheduler entry's arguments reach the agents command as they were given", { skip: process.platform !== 'win32' && 'Windows parses a command line itself' }, async () => {
+  const { xml, args } = taskSchedulerEntry(await stocksSchedule(), { ...windowsInstall, shellPath: 'C:\\Program Files (x86)\\Tools\\;C:\\odd "quoted" dir;C:\\a&b' })
+  const folder = mkdtempSync(join(tmpdir(), 'agents-args-'))
+  try {
+    const printer = join(folder, 'argv.js')
+    writeFileSync(printer, 'console.log(JSON.stringify(process.argv.slice(2)))')
+    const [line] = elements(xml, 'Arguments')
+
+    const printed = spawnSync(process.execPath, [`"${printer}"`, unescape(line)], { argv0: `"${process.execPath}"`, windowsVerbatimArguments: true, encoding: 'utf8' })
+
+    assert.equal(printed.status, 0, printed.stderr)
+    assert.deepEqual(JSON.parse(printed.stdout), args)
+  } finally {
+    rmSync(folder, { recursive: true, force: true })
+  }
+})
+
+test('a scheduled start sets the environment the entry gives it before the Run starts', async () => {
+  const ws = makeWorkspace()
+  try {
+    ws.setPd({ status: { example: 'status.healthy.json' } })
+    const elsewhere = join(ws.dataDir, '..', 'pinned-data')
+
+    const result = await ws.agents('run', 'stocks', '--scheduled', '--dry-run', '--env', `AGENTS_DATA_DIR=${elsewhere}`)
+
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(ws.runIds().length, 0, 'the Run used the pinned data area')
+    assert.match(readFileSync(join(elsewhere, 'scheduled-starts.log'), 'utf8'), /stocks: started Run \S+, which ended succeeded\n$/)
+  } finally {
+    ws.cleanup()
+  }
+})
+
+/** What `powercfg /query SCHEME_CURRENT SUB_SLEEP RTCWAKE` prints, with Allow wake timers at `index` on mains power. */
+const powercfg = (index: number) => `Power Scheme GUID: 381b4222-f694-41f0-9685-ff5bb260df2e  (Balanced)
+  GUID Alias: SCHEME_BALANCED
+  Subgroup GUID: 238c9fa8-0aad-41ed-83f4-97be242c8f20  (Sleep)
+    GUID Alias: SUB_SLEEP
+    Power Setting GUID: bd3b718a-0680-4d9d-8ab2-e1d2b4ac806d  (Allow wake timers)
+      GUID Alias: RTCWAKE
+      Possible Setting Index: 000
+      Possible Setting Friendly Name: Disable
+      Possible Setting Index: 001
+      Possible Setting Friendly Name: Enable
+      Possible Setting Index: 002
+      Possible Setting Friendly Name: Important Wake Timers Only
+    Current AC Power Setting Index: 0x0000000${index}
+    Current DC Power Setting Index: 0x00000000
+`
+
+test("a power plan allows a Schedule to wake the machine only with wake timers enabled on mains power", () => {
+  assert.equal(allowsWakeTimers(powercfg(1)), true)
+  assert.equal(allowsWakeTimers(powercfg(0)), false)
+  // Important wake timers only leaves out Task Scheduler's.
+  assert.equal(allowsWakeTimers(powercfg(2)), false)
+  assert.equal(allowsWakeTimers('Invalid Parameters -- try "/?" for help'), null)
 })

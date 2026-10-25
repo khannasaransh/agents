@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { parseEnv } from 'node:util'
 import { agentsRoot } from './paths.ts'
 
@@ -48,4 +48,13 @@ export function saranshEmails(): string[] {
     .split(',')
     .map((email) => email.trim().toLowerCase())
     .filter(Boolean)
+}
+
+/**
+ * ash_new's folder, from ASH_NEW_FOLDER in the env file (`~` stands for the home folder), else
+ * backend/portfolio-dashboard in the folder holding this repo, where setup's layout puts it.
+ */
+export function ashNewFolder(): string {
+  const folder = readEnvFile().ASH_NEW_FOLDER?.trim()
+  return folder ? folder.replace(/^~(?=[\\/]|$)/, homedir()) : resolve(agentsRoot, '..', 'backend', 'portfolio-dashboard')
 }

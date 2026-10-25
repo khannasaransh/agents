@@ -1,0 +1,1 @@
+{ "cleared": [{ "job": 468, "status": "failed", "error": "Cleared by pd clear-refresh: the process running it (process 23016) had ended" }], "refused": null }
