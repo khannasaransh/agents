@@ -122,7 +122,9 @@ export interface PdMarketSmith {
 export interface PdDifference {
   kind: 'quantity' | 'not_in_ledger' | 'not_at_broker' | 'unknown_security'
   security_id: string | null
+  /** As the export has it: ICICI Direct's holdings name each by ISIN, moomoo's positions by symbol. */
   isin: string | null
+  symbol: string | null
   name: string | null
   ledger_qty: number | null
   broker_qty: number
@@ -140,13 +142,14 @@ export interface PdReconciliation {
 export interface PdBrokerFile {
   file: string
   sha256: string
-  broker: 'icici_direct' | null
+  broker: 'icici_direct' | 'moomoo' | null
   kind: 'tradebook' | 'holdings' | null
-  book: 'IN' | null
+  book: 'IN' | 'US' | null
   portfolio_id: number | null
   /** seen: a tradebook with the same content was recorded already, so nothing is. unreadable: nothing in it was recorded, and `why` says why. */
   status: 'recorded' | 'seen' | 'reconciled' | 'unreadable'
   why: string | null
+  /** set_aside: rows that aren't the Book's trades: not a buy or sale, another market's (moomoo's Hong Kong fills), or, in the US Book, a security ash_new hasn't got. */
   trades: { recorded: number; in_ledger: number; set_aside: number } | null
   reconciliation: PdReconciliation | null
 }
@@ -162,9 +165,9 @@ export interface PdBrokerImport {
 
 /** A Book's real money, as `pd book-holdings` prints it (contract/book-holdings.schema.json). */
 export interface PdBook {
-  book: 'IN'
+  book: 'IN' | 'US'
   name: string
-  broker: 'icici_direct'
+  broker: 'icici_direct' | 'moomoo'
   broker_name: string
   currency: string
   /** Null before its broker's first file is recorded. */

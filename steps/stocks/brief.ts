@@ -14,7 +14,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingItems, type AnswerItem } from '../../src/answers.ts'
-import { differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
+import { brokerFiles, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
@@ -238,8 +238,9 @@ function money(amount: number, currency: string, decimals = 0): string {
 
 /** A Book's real money: its holdings and value, and its latest Reconciliation's differences. */
 function bookSection(book: PdBook): string {
+  const files = brokerFiles(book.broker)
   if (book.portfolio_id === null)
-    return `<section><h2>${esc(book.name)}</h2><p>No ${esc(book.broker_name)} file is recorded yet: drop its tradebook and holdings export in the Broker inbox, ${esc(brokerInboxDir())}, and the next Run records them.</p></section>`
+    return `<section><h2>${esc(book.name)}</h2><p>No ${esc(book.broker_name)} file is recorded yet: drop its ${esc(files.tradebook)} and ${esc(files.holdings)} export in the Broker inbox, ${esc(brokerInboxDir())}, and the next Run records them.</p></section>`
   const at = (amount: number | null, decimals = 0) => (amount === null ? '—' : esc(money(amount, book.currency, decimals)))
   const value = `<p>${at(book.value)} at ${esc(book.broker_name)}${book.as_of ? ` on the closes of ${esc(book.as_of)}` : ''}, ${at(book.cash)} of it in cash.</p>`
   const rows = book.holdings.map((h) => [
@@ -257,10 +258,11 @@ function bookSection(book: PdBook): string {
 /** A Book's latest Reconciliation: what matched, and each difference with what to do about it. */
 function reconciliationPart(book: PdBook): string {
   const r = book.reconciliation
-  if (!r) return `<p>No ${esc(book.broker_name)} holdings export has been reconciled yet: drop one in the Broker inbox each Saturday.</p>`
-  const of = `Reconciled with ${esc(r.file)}, ${esc(book.broker_name)}'s holdings of ${esc(r.as_of)}: ${r.matched} match`
+  const held = brokerFiles(book.broker).holdings
+  if (!r) return `<p>No ${esc(book.broker_name)} ${esc(held)} export has been reconciled yet: drop one in the Broker inbox each Saturday.</p>`
+  const of = `Reconciled with ${esc(r.file)}, ${esc(book.broker_name)}'s ${esc(held)} of ${esc(r.as_of)}: ${r.matched} match`
   if (!r.differences.length) return `<p>${of}, and nothing differs.</p>`
-  const rows = r.differences.map((d) => [esc(securityName(d)), d.ledger_qty === null ? '—' : esc(shares(d.ledger_qty)), esc(shares(d.broker_qty)), esc(differenceText(d, book.broker_name))])
+  const rows = r.differences.map((d) => [esc(securityName(d)), d.ledger_qty === null ? '—' : esc(shares(d.ledger_qty)), esc(shares(d.broker_qty)), esc(differenceText(d, book))])
   return `<p>${of}, and these ${r.differences.length} differ, each a To-do until a later holdings export settles it:</p>\n${table(['Security', 'Ledger', esc(book.broker_name), ''], rows)}`
 }
 

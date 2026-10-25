@@ -12,6 +12,19 @@
       "cash": 0,
       "holdings": [],
       "reconciliation": null
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "currency": "USD",
+      "portfolio_id": null,
+      "as_of": null,
+      "value": 0,
+      "cash": 0,
+      "holdings": [],
+      "reconciliation": null
     }
   ]
 }

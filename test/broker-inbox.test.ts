@@ -75,6 +75,33 @@ test('each Reconciliation difference becomes a To-do, from the latest holdings e
   ])
 })
 
+test("moomoo's trade history and positions are handed in unchanged, and the US Book's differences become To-dos", async () => {
+  prepare({ pd: { broker: { example: 'broker-import.moomoo.json' }, 'book-holdings': { example: 'book-holdings.books.json' } } })
+  // As moomoo names them: spaces and parentheses.
+  const history = 'History Transactions-Margin Account(3901)-20220802-20260815.csv'
+  const positions = 'Positions-Margin Account(3901)-20260815-043000.csv'
+  drop(history, positions)
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.pdCalls()[0].args.slice(2).map((file) => basename(file)), [history, positions])
+  assert.deepEqual(inInbox(), [])
+  assert.deepEqual(ws.runFiles(runId, 'broker-inbox').sort(), [history, positions])
+  const log = ws.readRunFile(runId, 'logs', 'broker-inbox.log')
+  assert.match(log, /History Transactions-Margin Account\(3901\)-20220802-20260815\.csv: moomoo's trade history, 7 trades recorded in the US Book, 3 rows set aside as not the Book's trades/)
+  assert.match(log, /Positions-Margin Account\(3901\)-20260815-043000\.csv: moomoo's positions of 2026-08-14, reconciled with the US Book: 3 match, 5 differences/)
+  const us = todos().filter((todo) => todo.startsWith('Reconciliation, US Book'))
+  assert.equal(todos().length, 10, "the India Book's five, then the US Book's")
+  assert.deepEqual(us, [
+    'Reconciliation, US Book, as of 2026-08-14: moomoo holds 6.24 of Apple (US:AAPL), its ledger 6. Drop the trade history with the missing buys in the Broker inbox.',
+    'Reconciliation, US Book, as of 2026-08-14: moomoo holds 0.8 of Nvidia Corp (US:NVDA), which its ledger has none of. Drop the trade history with its buys in the Broker inbox.',
+    "Reconciliation, US Book, as of 2026-08-14: moomoo holds 100 of Super Micro Computer (US:SMCI), its ledger 10: 10 for 1, as a split or bonus the Lake hasn't got would give.",
+    'Reconciliation, US Book, as of 2026-08-14: its ledger holds 4 of Waters Corp (US:WAT), which moomoo holds none of. Drop the trade history with its sales in the Broker inbox.',
+    "Reconciliation, US Book, as of 2026-08-14: moomoo holds 235 of iShares Latin America 40 ETF (symbol ILF), which ash_new's securities table hasn't got, so it can't be reconciled.",
+  ])
+})
+
 test("a file pd can't read is set aside in the inbox with a To-do, and one seen before moves into the Run", async () => {
   prepare({ pd: { broker: { example: 'broker-import.mixed.json' }, 'book-holdings': { example: 'book-holdings.empty.json' } } })
   drop('orderBook_Equity_2.csv', 'notes.csv', 'orderBook_Equity_3.csv')

@@ -355,6 +355,27 @@ test("the Stocks Brief shows the India Book's holdings and value, Reconciliation
   assert.ok(page.indexOf('To-dos') < page.indexOf('India Book ₹'), 'after what is waiting on Saransh')
 })
 
+test("the Stocks Brief shows the US Book in dollars at moomoo, with its positions' Reconciliation", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  const imported = JSON.parse(example('broker-import.moomoo.json'))
+  ws.writeRunFile(runId, 'broker-inbox.json', {
+    dryRun: false,
+    files: imported.files.map((f: { file: string }) => ({ ...f, movedTo: `broker-inbox/${f.file}`, setAside: null })),
+    books: JSON.parse(example('book-holdings.books.json')),
+  })
+
+  const page = text(await brief())
+
+  assert.ok(page.indexOf('India Book ₹') < page.indexOf('US Book $'), 'India first')
+  assert.match(page, /US Book \$10,193 at moomoo on the closes of 2026-08-14, \$3 of it in cash\./)
+  assert.match(page, /US:ENPH Enphase Energy 1200 \$4\.46 \$4\.50 on 2026-08-14 \$5,400/)
+  assert.match(page, /Reconciled with Positions-Margin Account\(3901\)-20260815-043000\.csv, moomoo's positions of 2026-08-14: 3 match, and these 5 differ/)
+  assert.match(page, /Apple \(US:AAPL\) 6 6\.24 moomoo holds 6\.24 of Apple \(US:AAPL\), its ledger 6\. Drop the trade history with the missing buys in the Broker inbox\./)
+  assert.match(page, /iShares Latin America 40 ETF \(symbol ILF\) — 235 moomoo holds 235/)
+  assert.match(page, /moomoo's trade history, 7 trades recorded in the US Book, 3 rows set aside as not the Book's trades/)
+})
+
 test("a Broker inbox Step that failed before recording anything leaves a Real Books section saying so", async () => {
   ws = makeWorkspace()
   ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'broker-inbox', status: 'failed' }, { name: 'brief', status: 'pending' }] })
@@ -373,4 +394,5 @@ test("before ICICI Direct's first file is recorded, the Brief says where to drop
   const page = text(await brief())
 
   assert.match(page, /India Book No ICICI Direct file is recorded yet: drop its tradebook and holdings export in the Broker inbox, .*broker-inbox, and the next Run records them\./)
+  assert.match(page, /US Book No moomoo file is recorded yet: drop its trade history and positions export in the Broker inbox, .*broker-inbox, and the next Run records them\./)
 })

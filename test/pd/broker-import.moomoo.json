@@ -1,0 +1,39 @@
+{
+  "dry_run": false,
+  "files": [
+    {
+      "file": "History Transactions-Margin Account(3901)-20220802-20260815.csv",
+      "sha256": "3c1f0e9d8b7a69584736251403f2e1d0c9b8a7968574635241302f1e0d9c8b7a",
+      "broker": "moomoo",
+      "kind": "tradebook",
+      "book": "US",
+      "portfolio_id": 5,
+      "status": "recorded",
+      "why": null,
+      "trades": { "recorded": 7, "in_ledger": 0, "set_aside": 3 },
+      "reconciliation": null
+    },
+    {
+      "file": "Positions-Margin Account(3901)-20260815-043000.csv",
+      "sha256": "8e7d6c5b4a39281706f5e4d3c2b1a0998e7d6c5b4a39281706f5e4d3c2b1a099",
+      "broker": "moomoo",
+      "kind": "holdings",
+      "book": "US",
+      "portfolio_id": 5,
+      "status": "reconciled",
+      "why": null,
+      "trades": null,
+      "reconciliation": {
+        "as_of": "2026-08-14",
+        "matched": 3,
+        "differences": [
+          { "kind": "quantity", "security_id": "US:AAPL", "isin": null, "symbol": "AAPL", "name": "Apple", "ledger_qty": 6, "broker_qty": 6.24, "ratio": null },
+          { "kind": "not_in_ledger", "security_id": "US:NVDA", "isin": null, "symbol": "NVDA", "name": "Nvidia Corp", "ledger_qty": 0, "broker_qty": 0.8, "ratio": null },
+          { "kind": "quantity", "security_id": "US:SMCI", "isin": null, "symbol": "SMCI", "name": "Super Micro Computer", "ledger_qty": 10, "broker_qty": 100, "ratio": "10 for 1" },
+          { "kind": "not_at_broker", "security_id": "US:WAT", "isin": null, "symbol": null, "name": "Waters Corp", "ledger_qty": 4, "broker_qty": 0, "ratio": null },
+          { "kind": "unknown_security", "security_id": null, "isin": null, "symbol": "ILF", "name": "iShares Latin America 40 ETF", "ledger_qty": null, "broker_qty": 235, "ratio": null }
+        ]
+      }
+    }
+  ]
+}

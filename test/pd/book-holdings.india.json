@@ -22,13 +22,26 @@
         "as_of": "2026-10-31",
         "matched": 3,
         "differences": [
-          { "kind": "not_in_ledger", "security_id": "IN:ANGELONE", "isin": "INE732I01021", "name": "Angel One Ltd", "ledger_qty": 0, "broker_qty": 15, "ratio": null },
-          { "kind": "quantity", "security_id": "IN:DELHIVERY", "isin": "INE148O01028", "name": "Delhivery Ltd", "ledger_qty": 30, "broker_qty": 48, "ratio": null },
-          { "kind": "not_at_broker", "security_id": "IN:IDFCFIRSTB", "isin": null, "name": "IDFC First Bank Ltd", "ledger_qty": 100, "broker_qty": 0, "ratio": null },
-          { "kind": "quantity", "security_id": "IN:WAAREEENER", "isin": "INE377N01017", "name": "Waaree Energies Ltd", "ledger_qty": 10, "broker_qty": 20, "ratio": "2 for 1" },
-          { "kind": "unknown_security", "security_id": null, "isin": "INE000Z01010", "name": "NEW LISTING LTD", "ledger_qty": null, "broker_qty": 10, "ratio": null }
+          { "kind": "not_in_ledger", "security_id": "IN:ANGELONE", "isin": "INE732I01021", "symbol": null, "name": "Angel One Ltd", "ledger_qty": 0, "broker_qty": 15, "ratio": null },
+          { "kind": "quantity", "security_id": "IN:DELHIVERY", "isin": "INE148O01028", "symbol": null, "name": "Delhivery Ltd", "ledger_qty": 30, "broker_qty": 48, "ratio": null },
+          { "kind": "not_at_broker", "security_id": "IN:IDFCFIRSTB", "isin": null, "symbol": null, "name": "IDFC First Bank Ltd", "ledger_qty": 100, "broker_qty": 0, "ratio": null },
+          { "kind": "quantity", "security_id": "IN:WAAREEENER", "isin": "INE377N01017", "symbol": null, "name": "Waaree Energies Ltd", "ledger_qty": 10, "broker_qty": 20, "ratio": "2 for 1" },
+          { "kind": "unknown_security", "security_id": null, "isin": "INE000Z01010", "symbol": null, "name": "NEW LISTING LTD", "ledger_qty": null, "broker_qty": 10, "ratio": null }
         ]
       }
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "currency": "USD",
+      "portfolio_id": null,
+      "as_of": null,
+      "value": 0,
+      "cash": 0,
+      "holdings": [],
+      "reconciliation": null
     }
   ]
 }
