@@ -3,8 +3,9 @@
 // under them, the Health Agent's diagnosis and proposed fix, or that it failed, with what became of
 // the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
 // for approval with what it would change; each Quarantine with its flag; each market's latest session
-// in the Lake against its last finished one; the To-dos the Steps raised; how this Run's Lake Step
-// went and how ash_new's last refresh ended; the Health report's verdict and flags; and the Run's health.
+// in the Lake against its last finished one; the To-dos the Steps raised; on Saturdays, what
+// MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
+// the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 // Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
 // downloads them as one Answers file, built in the page by answersFile's own source, for the next
@@ -13,7 +14,8 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingItems, type AnswerItem } from '../../src/answers.ts'
 import { readJson, writeText } from '../../src/files.ts'
-import type { PdStatus } from '../../src/pd.ts'
+import { fetchLine } from '../../src/marketsmith.ts'
+import type { PdMarketSmith, PdStatus } from '../../src/pd.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
@@ -224,6 +226,13 @@ function todosSection(todos: { step: string; todo: string }[]): string {
   return `<section><h2>To-dos</h2>\n${list(todos.map(({ step, todo }) => `${esc(todo)} <span class="muted">(${esc(step)})</span>`))}</section>`
 }
 
+/** What MarketSmith's fetch brought, on a Saturday: nothing on other days, when the Step skips itself. */
+function marketSmithSection(fetched: PdMarketSmith | null): string {
+  if (!fetched) return ''
+  const lines = fetched.regions.map((r) => `${esc(fetchLine(r))}.`)
+  return `<section><h2>MarketSmith</h2>\n${lines.map((line) => `<p>${line}</p>`).join('\n')}</section>`
+}
+
 /** How a run of pd daily ended, as "exit 1" or "timed out". */
 const ended = (attempt: RefreshAttempt) => (attempt.timedOut ? 'timed out' : `exit ${attempt.exitCode}`)
 
@@ -309,7 +318,7 @@ a { color: inherit; }
  * `status` is the Lake's as the Lake Step read it; `latest`, as the Health Step read it again once it
  * recorded the Health Agent's Corrections, so they are among those waiting.
  */
-function render(run: RunRecord, answers: AnswersResult | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
+function render(run: RunRecord, answers: AnswersResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   return `<!doctype html>
@@ -329,6 +338,7 @@ ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${marketsSection(status)}
 ${todosSection(todos)}
+${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
@@ -345,6 +355,6 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
+  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
   console.log(`Wrote ${out}`)
 })

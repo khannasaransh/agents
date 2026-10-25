@@ -10,7 +10,7 @@ import { agentsRoot, dataDir } from './paths.ts'
 import type { RunRecord } from './run.ts'
 
 /** In launchd's order: its Weekday 0 is Sunday. */
-const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
+export const weekdays = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const
 export type Weekday = (typeof weekdays)[number]
 
 /** The machines Schedules run on: the Mac, which installs them into launchd, and the Windows machine, into Task Scheduler. */

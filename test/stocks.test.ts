@@ -33,6 +33,8 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     run.steps.map((s) => [s.name, s.status]),
     [
       ['answers', 'succeeded'],
+      // A dry run fetches nothing from MarketSmith, whatever the day.
+      ['marketsmith', 'skipped'],
       ['lake', 'succeeded'],
       ['health', 'skipped'],
       ['brief', 'succeeded'],
@@ -50,7 +52,12 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
 
 test('a stocks Run whose refresh fails twice calls the Health Agent and ends partial, with a Brief that says why the Data gate failed and that the Health Agent failed too', async () => {
   ws = workspace()
-  ws.setPd({ 'clear-refresh': { example: 'clear-refresh.nothing.json' }, daily: { stderr: 'Stopped: Yahoo answered 429\n', exitCode: 1 }, status: { example: 'status.hold.json' } })
+  ws.setPd({
+    'clear-refresh': { example: 'clear-refresh.nothing.json' },
+    marketsmith: { example: 'marketsmith.fetched.json' },
+    daily: { stderr: 'Stopped: Yahoo answered 429\n', exitCode: 1 },
+    status: { example: 'status.hold.json' },
+  })
 
   const result = await ws.agents('run', 'stocks')
 
@@ -58,10 +65,14 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   const [id] = ws.runIds()
   const run = ws.readRun(id)
   assert.equal(run.status, 'partial')
+  // MarketSmith is fetched only when the Run started on a Saturday.
+  const [year, month, day] = id.split('-').map(Number)
+  const saturday = new Date(year, month - 1, day).getDay() === 6
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
       ['answers', 'succeeded'],
+      ['marketsmith', saturday ? 'succeeded' : 'skipped'],
       ['lake', 'failed'],
       ['health', 'failed'],
       ['brief', 'succeeded'],

@@ -1,0 +1,7 @@
+{
+  "fetched_at": "2026-10-31T01:33:15.880000+00:00",
+  "regions": [
+    { "region": "IN", "status": "fetched", "cookie": "PDASH_MS_INDIA_AUTH", "run_id": "2026-10-31T01-31-02Z", "universe": 2599, "ok": 2571, "skipped": 26, "failed": 2, "snapshot": "IN:2026-10-31", "error": null },
+    { "region": "US", "status": "failed", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": null, "universe": 0, "ok": 0, "skipped": 0, "failed": 0, "snapshot": null, "error": "SiteError: MarketSmith's search of NASDAQ failed 3 times: [Errno 11001] getaddrinfo failed" }
+  ]
+}

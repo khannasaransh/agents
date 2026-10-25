@@ -90,6 +90,29 @@ export interface PdDecided {
   why: string | null
 }
 
+/**
+ * What `pd marketsmith` prints (contract/marketsmith.schema.json): how each region's fetch of
+ * MarketSmith's data ended. It exits 78 when MarketSmith rejected a cookie and nothing else failed.
+ */
+export interface PdMarketSmith {
+  fetched_at: string
+  regions: {
+    region: 'IN' | 'US' | 'HK'
+    status: 'fetched' | 'cookie_rejected' | 'failed'
+    /** The setting in ash_new's .env the region authenticates with. */
+    cookie: string
+    run_id: string | null
+    universe: number
+    ok: number
+    skipped: number
+    /** Symbols whose fetch failed: each keeps its last fetch. */
+    failed: number
+    /** The fetch's dated snapshot, as a dossier names it: IN:2026-10-31. */
+    snapshot: string | null
+    error: string | null
+  }[]
+}
+
 /** What `pd clear-refresh` prints (contract/clear-refresh.schema.json): the refreshes it cleared, or why it refused. */
 export interface PdClearRefresh {
   cleared: { job: number; status: 'failed'; error: string }[]

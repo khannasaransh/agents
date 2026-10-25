@@ -28,7 +28,7 @@
   - its events;
   - the strategy and signal behind its order.
 
-  The dossier holds a copy of what it read, not a pointer to MarketSmith's latest fetch, so a Decision record can be checked against it later.
+  The dossier holds a copy of what it read, not a pointer to MarketSmith's latest fetch, so a Decision record can be checked against it later. Issue 22 keeps each MarketSmith fetch as a dated snapshot; `pdash.marketsmith.snapshots.snapshot_of` gives a name's entry with the snapshot's id, for the dossier to name.
 - [ ] A Feeds Step runs after the Plan Step, and the Brief shows coming events for the holdings.
 - [ ] Tests run on recorded responses, never the network:
   - parsing each source;

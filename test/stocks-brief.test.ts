@@ -82,6 +82,22 @@ test('a Hold mode day shows why the Data gate failed, and the Lake Step that fai
   assert.match(page, /lake: failed\. Log: logs\/lake\.log/)
 })
 
+test("on a Saturday the Brief says what MarketSmith's fetch brought, region by region, and says nothing of it on other days", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+  ws.writeRunFile(runId, 'marketsmith.json', JSON.parse(example('marketsmith.rejected.json')))
+
+  const page = text(await brief())
+
+  assert.match(page, /MarketSmith India wasn't fetched: MarketSmith India answered 403: the token has expired, or this IP is blocked\. The US: fetched 5969 of 5971, snapshot US:2026-10-31; 2 failed\. The Lake/)
+
+  ws.cleanup()
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+  assert.doesNotMatch(text(await brief()), /MarketSmith (India|The US)/)
+})
+
 const diagnosis = {
   why: ['The Lake Step failed.'],
   inputs: 'f'.repeat(64),
