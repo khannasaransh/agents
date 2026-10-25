@@ -3,8 +3,8 @@
 // each file it handled into done/, or into skipped/ when it isn't a PRD, so the inbox shows only
 // what's still waiting.
 import { existsSync, mkdirSync, readdirSync, renameSync, statSync } from 'node:fs'
-import { join, parse } from 'node:path'
-import { readJson, writeJson } from './files.ts'
+import { join } from 'node:path'
+import { freeName, readJson, writeJson } from './files.ts'
 import { prdInboxDir } from './paths.ts'
 
 /**
@@ -33,14 +33,6 @@ export function waitingFiles(): string[] {
   return readdirSync(prdInboxDir())
     .filter((name) => name !== 'sources.json' && !name.startsWith('.') && statSync(join(prdInboxDir(), name)).isFile())
     .sort()
-}
-
-/** `filename`, or when `folder` holds a file by that name, the first free `name (n).ext`. */
-export function freeName(folder: string, filename: string): string {
-  const { name, ext } = parse(filename)
-  let free = filename
-  for (let n = 2; existsSync(join(folder, free)); n++) free = `${name} (${n})${ext}`
-  return free
 }
 
 /**

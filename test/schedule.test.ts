@@ -238,7 +238,7 @@ test("a Task Scheduler entry's arguments reach the agents command as they were g
 test('a scheduled start sets the environment the entry gives it before the Run starts', async () => {
   const ws = makeWorkspace()
   try {
-    ws.setPd({ status: { example: 'status.healthy.json' } })
+    ws.setPd({ status: { example: 'status.healthy.json' }, 'book-holdings': { example: 'book-holdings.empty.json' } })
     const elsewhere = join(ws.dataDir, '..', 'pinned-data')
 
     const result = await ws.agents('run', 'stocks', '--scheduled', '--dry-run', '--env', `AGENTS_DATA_DIR=${elsewhere}`)

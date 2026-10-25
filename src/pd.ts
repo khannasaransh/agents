@@ -113,6 +113,74 @@ export interface PdMarketSmith {
   }[]
 }
 
+/**
+ * One difference Reconciliation found between a Book's real portfolio and its broker's holdings
+ * export: `quantity` (both hold it, in different numbers; `ratio` names a split's or bonus's shares,
+ * "2 for 1", when the broker's are one), `not_in_ledger`, `not_at_broker`, or `unknown_security` (one
+ * the securities table hasn't got, so it can't be compared).
+ */
+export interface PdDifference {
+  kind: 'quantity' | 'not_in_ledger' | 'not_at_broker' | 'unknown_security'
+  security_id: string | null
+  isin: string | null
+  name: string | null
+  ledger_qty: number | null
+  broker_qty: number
+  ratio: string | null
+}
+
+/** A holdings export reconciled against the ledger, as of the day it was downloaded. */
+export interface PdReconciliation {
+  as_of: string
+  matched: number
+  differences: PdDifference[]
+}
+
+/** What became of one Broker inbox file in `pd broker import`. */
+export interface PdBrokerFile {
+  file: string
+  sha256: string
+  broker: 'icici_direct' | null
+  kind: 'tradebook' | 'holdings' | null
+  book: 'IN' | null
+  portfolio_id: number | null
+  /** seen: a tradebook with the same content was recorded already, so nothing is. unreadable: nothing in it was recorded, and `why` says why. */
+  status: 'recorded' | 'seen' | 'reconciled' | 'unreadable'
+  why: string | null
+  trades: { recorded: number; in_ledger: number; set_aside: number } | null
+  reconciliation: PdReconciliation | null
+}
+
+/**
+ * What `pd broker import` prints (contract/broker-import.schema.json): each file handed in, identified
+ * by its columns, tradebooks recorded first, then holdings exports reconciled, the unreadable last.
+ */
+export interface PdBrokerImport {
+  dry_run: boolean
+  files: PdBrokerFile[]
+}
+
+/** A Book's real money, as `pd book-holdings` prints it (contract/book-holdings.schema.json). */
+export interface PdBook {
+  book: 'IN'
+  name: string
+  broker: 'icici_direct'
+  broker_name: string
+  currency: string
+  /** Null before its broker's first file is recorded. */
+  portfolio_id: number | null
+  as_of: string | null
+  value: number
+  cash: number
+  holdings: { security_id: string; name: string | null; qty: number; avg_cost: number | null; price: number | null; priced_on: string | null; value: number | null }[]
+  reconciliation: (PdReconciliation & { file: string; reconciled_at: string }) | null
+}
+
+/** What `pd book-holdings` prints: each Book's real money, India first. */
+export interface PdBookHoldings {
+  books: PdBook[]
+}
+
 /** What `pd clear-refresh` prints (contract/clear-refresh.schema.json): the refreshes it cleared, or why it refused. */
 export interface PdClearRefresh {
   cleared: { job: number; status: 'failed'; error: string }[]

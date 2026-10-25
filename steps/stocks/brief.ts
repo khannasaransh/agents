@@ -3,8 +3,9 @@
 // under them, the Health Agent's diagnosis and proposed fix, or that it failed, with what became of
 // the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
 // for approval with what it would change; each Quarantine with its flag; each market's latest session
-// in the Lake against its last finished one; the To-dos the Steps raised; on Saturdays, what
-// MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
+// in the Lake against its last finished one; the To-dos the Steps raised; each Book's real holdings
+// and value, its latest Reconciliation's differences and this Run's Broker inbox files; on Saturdays,
+// what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
 // the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 // Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
@@ -13,13 +14,16 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingItems, type AnswerItem } from '../../src/answers.ts'
+import { differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
-import type { PdMarketSmith, PdStatus } from '../../src/pd.ts'
+import { brokerInboxDir } from '../../src/paths.ts'
+import type { PdBook, PdMarketSmith, PdStatus } from '../../src/pd.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
 import type { AnswersResult } from './answers.ts'
+import type { BrokerInboxResult } from './broker-inbox.ts'
 import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 
@@ -226,6 +230,55 @@ function todosSection(todos: { step: string; todo: string }[]): string {
   return `<section><h2>To-dos</h2>\n${list(todos.map(({ step, todo }) => `${esc(todo)} <span class="muted">(${esc(step)})</span>`))}</section>`
 }
 
+/** An amount in a Book's currency, as its market writes it: ₹1,52,180; `decimals` for a share's price. */
+function money(amount: number, currency: string, decimals = 0): string {
+  const locale = currency === 'INR' ? 'en-IN' : 'en-US'
+  return new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(amount)
+}
+
+/** A Book's real money: its holdings and value, and its latest Reconciliation's differences. */
+function bookSection(book: PdBook): string {
+  if (book.portfolio_id === null)
+    return `<section><h2>${esc(book.name)}</h2><p>No ${esc(book.broker_name)} file is recorded yet: drop its tradebook and holdings export in the Broker inbox, ${esc(brokerInboxDir())}, and the next Run records them.</p></section>`
+  const at = (amount: number | null, decimals = 0) => (amount === null ? '—' : esc(money(amount, book.currency, decimals)))
+  const value = `<p>${at(book.value)} at ${esc(book.broker_name)}${book.as_of ? ` on the closes of ${esc(book.as_of)}` : ''}, ${at(book.cash)} of it in cash.</p>`
+  const rows = book.holdings.map((h) => [
+    esc(h.security_id),
+    esc(h.name ?? ''),
+    esc(shares(h.qty)),
+    at(h.avg_cost, 2),
+    h.price === null ? '—' : `${at(h.price, 2)}${h.priced_on ? ` on ${esc(h.priced_on)}` : ''}`,
+    at(h.value),
+  ])
+  const holdings = rows.length ? table(['Security', 'Name', 'Shares', 'Average cost', 'Close', 'Value'], rows) : '<p>It holds nothing.</p>'
+  return [`<section><h2>${esc(book.name)}</h2>`, value, holdings, reconciliationPart(book), '</section>'].join('\n')
+}
+
+/** A Book's latest Reconciliation: what matched, and each difference with what to do about it. */
+function reconciliationPart(book: PdBook): string {
+  const r = book.reconciliation
+  if (!r) return `<p>No ${esc(book.broker_name)} holdings export has been reconciled yet: drop one in the Broker inbox each Saturday.</p>`
+  const of = `Reconciled with ${esc(r.file)}, ${esc(book.broker_name)}'s holdings of ${esc(r.as_of)}: ${r.matched} match`
+  if (!r.differences.length) return `<p>${of}, and nothing differs.</p>`
+  const rows = r.differences.map((d) => [esc(securityName(d)), d.ledger_qty === null ? '—' : esc(shares(d.ledger_qty)), esc(shares(d.broker_qty)), esc(differenceText(d, book.broker_name))])
+  return `<p>${of}, and these ${r.differences.length} differ, each a To-do until a later holdings export settles it:</p>\n${table(['Security', 'Ledger', esc(book.broker_name), ''], rows)}`
+}
+
+/**
+ * Each Book's real money, and what became of this Run's Broker inbox files; that they couldn't be read
+ * when the Broker inbox Step failed first, and nothing when it didn't run.
+ */
+function booksSection(run: RunRecord, inbox: BrokerInboxResult | null): string {
+  const step = run.steps.find((s) => s.name === 'broker-inbox')
+  const unread = `<section><h2>Real Books</h2><p>The Books' holdings couldn't be read in this Run. See the Broker inbox Step's log: ${logLink(step?.log ?? 'logs/broker-inbox.log')}</p></section>`
+  if (!inbox) return step?.status === 'failed' ? unread : ''
+  const books = inbox.books?.books.map(bookSection) ?? [unread]
+  const files = inbox.files.length
+    ? [`<section><h2>This Run's Broker inbox files</h2>`, inbox.dryRun ? '<p>Dry run: none was recorded, and each stays in the Broker inbox.</p>' : '', list(inbox.files.map((f) => esc(fileLine(f)))), '</section>'].filter(Boolean)
+    : []
+  return [...books, ...files].join('\n')
+}
+
 /** What MarketSmith's fetch brought, on a Saturday: nothing on other days, when the Step skips itself. */
 function marketSmithSection(fetched: PdMarketSmith | null): string {
   if (!fetched) return ''
@@ -318,7 +371,7 @@ a { color: inherit; }
  * `status` is the Lake's as the Lake Step read it; `latest`, as the Health Step read it again once it
  * recorded the Health Agent's Corrections, so they are among those waiting.
  */
-function render(run: RunRecord, answers: AnswersResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
+function render(run: RunRecord, answers: AnswersResult | null, inbox: BrokerInboxResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   return `<!doctype html>
@@ -338,6 +391,7 @@ ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${marketsSection(status)}
 ${todosSection(todos)}
+${booksSection(run, inbox)}
 ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
@@ -355,6 +409,6 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
+  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<BrokerInboxResult>('broker-inbox.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
   console.log(`Wrote ${out}`)
 })

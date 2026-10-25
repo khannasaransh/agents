@@ -6,13 +6,12 @@
 // is recorded as answers.json, for the Brief. A file that isn't an Answers file stays where it is,
 // with a To-do. An Answer `pd` couldn't apply fails the Step and leaves its file, and every later
 // one, for the next Run. A dry run applies nothing and consumes no file.
-import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { join, relative } from 'node:path'
 import { answersFileError, isAnswersFileName, pdArgs, type Answer, type AnswersFile } from '../../src/answers.ts'
-import { readJson, writeJson } from '../../src/files.ts'
+import { moveInto, readJson, writeJson } from '../../src/files.ts'
 import { brokerInboxDir, downloadsDir } from '../../src/paths.ts'
 import { pdJson, type PdDecided } from '../../src/pd.ts'
-import { freeName } from '../../src/prd-inbox.ts'
 import { readRun } from '../../src/run.ts'
 import { readAnswersState, writeAnswersState, type AppliedAnswer } from '../../src/state.ts'
 import { runAsStep } from '../../src/step.ts'
@@ -102,19 +101,9 @@ async function apply(answer: Answer, file: AnswersFile, state: Record<string, Ap
   return { outcome: 'applied' }
 }
 
-/** Moves a file into the Run's answers/ folder under a free name there, copying it when Downloads is on another drive. */
+/** Moves a file into the Run's answers/ folder under a free name there, and returns its path in the Run. */
 function moveIntoRun({ name, folder }: Found, runFolder: string): string {
-  const into = join(runFolder, 'answers')
-  mkdirSync(into, { recursive: true })
-  const moved = join('answers', freeName(into, name))
-  try {
-    renameSync(join(folder, name), join(runFolder, moved))
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error
-    copyFileSync(join(folder, name), join(runFolder, moved))
-    rmSync(join(folder, name))
-  }
-  return moved
+  return relative(runFolder, moveInto(join(folder, name), join(runFolder, 'answers')))
 }
 
 await runAsStep(async ({ runId, runFolder }) => {

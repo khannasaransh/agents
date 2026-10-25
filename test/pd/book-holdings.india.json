@@ -1,0 +1,34 @@
+{
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "currency": "INR",
+      "portfolio_id": 4,
+      "as_of": "2026-10-30",
+      "value": 152179.9,
+      "cash": 9579.9,
+      "holdings": [
+        { "security_id": "IN:ASIANPAINT", "name": "Asian Paints Ltd", "qty": 40, "avg_cost": 1415.71, "price": 1400, "priced_on": "2026-10-30", "value": 56000 },
+        { "security_id": "IN:DELHIVERY", "name": "Delhivery Ltd", "qty": 30, "avg_cost": 472.75, "price": 470, "priced_on": "2026-10-30", "value": 14100 },
+        { "security_id": "IN:SENCO", "name": "Senco Gold Ltd", "qty": 100, "avg_cost": 345.7, "price": 350, "priced_on": "2026-10-30", "value": 35000 },
+        { "security_id": "IN:WAAREEENER", "name": "Waaree Energies Ltd", "qty": 10, "avg_cost": 3055.5, "price": 3750, "priced_on": "2026-10-30", "value": 37500 }
+      ],
+      "reconciliation": {
+        "file": "7500057272_Demat.csv",
+        "reconciled_at": "2026-10-31T04:02:11.512000+00:00",
+        "as_of": "2026-10-31",
+        "matched": 3,
+        "differences": [
+          { "kind": "not_in_ledger", "security_id": "IN:ANGELONE", "isin": "INE732I01021", "name": "Angel One Ltd", "ledger_qty": 0, "broker_qty": 15, "ratio": null },
+          { "kind": "quantity", "security_id": "IN:DELHIVERY", "isin": "INE148O01028", "name": "Delhivery Ltd", "ledger_qty": 30, "broker_qty": 48, "ratio": null },
+          { "kind": "not_at_broker", "security_id": "IN:IDFCFIRSTB", "isin": null, "name": "IDFC First Bank Ltd", "ledger_qty": 100, "broker_qty": 0, "ratio": null },
+          { "kind": "quantity", "security_id": "IN:WAAREEENER", "isin": "INE377N01017", "name": "Waaree Energies Ltd", "ledger_qty": 10, "broker_qty": 20, "ratio": "2 for 1" },
+          { "kind": "unknown_security", "security_id": null, "isin": "INE000Z01010", "name": "NEW LISTING LTD", "ledger_qty": null, "broker_qty": 10, "ratio": null }
+        ]
+      }
+    }
+  ]
+}

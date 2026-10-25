@@ -333,3 +333,44 @@ test("the Stocks Brief says what became of the Answers this Run applied, each wi
   ws.writeRunFile(runId, 'answers.json', { dryRun: false, files: [] })
   assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /Your Answers No Answers file was waiting in Downloads or the Broker inbox\./)
 })
+
+test("the Stocks Brief shows the India Book's holdings and value, Reconciliation's differences and the Broker inbox's files", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  const imported = JSON.parse(example('broker-import.recorded.json'))
+  ws.writeRunFile(runId, 'broker-inbox.json', {
+    dryRun: false,
+    files: imported.files.map((f: { file: string }) => ({ ...f, movedTo: `broker-inbox/${f.file}`, setAside: null })),
+    books: JSON.parse(example('book-holdings.india.json')),
+  })
+
+  const page = text(await brief())
+
+  assert.match(page, /India Book ₹1,52,180 at ICICI Direct on the closes of 2026-10-30, ₹9,580 of it in cash\./)
+  assert.match(page, /Security Name Shares Average cost Close Value IN:ASIANPAINT Asian Paints Ltd 40 ₹1,415\.71 ₹1,400\.00 on 2026-10-30 ₹56,000/)
+  assert.match(page, /Reconciled with 7500057272_Demat\.csv, ICICI Direct's holdings of 2026-10-31: 3 match, and these 5 differ, each a To-do until a later holdings export settles it:/)
+  assert.match(page, /Delhivery Ltd \(IN:DELHIVERY\) 30 48 ICICI Direct holds 48 of Delhivery Ltd \(IN:DELHIVERY\), its ledger 30\. Drop the tradebook with the missing buys in the Broker inbox\./)
+  assert.match(page, /NEW LISTING LTD \(ISIN INE000Z01010\) — 10 ICICI Direct holds 10/)
+  assert.match(page, /This Run's Broker inbox files orderBook_Equity_1\.csv: ICICI Direct's tradebook, 6 trades recorded in the India Book, 1 in its ledger already 7500057272_Demat\.csv: ICICI Direct's holdings of 2026-10-31/)
+  assert.ok(page.indexOf('To-dos') < page.indexOf('India Book ₹'), 'after what is waiting on Saransh')
+})
+
+test("a Broker inbox Step that failed before recording anything leaves a Real Books section saying so", async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'broker-inbox', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /Real Books The Books' holdings couldn't be read in this Run\. See the Broker inbox Step's log: logs\/broker-inbox\.log/)
+})
+
+test("before ICICI Direct's first file is recorded, the Brief says where to drop it", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  ws.writeRunFile(runId, 'broker-inbox.json', { dryRun: false, files: [], books: JSON.parse(example('book-holdings.empty.json')) })
+
+  const page = text(await brief())
+
+  assert.match(page, /India Book No ICICI Direct file is recorded yet: drop its tradebook and holdings export in the Broker inbox, .*broker-inbox, and the next Run records them\./)
+})

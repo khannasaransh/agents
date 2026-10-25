@@ -1,0 +1,41 @@
+{
+  "dry_run": false,
+  "files": [
+    {
+      "file": "orderBook_Equity_2.csv",
+      "sha256": "5f0c1e2d3b4a59687766554433221100ffeeddccbbaa99887766554433221100",
+      "broker": "icici_direct",
+      "kind": "tradebook",
+      "book": "IN",
+      "portfolio_id": 4,
+      "status": "seen",
+      "why": "orderBook_Equity_1.csv, the same file, was recorded already",
+      "trades": null,
+      "reconciliation": null
+    },
+    {
+      "file": "notes.csv",
+      "sha256": "0011223344556677889900112233445566778899001122334455667788990011",
+      "broker": null,
+      "kind": null,
+      "book": null,
+      "portfolio_id": null,
+      "status": "unreadable",
+      "why": "Its columns aren't any broker's export ash_new reads",
+      "trades": null,
+      "reconciliation": null
+    },
+    {
+      "file": "orderBook_Equity_3.csv",
+      "sha256": "99887766554433221100ffeeddccbbaa99887766554433221100ffeeddccbbaa",
+      "broker": "icici_direct",
+      "kind": "tradebook",
+      "book": "IN",
+      "portfolio_id": 4,
+      "status": "unreadable",
+      "why": "Line 2: No IN security is NOSUCHCO. Nothing in it was recorded",
+      "trades": null,
+      "reconciliation": null
+    }
+  ]
+}

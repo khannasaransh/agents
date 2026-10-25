@@ -1,0 +1,17 @@
+{
+  "dry_run": true,
+  "files": [
+    {
+      "file": "orderBook_Equity_1.csv",
+      "sha256": "5f0c1e2d3b4a59687766554433221100ffeeddccbbaa99887766554433221100",
+      "broker": "icici_direct",
+      "kind": "tradebook",
+      "book": "IN",
+      "portfolio_id": 4,
+      "status": "recorded",
+      "why": null,
+      "trades": { "recorded": 6, "in_ledger": 1, "set_aside": 0 },
+      "reconciliation": null
+    }
+  ]
+}

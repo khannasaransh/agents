@@ -1,0 +1,17 @@
+{
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "currency": "INR",
+      "portfolio_id": null,
+      "as_of": null,
+      "value": 0,
+      "cash": 0,
+      "holdings": [],
+      "reconciliation": null
+    }
+  ]
+}

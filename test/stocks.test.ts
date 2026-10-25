@@ -20,7 +20,7 @@ function workspace(): Workspace {
 
 test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agent on a healthy Lake, then writes the Stocks Brief', async () => {
   ws = workspace()
-  ws.setPd({ status: { example: 'status.clean.json' } })
+  ws.setPd({ status: { example: 'status.clean.json' }, 'book-holdings': { example: 'book-holdings.empty.json' } })
 
   const result = await ws.agents('run', 'stocks', '--dry-run')
 
@@ -33,6 +33,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     run.steps.map((s) => [s.name, s.status]),
     [
       ['answers', 'succeeded'],
+      ['broker-inbox', 'succeeded'],
       // A dry run fetches nothing from MarketSmith, whatever the day.
       ['marketsmith', 'skipped'],
       ['lake', 'succeeded'],
@@ -42,8 +43,8 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
   )
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['status']],
-    'nothing in ash_new is refreshed or cleared',
+    [['book-holdings'], ['status']],
+    'nothing in ash_new is recorded, refreshed or cleared',
   )
   assert.match(result.stdout, new RegExp(`Brief: .*${id}[\\\\/]brief\\.html`))
   assert.match(ws.readRunFile(id, 'brief.html'), /Data gate: pass/)
@@ -53,6 +54,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
 test('a stocks Run whose refresh fails twice calls the Health Agent and ends partial, with a Brief that says why the Data gate failed and that the Health Agent failed too', async () => {
   ws = workspace()
   ws.setPd({
+    'book-holdings': { example: 'book-holdings.empty.json' },
     'clear-refresh': { example: 'clear-refresh.nothing.json' },
     marketsmith: { example: 'marketsmith.fetched.json' },
     daily: { stderr: 'Stopped: Yahoo answered 429\n', exitCode: 1 },
@@ -72,6 +74,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     run.steps.map((s) => [s.name, s.status]),
     [
       ['answers', 'succeeded'],
+      ['broker-inbox', 'succeeded'],
       ['marketsmith', saturday ? 'succeeded' : 'skipped'],
       ['lake', 'failed'],
       ['health', 'failed'],

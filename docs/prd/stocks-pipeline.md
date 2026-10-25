@@ -673,13 +673,13 @@ There are two seams, and both are a command with files in and files out.
   - whether ICICI Direct and moomoo let a sale's proceeds pay for a buy at the same open (assumed yes until then);
   - the Market condition's thresholds, the exposure levels and the Playbook's ranges (placeholders until then);
   - what happens to the Sash app, before ash_backend is archived;
-  - one tradebook and one holdings export from each broker, to build the import presets;
+  - moomoo's trade history and positions export, to build its import presets (ICICI Direct's came for issue 23);
   - the contact for the SEC's User-Agent;
   - later, contract notes, if real brokerage is to enter the costs.
 - **Unconfirmed:**
   - **Codex's read-only sandbox on Windows:** its unelevated sandbox holds, but it can't enforce the deny rules that keep an Agent from Tools it doesn't declare, so Codex refuses those calls (issue 19). The Health Agent therefore starts on Claude Code, and so does the Chart analyst unless Codex's elevated sandbox proves to enforce them.
   - **NSE and BSE endpoints** need browser-like headers and cookies, and change without notice. A failing Feed skips itself with a To-do.
-  - **Broker charges in exports:** whether ICICI Direct's and moomoo's exports include charges, which would let the reviews check the ₹0 / $0 brokerage.
+  - **Broker charges in exports:** whether moomoo's exports include charges, which would let the reviews check the $0 brokerage. ICICI Direct's tradebook does, and its brokerage isn't ₹0: about 0.24% of each trade in Saransh's sample (issue 23).
   - **Web search permission:** how Claude Code's web search is allowed for the Events and Risk analysts, given that the Worker denies every command that isn't read-only.
 - **Defaults chosen while writing this PRD, not discussed:**
   - **Breaker recovery:** new buys resume once a Book recovers above −5%, and full exposure above −9%. Both are tested in the Book backtest.

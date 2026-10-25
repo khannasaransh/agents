@@ -1,0 +1,36 @@
+{
+  "dry_run": false,
+  "files": [
+    {
+      "file": "orderBook_Equity_1.csv",
+      "sha256": "5f0c1e2d3b4a59687766554433221100ffeeddccbbaa99887766554433221100",
+      "broker": "icici_direct",
+      "kind": "tradebook",
+      "book": "IN",
+      "portfolio_id": 4,
+      "status": "recorded",
+      "why": null,
+      "trades": { "recorded": 6, "in_ledger": 1, "set_aside": 0 },
+      "reconciliation": null
+    },
+    {
+      "file": "7500057272_Demat.csv",
+      "sha256": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90",
+      "broker": "icici_direct",
+      "kind": "holdings",
+      "book": "IN",
+      "portfolio_id": 4,
+      "status": "reconciled",
+      "why": null,
+      "trades": null,
+      "reconciliation": {
+        "as_of": "2026-10-31",
+        "matched": 3,
+        "differences": [
+          { "kind": "quantity", "security_id": "IN:DELHIVERY", "isin": "INE148O01028", "name": "Delhivery Ltd", "ledger_qty": 30, "broker_qty": 48, "ratio": null },
+          { "kind": "quantity", "security_id": "IN:WAAREEENER", "isin": "INE377N01017", "name": "Waaree Energies Ltd", "ledger_qty": 10, "broker_qty": 20, "ratio": "2 for 1" }
+        ]
+      }
+    }
+  ]
+}
