@@ -1,0 +1,5 @@
+{
+  "changed": true,
+  "why": null,
+  "quarantine": { "id": 5, "market": "HK", "security_id": "HK:0083", "name": null, "check": "stale", "date": "2026-10-16", "detail": "6 sessions behind", "since": "2026-10-27", "lifted_by": "dismissed", "lifted_at": "2026-10-28T01:31:00.120000+00:00", "correction_id": null }
+}

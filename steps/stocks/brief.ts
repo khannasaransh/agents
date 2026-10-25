@@ -1,9 +1,10 @@
 // Brief: writes the Stocks Brief, one self-contained HTML page in the Run folder that loads nothing
 // from the internet, from what earlier Steps wrote there: the Data gate's verdict and its reasons;
-// under them, the Health Agent's diagnosis and proposed fix, or that it failed; each market's latest
-// session in the Lake against its last finished one; the To-dos the Steps raised; how this Run's
-// Lake Step went and how ash_new's last refresh ended; the Health report's verdict and flags; and
-// the Run's health.
+// under them, the Health Agent's diagnosis and proposed fix, or that it failed, with what became of
+// the Corrections it proposed; each Correction waiting for approval with what it would change; each
+// Quarantine with its flag; each market's latest session in the Lake against its last finished one;
+// the To-dos the Steps raised; how this Run's Lake Step went and how ash_new's last refresh ended;
+// the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -12,7 +13,7 @@ import type { PdStatus } from '../../src/pd.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
-import type { HealthResult } from './health.ts'
+import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 
 /** Escapes text for HTML, so nothing from the Lake or a log is read as markup. */
@@ -51,7 +52,70 @@ function diagnosisSection(run: RunRecord, health: HealthResult | null): string {
     `<p class="text">${esc(health.diagnosis)}</p>`,
     `<h3>Proposed fix, not applied</h3>`,
     `<p class="text">${esc(health.fix)}</p>`,
+    ...(health.proposals ? [`<p>${proposalsLine(health.proposals, health.corrections.length)}</p>`] : []),
     ...(evidence.length ? [`<details><summary>Evidence it read: ${plural(evidence.length, 'item')}</summary>\n${list(evidence)}</details>`] : []),
+    '</section>',
+  ].join('\n')
+}
+
+/** What became of the Corrections the Health Agent proposed in this Run. */
+function proposalsLine(proposals: Proposals, proposed: number): string {
+  const corrections = plural(proposed, 'Correction')
+  if (proposals.status === 'dry-run') return `It proposed ${corrections}; a dry run records none in ash_new.`
+  if (proposals.status === 'failed') return `It proposed ${corrections}, but they couldn't be recorded in ash_new: ${esc(proposals.error)}`
+  const { recorded, known, refused } = proposals.printed
+  const parts = [
+    `${recorded.length} recorded, waiting for your approval`,
+    ...(known.length ? [`${known.length} proposed before`] : []),
+    ...(refused.length ? [`${refused.length} refused by ash_new (${refused.map((r) => esc(r.why)).join('; ')})`] : []),
+  ]
+  return `It proposed ${corrections}: ${parts.join(', ')}.`
+}
+
+/** A Correction in a few words: "Split of 11.655 for 1 on 2026-10-08". */
+function correctionText(c: PdStatus['corrections'][number]): string {
+  if (c.kind === 'split') return `Split of ${c.ratio} for 1 on ${c.date}`
+  if (c.kind === 'demerger') return `Demerger on ${c.date}, the company keeping ${Math.round((c.ratio ?? 0) * 1000) / 10}% of its value`
+  return c.value === null ? `No dividend on ${c.date}` : `Dividend of ${c.value} on ${c.date}`
+}
+
+function correctionsSection(status: PdStatus | null): string {
+  if (!status) return ''
+  if (!status.corrections.length) return '<section><h2>Corrections</h2><p>No Correction is waiting for your approval.</p></section>'
+  const rows = status.corrections.map((c) => [
+    String(c.id),
+    `${esc(c.security_id)}${c.name ? `<br><span class="muted">${esc(c.name)}</span>` : ''}`,
+    esc(correctionText(c)),
+    esc(c.effect),
+    esc(c.why),
+    `${esc(c.proposed_by)}<br><span class="muted">${esc(minutes(c.proposed_at))}</span>`,
+  ])
+  return [
+    `<section><h2>Corrections waiting for your approval: ${status.corrections.length}</h2>`,
+    '<p>Nothing is applied until you approve it. In ash_new, <code>pd corrections approve &lt;id&gt;</code> adds one to the Corrections file, which the next refresh applies, running again the backtests it affects; <code>pd corrections reject &lt;id&gt;</code> drops it.</p>',
+    table(['Id', 'Security', 'Correction', 'What it would change', 'Why', 'Proposed by'], rows),
+    '</section>',
+  ].join('\n')
+}
+
+/** "1 security", "3 securities". */
+const securities = (n: number) => `${n} securit${n === 1 ? 'y' : 'ies'}`
+
+function quarantineSection(status: PdStatus | null): string {
+  if (!status) return ''
+  const { quarantines } = status
+  if (!quarantines.length) return '<section><h2>Quarantine</h2><p>No security is quarantined.</p></section>'
+  const names = new Map(status.markets.map((m) => [m.market, m.name]))
+  const held = (qs: PdStatus['quarantines']) => securities(new Set(qs.map((q) => q.security_id)).size)
+  const lists = [...new Set(quarantines.map((q) => q.market))].map((market) => {
+    const mine = quarantines.filter((q) => q.market === market)
+    const rows = mine.map((q) => [String(q.id), esc(q.security_id), esc(q.name ?? ''), esc(q.check), esc(q.date ?? '—'), esc(q.detail), esc(q.since)])
+    return `<details><summary>${esc(names.get(market) ?? market)}: ${held(mine)}</summary>\n${table(['Id', 'Security', 'Name', 'Flag', 'Date', 'Detail', 'Since'], rows)}</details>`
+  })
+  return [
+    `<section><h2>Quarantine: ${held(quarantines)}</h2>`,
+    '<p>A security the Health report flagged is held out of every Book, neither bought nor sold on a signal while its Disaster stop stays, until its Correction is approved or you dismiss its flag: <code>pd quarantines dismiss &lt;id&gt;</code> in ash_new.</p>',
+    ...lists,
     '</section>',
   ].join('\n')
 }
@@ -144,7 +208,11 @@ details { margin: 0.5rem 0; } summary { cursor: pointer; }
 a { color: inherit; }
 `
 
-function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
+/**
+ * `status` is the Lake's as the Lake Step read it; `latest`, as the Health Step read it again once it
+ * recorded the Health Agent's Corrections, so they are among those waiting.
+ */
+function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   return `<!doctype html>
 <html lang="en">
@@ -158,6 +226,8 @@ function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null
 <h1>Stocks Brief ${esc(run.id)}</h1>
 ${run.dryRun ? '<p class="note">Dry run: the Lake was read as it is, not refreshed, and nothing was recorded in ash_new.</p>\n' : ''}${gateSection(status, lakeLog)}
 ${diagnosisSection(run, health)}
+${correctionsSection(latest ?? status)}
+${quarantineSection(latest ?? status)}
 ${marketsSection(status)}
 ${todosSection(todos)}
 ${lakeSection(lake, status)}
@@ -175,6 +245,6 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
+  writeText(out, render(readRun(runId), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
   console.log(`Wrote ${out}`)
 })

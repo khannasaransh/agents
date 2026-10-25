@@ -71,5 +71,7 @@
   "own_schedule": {
     "enabled": false,
     "task_registered": false
-  }
+  },
+  "quarantines": [],
+  "corrections": []
 }

@@ -27,6 +27,57 @@ export interface PdStatus {
   } | null
   gate: { verdict: 'pass' | 'fail'; reasons: string[] }
   own_schedule: { enabled: boolean; task_registered: boolean | null }
+  /** Each open Quarantine with its flag: the security is held out of every Book while one is open. */
+  quarantines: PdQuarantine[]
+  /** Each Correction waiting for approval, with what it would change. */
+  corrections: (PdCorrection & { name: string | null; effect: string })[]
+}
+
+/** A Correction as the Corrections file holds it: what the Health Agent proposes. */
+export interface CorrectionChange {
+  security_id: string
+  kind: 'split' | 'dividend' | 'demerger'
+  date: string
+  /** A split's shares after per share before; a demerger's share of the value the company kept. */
+  ratio: number | null
+  /** A dividend's cash per share; null drops it. */
+  value: number | null
+  why: string
+}
+
+/** A proposed Correction, as ash_new records it. */
+export interface PdCorrection extends CorrectionChange {
+  id: number
+  market: string
+  status: 'waiting' | 'approved' | 'rejected'
+  proposed_by: string
+  proposed_at: string
+  decided_at: string | null
+}
+
+/** A security a Health report flagged, held out of every Book until its Correction is approved or its flag dismissed. */
+export interface PdQuarantine {
+  id: number
+  market: string
+  security_id: string
+  name: string | null
+  check: string
+  date: string | null
+  detail: string
+  /** The Health report that flagged it first. */
+  since: string
+  lifted_by: 'corrected' | 'dismissed' | null
+  lifted_at: string | null
+  correction_id: number | null
+}
+
+/** What `pd corrections propose` prints (contract/corrections-propose.schema.json). */
+export interface PdCorrectionsPropose {
+  recorded: PdCorrection[]
+  /** Proposed before, as each is now: not recorded again. */
+  known: PdCorrection[]
+  /** Each entry that isn't a Correction, by its place in the file. */
+  refused: { index: number; why: string }[]
 }
 
 /** What `pd clear-refresh` prints (contract/clear-refresh.schema.json): the refreshes it cleared, or why it refused. */

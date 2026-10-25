@@ -91,6 +91,7 @@ const diagnosis = {
     { source: 'lakeLog', shows: 'Both runs stopped on "Yahoo answered 429"' },
     { source: 'data/logs/jobs/482.jsonl', shows: 'The job failed in prices-update' },
   ],
+  corrections: [],
 }
 
 test("the Health Agent's diagnosis and proposed fix come right under the Data gate's verdict, with the evidence it read", async () => {
@@ -104,9 +105,54 @@ test("the Health Agent's diagnosis and proposed fix come right under the Data ga
 
   assert.match(
     page,
-    /Data gate: fail\..*1 session behind its last finished session, 2026-10-26 Health Agent's diagnosis Yahoo rate-limited the price top-up, so both runs of pd daily stopped before the US prices were in\. Proposed fix, not applied Run pd daily again after 10:00 IST, when the limit resets\. Evidence it read: 2 items lakeLog ?: Both runs stopped on "Yahoo answered 429" data\/logs\/jobs\/482\.jsonl ?: The job failed in prices-update Markets/,
+    /Data gate: fail\..*1 session behind its last finished session, 2026-10-26 Health Agent's diagnosis Yahoo rate-limited the price top-up, so both runs of pd daily stopped before the US prices were in\. Proposed fix, not applied Run pd daily again after 10:00 IST, when the limit resets\. Evidence it read: 2 items lakeLog ?: Both runs stopped on "Yahoo answered 429" data\/logs\/jobs\/482\.jsonl ?: The job failed in prices-update Corrections No Correction is waiting for your approval\. Quarantine No security is quarantined\. Markets/,
   )
   assert.match(html, /Health Agent's diagnosis<\/h2>\n<p class="text">Yahoo rate-limited the price top-up, so both runs of pd daily stopped\nbefore/, 'its line breaks are kept')
+})
+
+test('each Correction waiting for approval is listed with what it would change, then each Quarantine with its flag, by market', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+
+  const page = text(await brief())
+
+  assert.match(
+    page,
+    /Corrections waiting for your approval: 1 Nothing is applied until you approve it\. In ash_new, pd corrections approve <id> adds one to the Corrections file.*Id Security Correction What it would change Why Proposed by 7 IN:BHAGYAPROP Bhagyanagar India <Ltd> No dividend on 2025-03-12 The dividend on 2025-03-12 dropped: the total-return index's move that day goes from \+122\.4% to -0\.1% A 12\.00 dividend on a 9\.80 close: BSE's corporate actions list no dividend that year, so Yahoo's is a <mistake> the Health Agent, Run 2026-10-26-0930 2026-10-26 01:52 UTC/,
+  )
+  assert.match(page, /Quarantine: 5 securities A security the Health report flagged is held out of every Book.*pd quarantines dismiss <id> in ash_new\./)
+  assert.match(page, /Hong Kong: 1 security Id Security Name Flag Date Detail Since 5 HK:0083 stale 2026-10-16 6 sessions behind 2026-10-27/)
+  assert.match(page, /India: 3 securities .* 4 IN:BHAGYAPROP Bhagyanagar India <Ltd> dividend 2025-03-12 A dividend of 12\.00 on a close of 9\.80 2026-10-27/)
+  assert.match(page, /United States: 1 security .* 3 US:NFE New Fortress Energy Inc jump 2026-10-22/)
+  assert.ok(page.indexOf('Corrections waiting') < page.indexOf('Quarantine:') && page.indexOf('Quarantine:') < page.indexOf('Markets'))
+})
+
+test("the Corrections the Health Agent recorded in this Run are listed as waiting, from the Lake's status read again after them", async () => {
+  prepare({ health: 'succeeded' })
+  ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  ws.writeRunFile(runId, 'health/status.json', example('status.healthy.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /Corrections waiting for your approval: 1 .* 7 IN:BHAGYAPROP/)
+  assert.match(page, /Quarantine: 5 securities/)
+  assert.match(page, /Data gate: pass/)
+})
+
+test("what became of the Corrections the Health Agent proposed is said under its diagnosis", async () => {
+  prepare({ health: 'succeeded' })
+  ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+  const proposed = JSON.parse(example('corrections-propose.recorded.json'))
+  const corrections = [{ security_id: 'IN:BHAGYANGR', kind: 'split', date: '2026-10-08', ratio: 11.655, value: null, why: '-90.9%' }]
+  ws.writeRunFile(runId, 'health.json', { ...diagnosis, corrections: [...corrections, ...corrections, ...corrections], proposals: { status: 'recorded', printed: proposed } })
+
+  assert.match(text(await brief()), /Proposed fix, not applied .* It proposed 3 Corrections: 1 recorded, waiting for your approval, 1 proposed before, 1 refused by ash_new \(Value error, a split's ratio is shares after per share before: above 0, and not 1\)\./)
+
+  ws.writeRunFile(runId, 'health.json', { ...diagnosis, corrections, proposals: { status: 'failed', error: 'pd corrections propose exited with 1: no database' } })
+  assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /It proposed 1 Correction, but they couldn't be recorded in ash_new: pd corrections propose exited with 1: no database/)
 })
 
 test('a Health Agent that failed is shown under the Data gate, with why and its log', async () => {
@@ -118,7 +164,7 @@ test('a Health Agent that failed is shown under the Data gate, with why and its 
 
   assert.match(
     page,
-    /2026-10-26 Health Agent The Health Agent failed, so there is no diagnosis: codex failed: You've hit your usage limit\.; then claude-code failed: Claude Code is down\. See its log: logs\/health\.log Markets/,
+    /2026-10-26 Health Agent The Health Agent failed, so there is no diagnosis: codex failed: You've hit your usage limit\.; then claude-code failed: Claude Code is down\. See its log: logs\/health\.log Corrections /,
   )
   assert.match(page, /health: failed\. Log: logs\/health\.log/)
 })
@@ -129,7 +175,7 @@ test('a Health Step that failed before recording anything is shown as a failed H
 
   const page = text(await brief())
 
-  assert.match(page, /Health Agent The Health Agent failed before it recorded a diagnosis\. See its log: logs\/health\.log Markets/)
+  assert.match(page, /Health Agent The Health Agent failed before it recorded a diagnosis\. See its log: logs\/health\.log Corrections /)
 })
 
 test('a Health Step that failed before recording why shows no diagnosis an earlier run of it left', async () => {

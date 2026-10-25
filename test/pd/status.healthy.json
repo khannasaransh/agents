@@ -32,5 +32,30 @@
     ]
   },
   "gate": { "verdict": "pass", "reasons": [] },
-  "own_schedule": { "enabled": false, "task_registered": false }
+  "own_schedule": { "enabled": false, "task_registered": false },
+  "quarantines": [
+    { "id": 5, "market": "HK", "security_id": "HK:0083", "name": null, "check": "stale", "date": "2026-10-16", "detail": "6 sessions behind", "since": "2026-10-27", "lifted_by": null, "lifted_at": null, "correction_id": null },
+    { "id": 4, "market": "IN", "security_id": "IN:BHAGYAPROP", "name": "Bhagyanagar India <Ltd>", "check": "dividend", "date": "2025-03-12", "detail": "A dividend of 12.00 on a close of 9.80", "since": "2026-10-27", "lifted_by": null, "lifted_at": null, "correction_id": null },
+    { "id": 1, "market": "IN", "security_id": "IN:DBEIL", "name": "Deepak Builders & Engineers India Ltd", "check": "cross_source", "date": "2026-08-18", "detail": "MarketSmith closed at 178.08, Yahoo at 6.68 (+2565.9%)", "since": "2026-10-27", "lifted_by": null, "lifted_at": null, "correction_id": null },
+    { "id": 2, "market": "IN", "security_id": "IN:MBECL", "name": "Mcnally Bharat Engr.Co", "check": "cross_source", "date": "2026-08-27", "detail": "MarketSmith closed at 3.27, Yahoo at 65.40 (-95.0%)", "since": "2026-10-27", "lifted_by": null, "lifted_at": null, "correction_id": null },
+    { "id": 3, "market": "US", "security_id": "US:NFE", "name": "New Fortress Energy Inc", "check": "jump", "date": "2026-10-22", "detail": "Rose 46.2% in a day with no split recorded", "since": "2026-10-27", "lifted_by": null, "lifted_at": null, "correction_id": null }
+  ],
+  "corrections": [
+    {
+      "id": 7,
+      "market": "IN",
+      "security_id": "IN:BHAGYAPROP",
+      "kind": "dividend",
+      "date": "2025-03-12",
+      "ratio": null,
+      "value": null,
+      "why": "A 12.00 dividend on a 9.80 close: BSE's corporate actions list no dividend that year, so Yahoo's is a <mistake>",
+      "status": "waiting",
+      "proposed_by": "the Health Agent, Run 2026-10-26-0930",
+      "proposed_at": "2026-10-26T01:52:10.441210+00:00",
+      "decided_at": null,
+      "name": "Bhagyanagar India <Ltd>",
+      "effect": "The dividend on 2025-03-12 dropped: the total-return index's move that day goes from +122.4% to -0.1%"
+    }
+  ]
 }

@@ -45,7 +45,14 @@ const answer = {
     { source: 'lakeLog', shows: 'Both runs stopped on "Yahoo answered 429 Too Many Requests"' },
     { source: 'data/logs/jobs/482.jsonl', shows: 'The job failed in prices-update after 40 tickers in a row were refused' },
   ],
+  corrections: [] as unknown[],
 }
+
+/** The Corrections the Health Agent proposes for the known data issues. */
+const corrections = [
+  { security_id: 'IN:BHAGYANGR', kind: 'split', date: '2026-10-08', ratio: 11.655, value: null, why: 'A -90.9% close with no action recorded, its open about 1/11.7 of the close before' },
+  { security_id: 'US:NFE', kind: 'dividend', date: '2023-01-03', ratio: null, value: null, why: 'A 150.00 dividend on a 42.42 close' },
+]
 
 /** What `claude --print --output-format json` prints when its schema-checked answer is `answer`. */
 const claudeCodeAnswering = (answer: unknown) => ({
@@ -181,4 +188,62 @@ test('a dry run diagnoses on the fake Worker', async () => {
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(ws.workerCliCalls('codex'), [])
   assert.equal(health().diagnosis, answer.diagnosis)
+})
+
+test('the Corrections the Health Agent proposes are recorded in ash_new to wait for approval, and health.json says what became of them', async () => {
+  prepare({ status: 'status.healthy.json' })
+  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, corrections }))
+  ws.setPd({ corrections: { example: 'corrections-propose.recorded.json' }, status: { example: 'status.healthy.json' } })
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  const [call, reread, ...more] = ws.pdCalls()
+  assert.deepEqual(more, [])
+  assert.deepEqual(reread.args, ['status'], "the Lake's status is read again, with them waiting")
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'health', 'status.json')), example('status.healthy.json'))
+  const file = call.args[2]
+  assert.deepEqual([...call.args.slice(0, 2), ...call.args.slice(3)], ['corrections', 'propose', '--by', `the Health Agent, Run ${runId}`])
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { corrections })
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'health', 'corrections.json')), { corrections }, 'kept in the Run folder')
+  const recorded = health()
+  assert.deepEqual(recorded.corrections, corrections)
+  assert.deepEqual(recorded.proposals, { status: 'recorded', printed: example('corrections-propose.recorded.json') })
+  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /Corrections: 1 recorded, waiting for approval; 1 proposed before; 1 refused/)
+})
+
+test('a diagnosis with no Corrections records none in ash_new', async () => {
+  prepare({ status: 'status.healthy.json' })
+  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+
+  assert.equal((await step()).status, 0)
+  assert.deepEqual(ws.pdCalls(), [])
+  assert.equal(health().proposals, undefined)
+})
+
+test("Corrections that can't be recorded fail the Step, keeping the diagnosis, and a re-run records them without asking the Agent again", async () => {
+  prepare({ status: 'status.healthy.json' })
+  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, corrections }))
+  ws.setPd({ corrections: [{ stderr: 'database is locked', exitCode: 1 }, { example: 'corrections-propose.recorded.json' }] })
+
+  const failed = await step()
+
+  assert.equal(failed.status, 1)
+  assert.equal(health().diagnosis, answer.diagnosis)
+  assert.equal(health().proposals.status, 'failed')
+  assert.match(health().proposals.error, /pd corrections propose .* exited with 1: database is locked/)
+
+  assert.equal((await step()).status, 0)
+  assert.equal(ws.workerCliCalls('claude').length, 1, 'the diagnosis is kept')
+  assert.deepEqual(ws.pdCalls().map((call) => call.args[0]), ['corrections', 'corrections', 'status'])
+  assert.equal(health().proposals.status, 'recorded')
+})
+
+test('a dry run records no Correction in ash_new', async () => {
+  prepare({ lake: 'failed', status: 'status.hold.json', dryRun: true })
+  ws.writeCannedAnswers({ health: [{ answer: { ...answer, corrections } }] })
+
+  assert.equal((await step()).status, 0)
+  assert.deepEqual(ws.pdCalls(), [])
+  assert.deepEqual(health().proposals, { status: 'dry-run' })
 })

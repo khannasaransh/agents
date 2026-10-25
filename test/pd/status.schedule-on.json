@@ -121,5 +121,7 @@
   "own_schedule": {
     "enabled": true,
     "task_registered": true
-  }
+  },
+  "quarantines": [],
+  "corrections": []
 }

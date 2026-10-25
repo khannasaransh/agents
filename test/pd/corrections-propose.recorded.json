@@ -1,0 +1,9 @@
+{
+  "recorded": [
+    { "id": 7, "market": "IN", "security_id": "IN:BHAGYANGR", "kind": "split", "date": "2026-10-08", "ratio": 11.655, "value": null, "why": "A -90.9% close with no action recorded, its open about 1/11.7 of the close before: an unrecorded split or bonus", "status": "waiting", "proposed_by": "the Health Agent, Run 2026-10-27-0930", "proposed_at": "2026-10-27T01:52:10.441210+00:00", "decided_at": null }
+  ],
+  "known": [
+    { "id": 3, "market": "US", "security_id": "US:NFE", "kind": "dividend", "date": "2023-01-03", "ratio": null, "value": null, "why": "A 150.00 dividend on a 42.42 close", "status": "waiting", "proposed_by": "the Health Agent, Run 2026-10-26-0930", "proposed_at": "2026-10-26T01:50:02.100230+00:00", "decided_at": null }
+  ],
+  "refused": [{ "index": 2, "why": "Value error, a split's ratio is shares after per share before: above 0, and not 1" }]
+}
