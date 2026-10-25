@@ -37,6 +37,7 @@ async function brief(): Promise<string> {
 function text(html: string): string {
   return html
     .replace(/<head>[\s\S]*?<\/head>/, '')
+    .replace(/<script\b[\s\S]*?<\/script>/g, '')
     .replace(/<[^>]+>/g, ' ')
     .replaceAll('&lt;', '<')
     .replaceAll('&gt;', '>')
@@ -119,10 +120,10 @@ test('each Correction waiting for approval is listed with what it would change, 
 
   assert.match(
     page,
-    /Corrections waiting for your approval: 1 Nothing is applied until you approve it\. In ash_new, pd corrections approve <id> adds one to the Corrections file.*Id Security Correction What it would change Why Proposed by 7 IN:BHAGYAPROP Bhagyanagar India <Ltd> No dividend on 2025-03-12 The dividend on 2025-03-12 dropped: the total-return index's move that day goes from \+122\.4% to -0\.1% A 12\.00 dividend on a 9\.80 close: BSE's corporate actions list no dividend that year, so Yahoo's is a <mistake> the Health Agent, Run 2026-10-26-0930 2026-10-26 01:52 UTC/,
+    /Corrections waiting for your approval: 1 Nothing is applied until you approve it\. Approve or reject each, then Save answers: the next Run records your Answers in ash_new before it refreshes the Lake\..*Id Security Correction What it would change Why Proposed by Your Answer 7 IN:BHAGYAPROP Bhagyanagar India <Ltd> No dividend on 2025-03-12 The dividend on 2025-03-12 dropped: the total-return index's move that day goes from \+122\.4% to -0\.1% A 12\.00 dividend on a 9\.80 close: BSE's corporate actions list no dividend that year, so Yahoo's is a <mistake> the Health Agent, Run 2026-10-26-0930 2026-10-26 01:52 UTC Approve Reject/,
   )
-  assert.match(page, /Quarantine: 5 securities A security the Health report flagged is held out of every Book.*pd quarantines dismiss <id> in ash_new\./)
-  assert.match(page, /Hong Kong: 1 security Id Security Name Flag Date Detail Since 5 HK:0083 stale 2026-10-16 6 sessions behind 2026-10-27/)
+  assert.match(page, /Quarantine: 5 securities A security the Health report flagged is held out of every Book.*you dismiss its flag as a false alarm: Dismiss it, then Save answers\./)
+  assert.match(page, /Hong Kong: 1 security Id Security Name Flag Date Detail Since Your Answer 5 HK:0083 stale 2026-10-16 6 sessions behind 2026-10-27 Dismiss/)
   assert.match(page, /India: 3 securities .* 4 IN:BHAGYAPROP Bhagyanagar India <Ltd> dividend 2025-03-12 A dividend of 12\.00 on a close of 9\.80 2026-10-27/)
   assert.match(page, /United States: 1 security .* 3 US:NFE New Fortress Energy Inc jump 2026-10-22/)
   assert.ok(page.indexOf('Corrections waiting') < page.indexOf('Quarantine:') && page.indexOf('Quarantine:') < page.indexOf('Markets'))
@@ -238,8 +239,10 @@ test('the Stocks Brief is one self-contained page that loads nothing from the in
 
   assert.match(html, /^<!doctype html>/)
   assert.doesNotMatch(html, /https?:|\/\/[a-z]/i, 'no address to fetch')
-  assert.doesNotMatch(html, /<(script|link|img|iframe|object|embed)\b/i)
-  assert.doesNotMatch(html, /@import|url\(/i)
+  assert.doesNotMatch(html, /<(link|img|iframe|object|embed)\b/i)
+  assert.doesNotMatch(html, /<script\b[^>]*\bsrc\b/i, 'its script is in the page')
+  assert.doesNotMatch(html, /\b(fetch|XMLHttpRequest|WebSocket|import)\s*\(/, 'its script asks nothing of a server')
+  assert.doesNotMatch(html.match(/<style>[\s\S]*?<\/style>/)![0], /@import|url\(/i, 'its style fetches nothing')
   // A name from the Lake is shown as text, never as markup.
   assert.match(html, /Bhagyanagar India &lt;Ltd&gt;/)
 })
@@ -253,4 +256,64 @@ test('the Stocks Brief is written once per Run unless forced', async () => {
   assert.match(text(await brief()), /Data gate: pass/)
   assert.equal((await ws.agents('step', 'brief', '--run', runId, '--force')).status, 0)
   assert.match(text(ws.readRunFile(runId, 'brief.html')), /Data gate: fail/)
+})
+
+test('each item waiting on Saransh has its id and a button for each of its Answers, and the page has a Save answers button', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+
+  const html = await brief()
+
+  const items = [...html.matchAll(/<div class="answer" data-item="([^"]+)">(.*?)<\/div>/g)].map(([, item, cell]) => [item, [...cell.matchAll(/data-answer="([^"]+)"/g)].map(([, answer]) => answer)])
+  assert.deepEqual(items, [
+    ['correction:7', ['approve', 'reject']],
+    ['quarantine:5', ['dismiss']],
+    ['quarantine:4', ['dismiss']],
+    ['quarantine:1', ['dismiss']],
+    ['quarantine:2', ['dismiss']],
+    ['quarantine:3', ['dismiss']],
+  ])
+  assert.match(html, /<button type="button" id="save-answers" disabled>Save answers<\/button>/)
+  assert.deepEqual(JSON.parse(html.match(/<script type="application\/json" id="answer-items">(.*?)<\/script>/)![1]), items.map(([item, answers]) => ({ item, answers })))
+})
+
+test('a Brief with nothing waiting on Saransh has no Save answers button', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+
+  const html = await brief()
+
+  assert.doesNotMatch(html, /Save answers|<script/)
+})
+
+test("the Stocks Brief says what became of the Answers this Run applied, each with why it was ignored", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  ws.writeRunFile(runId, 'answers.json', {
+    dryRun: false,
+    files: [
+      {
+        file: 'stocks-answers-2026-10-26-0930-20261026031000.json',
+        from: 'C:\\Users\\saransh\\Downloads',
+        movedTo: 'answers/stocks-answers-2026-10-26-0930-20261026031000.json',
+        run: '2026-10-26-0930',
+        savedAt: '2026-10-26T03:10:00.000Z',
+        answers: [
+          { item: 'correction:7', answer: 'approve', note: 'Matches <BSE>', outcome: 'applied' },
+          { item: 'quarantine:5', answer: 'dismiss', outcome: 'ignored', why: 'Quarantine 5 was corrected already' },
+        ],
+      },
+    ],
+  })
+
+  const page = text(await brief())
+
+  assert.match(
+    page,
+    /Your Answers 1 of your 2 Answers applied, 1 ignored\. Each Answer, by file, oldest first stocks-answers-2026-10-26-0930-20261026031000\.json, saved at 2026-10-26 03:10 UTC from the Brief of Run 2026-10-26-0930: Correction 7: approve, applied \(your note: Matches <BSE>\) Quarantine 5: dismiss, ignored: Quarantine 5 was corrected already/,
+  )
+  assert.ok(page.indexOf('Your Answers') < page.indexOf('Corrections'))
+
+  ws.writeRunFile(runId, 'answers.json', { dryRun: false, files: [] })
+  assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /Your Answers No Answers file was waiting in Downloads or the Broker inbox\./)
 })

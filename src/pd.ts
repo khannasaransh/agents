@@ -80,6 +80,16 @@ export interface PdCorrectionsPropose {
   refused: { index: number; why: string }[]
 }
 
+/**
+ * What `pd corrections approve|reject` and `pd quarantines dismiss` print, as the Answers Step reads
+ * it (contract/corrections-decide.schema.json, quarantines-dismiss.schema.json): whether deciding
+ * changed anything, and why not, as when it was decided already or there is no such item.
+ */
+export interface PdDecided {
+  changed: boolean
+  why: string | null
+}
+
 /** What `pd clear-refresh` prints (contract/clear-refresh.schema.json): the refreshes it cleared, or why it refused. */
 export interface PdClearRefresh {
   cleared: { job: number; status: 'failed'; error: string }[]

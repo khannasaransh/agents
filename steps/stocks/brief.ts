@@ -1,18 +1,23 @@
 // Brief: writes the Stocks Brief, one self-contained HTML page in the Run folder that loads nothing
 // from the internet, from what earlier Steps wrote there: the Data gate's verdict and its reasons;
 // under them, the Health Agent's diagnosis and proposed fix, or that it failed, with what became of
-// the Corrections it proposed; each Correction waiting for approval with what it would change; each
-// Quarantine with its flag; each market's latest session in the Lake against its last finished one;
-// the To-dos the Steps raised; how this Run's Lake Step went and how ash_new's last refresh ended;
-// the Health report's verdict and flags; and the Run's health.
+// the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
+// for approval with what it would change; each Quarantine with its flag; each market's latest session
+// in the Lake against its last finished one; the To-dos the Steps raised; how this Run's Lake Step
+// went and how ash_new's last refresh ended; the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
+// Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
+// downloads them as one Answers file, built in the page by answersFile's own source, for the next
+// Run's Answers Step: the page works opened from disk, with nothing running.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingItems, type AnswerItem } from '../../src/answers.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import type { PdStatus } from '../../src/pd.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
+import type { AnswersResult } from './answers.ts'
 import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 
@@ -79,6 +84,89 @@ function correctionText(c: PdStatus['corrections'][number]): string {
   return c.value === null ? `No dividend on ${c.date}` : `Dividend of ${c.value} on ${c.date}`
 }
 
+/** An item's buttons, one per Answer it takes, and a note, shown once an Answer is chosen. */
+function answerButtons({ item, answers }: AnswerItem): string {
+  const buttons = answers.map((answer) => `<button type="button" data-answer="${esc(answer)}" aria-pressed="false">${esc(capitalised(answer))}</button>`)
+  return `<div class="answer" data-item="${esc(item)}">${buttons.join('')}<input class="answer-note" type="text" placeholder="Note, if any" aria-label="Your note on ${esc(itemName(item))}"></div>`
+}
+
+/** What became of the Answers this Run's Answers Step read; nothing when it recorded nothing. */
+function answersSection(answers: AnswersResult | null): string {
+  if (!answers) return ''
+  if (!answers.files.length) return '<section><h2>Your Answers</h2><p>No Answers file was waiting in Downloads or the Broker inbox.</p></section>'
+  const all = answers.files.flatMap((f) => f.answers)
+  const count = (outcome: string) => all.filter((a) => a.outcome === outcome).length
+  const summary = answers.dryRun
+    ? `Dry run: none of your ${plural(all.length, 'Answer')} was applied, and each Answers file was left where it was.`
+    : [`${count('applied')} of your ${plural(all.length, 'Answer')} applied`, `${count('ignored')} ignored`, ...(count('failed') ? [`${count('failed')} couldn't be applied, so its file and every later one wait for the next Run`] : [])].join(', ') + '.'
+  const shown = { applied: 'applied', ignored: 'ignored', failed: "couldn't be applied", 'not-tried': 'not tried yet', 'dry-run': 'not applied in a dry run' }
+  const files = answers.files.map((f) => {
+    const lines = f.answers.map((a) => `${esc(itemName(a.item))}: ${esc(a.answer)}, ${shown[a.outcome]}${a.why ? `: ${esc(a.why)}` : ''}${a.note ? ` <span class="muted">(your note: ${esc(a.note)})</span>` : ''}`)
+    return `<p>${esc(f.file)}, saved at ${esc(minutes(f.savedAt))} from the Brief of Run ${esc(f.run)}:</p>\n${lines.length ? list(lines) : '<p>No Answer in it.</p>'}`
+  })
+  return [`<section><h2>Your Answers</h2>`, `<p>${summary}</p>`, `<details><summary>Each Answer, by file, oldest first</summary>`, ...files, '</details>', '</section>'].join('\n')
+}
+
+/**
+ * The bar with the Save answers button, the items it may answer, and the script that saves them,
+ * running answersFile and answersFileName from their own source; nothing when nothing is waiting.
+ */
+function saveAnswers(runId: string, items: AnswerItem[]): string {
+  if (!items.length) return ''
+  // Escaped so nothing in the data or the code can end the script early: `<\/` means `</` in a string or a pattern alike.
+  const json = (value: unknown) => JSON.stringify(value).replaceAll('<', '\\u003c')
+  const code = (fn: Function) => String(fn).replaceAll('</', '<\\/').replaceAll('<!--', '<\\!--')
+  return `<div class="save-bar"><span id="answer-count">No Answer chosen yet.</span> <button type="button" id="save-answers" disabled>Save answers</button> <span id="answers-saved" class="muted"></span></div>
+<script type="application/json" id="answer-items">${json(items)}</script>
+<script>
+const answersFile = ${code(answersFile)}
+const answersFileName = ${code(answersFileName)}
+const run = ${json(runId)}
+const items = JSON.parse(document.getElementById('answer-items').textContent)
+const chosen = {}
+let unsaved = false
+const count = document.getElementById('answer-count')
+const save = document.getElementById('save-answers')
+const saved = document.getElementById('answers-saved')
+function show() {
+  const n = Object.keys(chosen).length
+  count.textContent = n ? n + (n === 1 ? ' Answer' : ' Answers') + ' chosen.' : 'No Answer chosen yet.'
+  save.disabled = !n
+}
+document.addEventListener('click', (event) => {
+  const button = event.target.closest('button[data-answer]')
+  if (!button) return
+  const cell = button.closest('[data-item]')
+  const item = cell.dataset.item
+  if (chosen[item] && chosen[item].answer === button.dataset.answer) delete chosen[item]
+  else chosen[item] = { answer: button.dataset.answer, note: cell.querySelector('.answer-note').value }
+  for (const each of cell.querySelectorAll('button[data-answer]')) each.setAttribute('aria-pressed', String(Boolean(chosen[item]) && chosen[item].answer === each.dataset.answer))
+  cell.classList.toggle('chosen', Boolean(chosen[item]))
+  unsaved = true
+  show()
+})
+document.addEventListener('input', (event) => {
+  const cell = event.target.closest('[data-item]')
+  if (!cell || !chosen[cell.dataset.item]) return
+  chosen[cell.dataset.item].note = event.target.value
+  unsaved = true
+})
+save.addEventListener('click', () => {
+  const file = answersFile(run, items, chosen, new Date().toISOString())
+  const link = document.createElement('a')
+  link.href = URL.createObjectURL(new Blob([JSON.stringify(file, null, 2)], { type: 'application/json' }))
+  link.download = answersFileName(file)
+  link.click()
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000)
+  unsaved = false
+  saved.textContent = 'Saved ' + file.answers.length + (file.answers.length === 1 ? ' Answer' : ' Answers') + ' as ' + link.download + ' (in Downloads, unless your browser asked where): the next Run applies them from Downloads or the Broker inbox. The first Answer applied to an item settles it.'
+})
+window.addEventListener('beforeunload', (event) => {
+  if (unsaved && Object.keys(chosen).length) event.preventDefault()
+})
+</script>`
+}
+
 function correctionsSection(status: PdStatus | null): string {
   if (!status) return ''
   if (!status.corrections.length) return '<section><h2>Corrections</h2><p>No Correction is waiting for your approval.</p></section>'
@@ -89,11 +177,12 @@ function correctionsSection(status: PdStatus | null): string {
     esc(c.effect),
     esc(c.why),
     `${esc(c.proposed_by)}<br><span class="muted">${esc(minutes(c.proposed_at))}</span>`,
+    answerButtons(answerItem('correction', c.id)),
   ])
   return [
     `<section><h2>Corrections waiting for your approval: ${status.corrections.length}</h2>`,
-    '<p>Nothing is applied until you approve it. In ash_new, <code>pd corrections approve &lt;id&gt;</code> adds one to the Corrections file, which the next refresh applies, running again the backtests it affects; <code>pd corrections reject &lt;id&gt;</code> drops it.</p>',
-    table(['Id', 'Security', 'Correction', 'What it would change', 'Why', 'Proposed by'], rows),
+    '<p>Nothing is applied until you approve it. Approve or reject each, then Save answers: the next Run records your Answers in ash_new before it refreshes the Lake. An approved Correction joins the Corrections file and that refresh applies it, running again the backtests it affects; a rejected one is dropped.</p>',
+    table(['Id', 'Security', 'Correction', 'What it would change', 'Why', 'Proposed by', 'Your Answer'], rows),
     '</section>',
   ].join('\n')
 }
@@ -109,12 +198,12 @@ function quarantineSection(status: PdStatus | null): string {
   const held = (qs: PdStatus['quarantines']) => securities(new Set(qs.map((q) => q.security_id)).size)
   const lists = [...new Set(quarantines.map((q) => q.market))].map((market) => {
     const mine = quarantines.filter((q) => q.market === market)
-    const rows = mine.map((q) => [String(q.id), esc(q.security_id), esc(q.name ?? ''), esc(q.check), esc(q.date ?? '—'), esc(q.detail), esc(q.since)])
-    return `<details><summary>${esc(names.get(market) ?? market)}: ${held(mine)}</summary>\n${table(['Id', 'Security', 'Name', 'Flag', 'Date', 'Detail', 'Since'], rows)}</details>`
+    const rows = mine.map((q) => [String(q.id), esc(q.security_id), esc(q.name ?? ''), esc(q.check), esc(q.date ?? '—'), esc(q.detail), esc(q.since), answerButtons(answerItem('quarantine', q.id))])
+    return `<details><summary>${esc(names.get(market) ?? market)}: ${held(mine)}</summary>\n${table(['Id', 'Security', 'Name', 'Flag', 'Date', 'Detail', 'Since', 'Your Answer'], rows)}</details>`
   })
   return [
     `<section><h2>Quarantine: ${held(quarantines)}</h2>`,
-    '<p>A security the Health report flagged is held out of every Book, neither bought nor sold on a signal while its Disaster stop stays, until its Correction is approved or you dismiss its flag: <code>pd quarantines dismiss &lt;id&gt;</code> in ash_new.</p>',
+    '<p>A security the Health report flagged is held out of every Book, neither bought nor sold on a signal while its Disaster stop stays, until its Correction is approved or you dismiss its flag as a false alarm: Dismiss it, then Save answers.</p>',
     ...lists,
     '</section>',
   ].join('\n')
@@ -206,14 +295,23 @@ th, td { text-align: left; padding: 0.3rem 0.75rem 0.3rem 0; border-bottom: 1px 
 th { font-weight: 600; }
 details { margin: 0.5rem 0; } summary { cursor: pointer; }
 a { color: inherit; }
+.answer { display: flex; flex-wrap: wrap; gap: 0.25rem; min-width: 9rem; }
+.answer button, .save-bar button { font: inherit; font-size: 0.9rem; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0.1rem 0.6rem; cursor: pointer; }
+.answer button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.answer-note { font: inherit; font-size: 0.85rem; width: 100%; box-sizing: border-box; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0.1rem 0.4rem; }
+.answer:not(.chosen) .answer-note { display: none; }
+.save-bar { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 0.5rem 1rem; margin: 2rem -1rem 0; }
+.save-bar button { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.save-bar button:disabled { opacity: 0.4; cursor: default; }
 `
 
 /**
  * `status` is the Lake's as the Lake Step read it; `latest`, as the Health Step read it again once it
  * recorded the Health Agent's Corrections, so they are among those waiting.
  */
-function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
+function render(run: RunRecord, answers: AnswersResult | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
+  const waiting = latest ?? status
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -226,13 +324,15 @@ function render(run: RunRecord, lake: LakeResult | null, status: PdStatus | null
 <h1>Stocks Brief ${esc(run.id)}</h1>
 ${run.dryRun ? '<p class="note">Dry run: the Lake was read as it is, not refreshed, and nothing was recorded in ash_new.</p>\n' : ''}${gateSection(status, lakeLog)}
 ${diagnosisSection(run, health)}
-${correctionsSection(latest ?? status)}
-${quarantineSection(latest ?? status)}
+${answersSection(answers)}
+${correctionsSection(waiting)}
+${quarantineSection(waiting)}
 ${marketsSection(status)}
 ${todosSection(todos)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
+${saveAnswers(run.id, waiting ? waitingItems(waiting) : [])}
 </body>
 </html>
 `
@@ -245,6 +345,6 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
+  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
   console.log(`Wrote ${out}`)
 })

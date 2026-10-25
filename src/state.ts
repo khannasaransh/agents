@@ -68,3 +68,21 @@ export function readPmBacklog(): string[] {
 export function writePmBacklog(runs: string[]): void {
   writeJson(pmBacklogFile(), runs)
 }
+
+/** The Answer last applied to an item, by the item's id: when it was saved, and the Run that applied it. */
+export interface AppliedAnswer {
+  answer: string
+  savedAt: string
+  run: string
+}
+
+const answersStateFile = () => join(stateDir(), 'answers.json')
+
+/** The Answers applied so far, so an Answers file saved before one of them can't undo it. */
+export function readAnswersState(): Record<string, AppliedAnswer> {
+  return existsSync(answersStateFile()) ? readJson(answersStateFile()) : {}
+}
+
+export function writeAnswersState(state: Record<string, AppliedAnswer>): void {
+  writeJson(answersStateFile(), state)
+}

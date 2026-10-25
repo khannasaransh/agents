@@ -32,6 +32,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
+      ['answers', 'succeeded'],
       ['lake', 'succeeded'],
       ['health', 'skipped'],
       ['brief', 'succeeded'],
@@ -60,6 +61,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
+      ['answers', 'succeeded'],
       ['lake', 'failed'],
       ['health', 'failed'],
       ['brief', 'succeeded'],

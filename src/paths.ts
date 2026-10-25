@@ -1,3 +1,4 @@
+import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -14,7 +15,7 @@ export function workerConfigDir(): string {
   return process.env.AGENTS_WORKER_CONFIG_DIR ?? join(agentsRoot, 'worker-config')
 }
 
-/** The git-ignored data area: Runs, state, Memory and the PRD inbox. */
+/** The git-ignored data area: Runs, state, Memory, the PRD inbox and the Broker inbox. */
 export function dataDir(): string {
   return process.env.AGENTS_DATA_DIR ?? join(agentsRoot, 'data')
 }
@@ -39,6 +40,16 @@ export function memoryDir(): string {
 /** Where PRD files wait for the Docs Agent, whether the Discord Step saved them or Saransh dropped them in by hand. */
 export function prdInboxDir(): string {
   return join(dataDir(), 'prd-inbox')
+}
+
+/** Where Saransh drops his brokers' tradebooks and holdings exports, and may drop Answers files too. */
+export function brokerInboxDir(): string {
+  return join(dataDir(), 'broker-inbox')
+}
+
+/** Saransh's Downloads folder, where the Stocks Brief's Save answers button saves an Answers file. */
+export function downloadsDir(): string {
+  return join(homedir(), 'Downloads')
 }
 
 /** The Pipeline's own Antigravity home, which Saransh logs in to once, so his own Antigravity config stays out of its calls. */
