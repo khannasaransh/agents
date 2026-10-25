@@ -11,7 +11,7 @@
 - [ ] ash_new's app database keeps each Book's Sleeves and their Stages, with every change's date and who approved it. Only `pd` commands change them.
 - [ ] The Candidate report's Candidates appear in the Brief as items, and an Answer approves a Candidate into Paper.
 - [ ] Entering Paper launches the strategy in ash_new, starting its live track that day.
-- [ ] A strategy whose rules change is a new strategy and starts as a Candidate. The old one keeps its Stage until the new one replaces it.
+- [ ] Each Sleeve names its strategy's version. A strategy whose rules, parameters or code hash change is a new version, and starts as a Candidate. The old one keeps its Stage until the new one replaces it.
 - [ ] A Retired strategy's Sleeve buys nothing new and winds down through the strategy's own exits.
 - [ ] The Brief shows each Book's Sleeves with their Stages and how long each has been in its Stage.
 - [ ] Tests:

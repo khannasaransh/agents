@@ -23,12 +23,12 @@ A stocks Pipeline in the agents repo, run on the Windows machine that holds the 
 1. **Records what Saransh did:** his Answers from the last Stocks Brief, and the tradebooks and holdings exports he dropped in the Broker inbox.
 2. **Fetches MarketSmith's data** through ash_new, on Saturdays, keeping each fetch as a dated snapshot.
 3. **Brings the Lake up to date** with ash_new's daily chain. It clears a stuck refresh and retries a failed one once. If something still breaks, the Health Agent works out why. The Data gate decides whether the Portfolio Manager may act at all (Hold mode otherwise), and a single flagged security goes into Quarantine.
-4. **Makes the Rule plan in code** for each Book: India and the US, each real and paper. It uses the same engine that backtests the Book, so live trades what was tested. It reads each market's Market condition, which sets how much of the Book may be in stocks.
+4. **Makes the Rule plan in code** for each Book: India and the US, each real and paper. It starts from the Book's state: its reconciled holdings and cash, and what open orders reserve. It uses the same engine that backtests the Book, so live trades what was tested. It reads each market's Market condition, which sets how much of the Book may be in stocks.
 5. **Puts the plan to the Desk and the Portfolio Manager.** The Events, Chart and Risk analysts read the Feeds and the Lake for the Rule plan's names and argue over it. The Portfolio Manager decides what to change within the Book's Playbook, and writes a Decision record with the evidence for each change. A final check holds it to the Mandate, the Playbook and the Book's Judgement mode.
 6. **Reviews the Books** on Saturdays: weekly, monthly with attribution, and yearly, when strategies are chosen again.
 7. **Writes the Stocks Brief:** an HTML page holding the Order list for India's open and the US's evening open, everything waiting on Saransh, and buttons to answer.
 
-The Portfolio Manager only advises; Saransh places every order. A strategy reaches real money only through the Stages, and the Portfolio Manager's judgement only through its Judgement mode: real Books run in subtract only mode until its judgement has matched the strategies on paper (ADR 0003). Each Book's objective is checked on its own backtest: the highest CAGR with a backtested max drawdown of at most 25% and a holdout CAGR of at least 20%.
+The Portfolio Manager only advises; Saransh places every order. A strategy reaches real money only through the Stages, and the Portfolio Manager's judgement only through its Judgement mode: real Books run in subtract only mode until its paper Book has matched a rules-only paper Book, which trades the Rule plan unchanged (ADR 0003, ADR 0004). Each Book's objective is checked on its own backtest: the highest CAGR with a backtested max drawdown of at most 25% and a holdout CAGR of at least 20%.
 
 ## User Stories
 
@@ -92,7 +92,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 44. As Saransh, I want a strategy demoted when its live drawdown passes 1.5 times its backtest's worst, or its rolling 12-month return falls below its backtest's 5th percentile, so that a broken strategy loses its money without waiting for me.
 45. As Saransh, I want a strategy whose rules change to be a new strategy that starts again as a Candidate, while the old one keeps its Stage until replaced, so that no tweak inherits a live record it didn't earn.
 46. As Saransh, I want a strategy entering Paper to be launched in ash_new, so that its live track starts the day its Paper Stage does.
-47. As Saransh, I want CW2's selected variant activated and the ash ports loaded before Candidates are picked, so that the selection sees the best versions of the strategies I have.
+47. As Saransh, I want CW2's selected variant activated, and the ash ports audited against ash's own with a version each, before Candidates are picked, so that the selection sees only the versions I approved.
 48. As Saransh, I want a Retired strategy's Sleeve wound down through the strategy's own exits, so that retiring it doesn't dump positions on one day.
 
 ### The Book backtest
@@ -127,8 +127,8 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 ### The Desk
 
-64. As Saransh, I want three analysts (Events, Chart and Risk) each to write their own view of the Rule plan's names, independently, so that I get the judgement rules can't make.
-65. As Saransh, I want the Desk to review only the Rule plan's buys and sales and the holdings with results or another event in the next 5 sessions, so that it doesn't make Overrides out of noise.
+64. As Saransh, I want three analysts (Events, Chart and Risk) each to write their own view of the Rule plan's names that need it, independently, so that I get the judgement rules can't make.
+65. As Saransh, I want the Desk to review only the Rule plan's buys and sales and the holdings with results or another event in the next 5 sessions, each name only by the analysts it needs (Events for an event, Chart for a buy, Risk for a Book's buys), and a view reused while nothing it read has changed, so that it doesn't make Overrides out of noise or spend calls on a quiet day.
 66. As Saransh, I want the Events analyst to read results dates, guidance, pledges, promoter selling, governance and filings, so that I don't buy into an avoidable event.
 67. As Saransh, I want the Chart analyst to judge how far a stock is extended from its base, its distribution days and its gaps down on volume, so that entries aren't made at the worst point.
 68. As Saransh, I want the Risk analyst to find concentrations that sectors miss, such as one theme, one promoter group or five names reporting in one week, and to flag thin liquidity, so that a Book isn't one bet in disguise.
@@ -142,7 +142,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 74. As Saransh, I want the Portfolio Manager to chair the Desk, decide each change from the Rule plan within the Book's Playbook and write a Decision record for it, so that every difference from the rules has evidence I can read.
 75. As Saransh, I want a final check that every change from the Rule plan is inside the Mandate, inside its Lever's range and allowed by the Book's Judgement mode, with a Decision record whose figures match the Run's inputs. A change that fails is dropped, and if what remains breaks the Mandate the Rule plan goes out unchanged, so that an Agent's mistake never reaches the Order list.
-76. As Saransh, I want the Rule plan sent out as the Order list, with a note, when the Agents fail, so that a Worker outage still leaves me the tested plan.
+76. As Saransh, I want the Rule plan sent out as the Order list, with a note, when the Agents fail, but only once it passes the whole-Book check and without the buys whose required Desk review is missing, so that a Worker outage still leaves me the tested plan without skipping a review it needed.
 77. As Saransh, I want the Portfolio Manager to propose a promotion when a Stage's time is up and its record passes, so that I don't have to track the calendars.
 78. As Saransh, I want the Portfolio Manager to write each Book's commentary in the Brief, so that I read the day's meaning, not raw tables.
 
@@ -158,16 +158,29 @@ These stories were added on 25 Oct 2026 (ADR 0003), so they are numbered after t
 129. As Saransh, I want the Portfolio Manager to buy only names in the Book's Pool, those a strategy with a Sleeve in the Book bought or signalled to buy in the last 2 months, so that every position traces back to a strategy I approved.
 130. As Saransh, I want the Portfolio Manager to size down freely, but above a strategy's size only once the override scorecard shows upsizing adds and I widen the range, so that conviction is earned.
 131. As Saransh, I want each Book to have a Judgement mode (plan only, subtract only or Playbook), with real Books in subtract only and paper Books in Playbook from their first Run, so that the Portfolio Manager builds a record on paper before it adds anything with real money.
-132. As Saransh, I want a real Book moved to Playbook only by my Answer, after 3 months in which the paper Book's Overrides at least matched the Rule plan alone, so that latitude follows evidence.
+132. As Saransh, I want a real Book moved to Playbook only by my Answer, after 3 months in which the paper Book matched its rules-only paper Book, so that latitude follows evidence.
 133. As Saransh, I want a Decision record for every change and for every Run's exposure level, in words I use (what the strategy said, what went out, the Lever, the figures with their sources, what is expected and when it is judged), so that I can check any decision against its data.
 134. As Saransh, I want a change rejected when its Decision record cites a figure that isn't in the Run's inputs, so that the Portfolio Manager can't invent evidence.
 135. As Saransh, I want the override scorecard tallied by Lever, and a Lever that keeps losing to the Rule plan proposed for a narrower range, so that each kind of judgement is kept or cut on its record.
 
+### The Book state and the baseline
+
+These stories were added on 25 Oct 2026, from the consolidation research (ADR 0004), so they are numbered after the rest.
+
+136. As Saransh, I want each Rule plan made from the Book's state (its reconciled holdings and cash, with what open orders reserve), naming that state, the data and every version it used, so that a plan never spends money I haven't got and any day's plan can be made again.
+137. As Saransh, I want a security with an open Reconciliation difference neither bought nor sold on a signal until it's settled, so that no order rests on holdings I can't confirm.
+138. As Saransh, I want the Mandate and the Playbook versioned, and a Portfolio Manager output made under an old version or an old Book state refused, so that no decision outlives the limits it was made under.
+139. As Saransh, I want the final check to check the whole Book as the Order list would leave it, and never let a change drop a strategy exit or a Disaster stop, so that changes that pass one by one can't break a limit together.
+140. As Saransh, I want a rules-only paper Book beside each paper Book, trading the Rule plan unchanged from the same start, so that the Portfolio Manager's judgement is measured on what it did to a Book, not on scores that don't add up.
+141. As Saransh, I want every strategy versioned, and the Candidate test choosing only from versions I approve, so that no strategy inherits an old backtest's approval by name.
+142. As Saransh, I want one Book taken end to end in shadow first, its state and a Rule plan with one strategy, so that the state and the plan are trusted before any judgement is added.
+143. As Saransh, I want paper fills applied only once the Health report passes, so that a bad bar never becomes a paper fill.
+
 ### Orders and stops
 
 79. As Saransh, I want each Book's Order list to give each buy and sale in whole shares, and each Disaster stop to place or raise, so that I can place them without working anything out.
-80. As Saransh, I want India's orders as market orders for the pre-open auction and the US's for that evening's open, so that my fills are the open prices the backtests assume.
-81. As Saransh, I want every order to stay proposed until I mark it placed or skipped, and placed until a tradebook shows it filled, so that the Portfolio Manager never assumes what I did.
+80. As Saransh, I want India's orders for the pre-open auction and the US's for that evening's open, sales at market and buys limited to a set tolerance above the last close, so that my fills are the open prices the backtests assume and a gap up doesn't buy far above what was decided.
+81. As Saransh, I want every order to stay proposed until I mark it placed or skipped, and placed until a tradebook shows it filled, and each order valid only for its own session, so that the Portfolio Manager never assumes what I did and an old order is never placed.
 82. As Saransh, I want every Saturday's Brief to list each Disaster stop I haven't marked placed, so that an unprotected position can't go unnoticed.
 
 ### What comes back
@@ -184,7 +197,7 @@ These stories were added on 25 Oct 2026 (ADR 0003), so they are numbered after t
 
 90. As Saransh, I want to answer everything waiting on me in the Stocks Brief itself, with buttons, so that I don't have to go anywhere else.
 91. As Saransh, I want a Save answers button that saves my Answers to a file the next Run picks up, so that nothing has to be running for my clicks to count.
-92. As Saransh, I want an Answer never to expire, and an unanswered item shown again in each Brief, so that nothing is decided by my silence.
+92. As Saransh, I want an Answer never to expire, and an unanswered item shown again in each Brief, while an order's own validity still ends with its session, so that nothing is decided by my silence and no late Answer revives an old order.
 93. As Saransh, I want an Answer to an item that's already settled ignored and logged, so that an old file can't undo a newer decision.
 
 ### Paper Books
@@ -289,10 +302,10 @@ These stories were added on 25 Oct 2026 (ADR 0003), so they are numbered after t
    - a diagnosis;
    - a proposed fix, as text, never applied;
    - proposed Corrections in the Corrections file's format, recorded in ash_new to wait for approval.
-6. **Plan** (command, through `pd`). It applies the Data gate and reads each market's Market condition, then makes the Rule plan for each Book, real and paper (see The Book engine). It writes the Rule plans, each Book's exposure level and Pool, and the names the Desk must review, with a dossier for each name.
+6. **Plan** (command, through `pd`). It applies the Data gate and reads each market's Market condition, then makes the Rule plan for each Book, real and paper, from the Book's state (see The Book engine and The Book state). It writes the Rule plans, each Book's exposure level and Pool, and the names the Desk must review with the analysts each needs, with a dossier for each name.
 7. **Feeds** (command, through `pd`). It fetches the Feeds for the Rule plan's names and the holdings, reusing what it has cached.
 8. **Review** (command, through `pd`, Saturdays only). It computes the weekly figures, adds the monthly ones on the first Saturday of a month, and the yearly ones at the yearly review.
-9. **Desk** (Agents: three calls at once, one per analyst). Each analyst gets the Rule plan's names with their dossiers and Feeds, and writes a view of each name.
+9. **Desk** (Agents: one call per analyst needed, all at once; it skips itself when none is). Each analyst gets the names `pd plan` asks it to review, with their dossiers and Feeds, and writes a view of each. A view is reused, with its date, while nothing that analyst reads for the name has changed.
 10. **Portfolio Manager** (Agent).
     - **Its inputs:**
       - the Rule plans and the Desk's views;
@@ -307,9 +320,11 @@ These stories were added on 25 Oct 2026 (ADR 0003), so they are numbered after t
       - the Journal's new entries;
       - the Brief's commentary.
 11. **Check** (command, through `pd`). It makes the final Order lists.
-    - It accepts each change from the Rule plan only if the Book's Judgement mode allows it, it is inside its Lever's range, and its Decision record is complete, with every cited figure matching the Run's inputs.
-    - It drops each change that fails, and the Brief says why. If what remains breaks the Mandate, or the Portfolio Manager failed, the Rule plan goes out unchanged.
-    - It records the Order lists in ash_new: a paper Book's orders to fill at the next open, a real Book's orders as proposed.
+    - It records nothing unless this Run's Plan Step succeeded. It treats a Portfolio Manager output made from a Book state, Mandate version or Playbook version that is no longer current as failed.
+    - It accepts each change from the Rule plan only if the Book's Judgement mode allows it, it is inside its Lever's range, it drops or delays none of the Rule plan's exits or Disaster stops, and its Decision record is complete, with every cited figure matching the Run's inputs.
+    - It drops each change that fails, and the Brief says why. Then it checks the whole Book as the Order list would leave it: each position and sector against its cap, the stocks against the exposure level, and the buys against the cash left after what open orders reserve.
+    - If that fails, or the Portfolio Manager failed, the Rule plan goes out instead, once it passes the same check, and a buy whose required Desk review is missing waits a session. If the Rule plan fails too, only its exits and Disaster stops go out, with a To-do.
+    - It records the Order lists in ash_new: a paper Book's and a rules-only paper Book's orders to fill at the next open, a real Book's orders as proposed. Recording a list for a session that already has one supersedes the old one, and no order is recorded twice.
     - It records each accepted change as an Override, with the Rule plan's order and the Decision record beside it.
 12. **Save state** (command). It applies the Journal's entries and queues each proposed Lesson for Saransh's Answer, as the daily Pipeline's Save state does for Memory.
 13. **Brief** (command). It writes the Stocks Brief as a single self-contained HTML file in the Run folder.
@@ -322,18 +337,21 @@ A dry run changes nothing in ash_new:
 
 ### The Book engine (ash_new)
 
-- **A Book** is declared in ash_new's config: its market, currency, broker, benchmark, capital, cash fund, gold ETF and the numbers in its Mandate. Its Sleeves and their Stages are kept in the app database, along with every Stage change, its date and who approved it. They change only through `pd` commands.
+- **A Book** is declared in ash_new's config: its market, currency, broker, benchmark, capital, cash fund, gold ETF and the numbers in its Mandate, under a version. Changing any of them makes a new version, and every plan and result names the version it used. Its Sleeves and their Stages are kept in the app database, along with every Stage change, its date and who approved it. They change only through `pd` commands.
 - **One engine serves both the Book backtest and the daily Rule plan.** Unlike a Composite, it doesn't blend return series. It trades securities across the Sleeves, because caps on positions and sectors only exist at the level of holdings.
 - **Each Sleeve follows its strategy's own track unchanged.** The strategy runs on its own (simulated in a backtest, live-tracked in the Rule plan), and the Book lays its rules over it. A strategy's orders become the Book's at the Sleeve's weight, and then these rules apply, in order:
   1. Quarantines and the Data gate;
   2. Stage scaling: in a real Book, a Paper strategy holds nothing, a Real-small one a quarter of its share and a Real-full one all of it. A paper Book holds every strategy from Paper up at its full share;
-  3. the breakers, on the Book's drawdown from its high-water mark;
+  3. the breakers, on the Book's drawdown: its value per unit against its highest close, so new money neither hides nor deepens it. At −18%, at most half the exposure level is in stocks;
   4. the exposure level its market's Market condition sets. While the Book holds more in stocks than that, it makes no new buys, and then trims the weakest holdings first: lowest RS Rating first, with ties going to the one closest to its stop;
   5. the position and sector caps across the whole Book, Kept holdings included. A buy is cut to fit, and the part cut waits in the cash fund;
   6. the order-size guard, at 1% of the stock's 20-day average traded value;
-  7. whole shares, and lot sizes where a market has them.
+  7. whole shares, and lot sizes where a market has them;
+  8. each buy's limit price, the last close plus the Book's tolerance. A buy fills at the next open only at or under it; a sale carries no limit.
 
   The strategy's own track never sees these rules. So every Override's counterfactual is always at hand.
+- **Strategy versions:** every strategy has a version, made of its rules, its parameters and its code hash. A change to any of them is a new strategy. The approved versions are in ash_new's config, and the Candidate test considers only those. The ash ports already exist; their audit reports how each version differs from ash's own (fill timing, regime index, costs, missing inputs), and each gets a version that fills at the next open.
+- **The engine builds on ash_new's portfolio code** that exists today (sizing, costs, drift and order proposals, paper follow), not a second copy.
 - **Sleeve weights:** each strategy's weight is proportional to the inverse of its volatility over the past year, then scaled by its Stage. Gold is fixed at 10%. Whatever no Sleeve uses waits in the cash fund. Weights are set at each yearly review and drift in between.
 - **Disaster stops** are set at entry, at twice the strategy's stop distance, or 15% below the entry for a strategy without a stop. They are raised only on Saturdays. On daily bars, a low under the stop fills at the stop, or at the open when the price opens below it.
 - **Strategy exits** stay end-of-day, as each strategy's spec says.
@@ -344,7 +362,7 @@ A dry run changes nothing in ash_new:
   - the range of rolling 12-month returns and drawdowns, which the demotion rule and the weekly review compare against.
 
   The deflated Sharpe counts every variant tried in a strategy's family as a trial. The Candidate test runs the Book with and without the strategy.
-- **Parity:** the Rule plan is the Book engine's next session, run from the Book's actual holdings and cash. Started from the backtest's own holdings, it gives exactly the backtest's next session.
+- **Parity:** the Rule plan is the Book engine's next session, run from the Book's state. Started from the backtest's own holdings, it gives exactly the backtest's next session.
 
 ### The Market condition and the Playbook (ash_new)
 
@@ -352,7 +370,7 @@ ADR 0003 records why the Portfolio Manager judges within a Playbook rather than 
 
 - **The Market condition** is read by `pd plan` for each market from the Lake: the index against its 50- and 200-day averages, breadth (the share of the index's members above their 200-day average) and distribution days. Its thresholds are in ash_new's config. MarketSmith's own outlook, from the latest snapshot, is recorded beside it and decides nothing.
 - **The exposure level** for each Market condition is set in each Book's config, and the Book engine applies it (rule 4 above), so the Book backtest includes it.
-- **The Playbook** is in each Book's config beside its Mandate. It gives each Lever its range:
+- **The Playbook** is in each Book's config beside its Mandate, under a version as the Mandate's is. It gives each Lever its range:
   - **exposure:** the floor the Portfolio Manager may cut to below the exposure level, never above it. A cut works as the exposure level does: no new buys, then the weakest trimmed first;
   - **selection:** a buy in the Rule plan swapped for another name in the Pool, in the same Sleeve, for no more than the money the dropped buy had;
   - **size:** a multiple of the strategy's size, at most 1× until Saransh widens it on the override scorecard's evidence;
@@ -387,19 +405,36 @@ ADR 0003 records why the Portfolio Manager judges within a Playbook rather than 
 - **Stuck refreshes:** a `pd` command clears a refresh job marked running whose process no longer exists. It marks the job failed and frees the refresh lock. The `BrokenProcessPool` failure is diagnosed and fixed before the stocks Pipeline relies on the Lake.
 - **New securities:** the gold ETFs and cash funds are added to the Lake, with their prices.
 
+### The Book state (ash_new)
+
+- **The Book state** is what every Rule plan starts from. `pd book-state` writes it with an id:
+  - holdings and cash, replayed from the ledger;
+  - Reconciliation's open differences;
+  - open orders and the cash they reserve;
+  - the Disaster stops;
+  - which holdings are Legacy.
+
+  The same ledger always gives the same state and id.
+- A placed buy reserves its cash, at its limit, until a tradebook shows the fill. A placed sale's cash doesn't count until then either. While a placed order has no tradebook, the Rule plan makes no other order for the same security.
+- A security with an open Reconciliation difference is unsettled: it is neither bought nor sold on a signal until the difference is settled, and its Disaster stop stays.
+- Issue 47 builds the state first, for the India Book, with a shadow Rule plan of one strategy that isn't for placing.
+
 ### Real Books, paper Books and orders (ash_new)
 
 - **Real Books:** each real Book is one of ash_new's real portfolios. New import presets read ICICI Direct's and moomoo's tradebooks and holdings exports, built from sample files Saransh provides.
-- **Orders:** each item on an Order list has an id and a state: proposed, placed, skipped, filled or partly filled.
+- **Orders:** each item on an Order list has an id and a state: proposed, placed, skipped, filled, partly filled, expired or superseded.
+  - An order is valid only for its own session. One not filled on its session is expired, and so is the unfilled part of a partial fill. An Answer that comes later is recorded but never revives it.
+  - A buy that needs a sale's cash is listed under that sale, to be placed only once the sale is.
   - A fill matches an open order for the same security and side, on that order's session.
   - A fill that matches no order is recorded as a trade Saransh made himself, and flagged in the Brief.
 - **Reconciliation** compares each real Book's positions, replayed from its ledger, with the holdings export, one security at a time. Each difference becomes a To-do.
-- **Paper Books** are paper portfolios fed by Order lists. Each order fills at the next session's open with the strategies' costs: sales first, then buys cut to the cash available, as a manual paper portfolio's applied rebalance does today.
+- **Paper Books** are paper portfolios fed by Order lists. Each order fills at the next session's open with the strategies' costs: sales first, then buys cut to the cash available, as a manual paper portfolio's applied rebalance does today. Fills are applied only once the daily chain's Health report passes.
+- **Rules-only paper Books:** beside each paper Book, a second paper portfolio trades the Rule plan unchanged, from the same start, with the same Sleeves, Stages, cash and new money. The paper Book's gap to it is what the Portfolio Manager's judgement added (ADR 0004).
 - ash_new's Portfolios inbox is not extended to real portfolios. Answers come through the Brief.
 
 ### Feeds and dossiers (ash_new)
 
-- **Feeds are fetched only for the Rule plan's names and the holdings**, and keep each event's link:
+- **Feeds are fetched only for the Rule plan's names and the holdings**, and keep each event's link and the time it was fetched. A Decision record may cite only events fetched before its Run:
   - India: NSE and BSE corporate announcements, board meetings (which give results dates) and pledges.
   - US: SEC EDGAR filings (8-K, 10-Q, 10-K, Form 4).
   - An earnings calendar: from NSE's board meetings for India, and from Yahoo's earnings dates for the US.
@@ -409,6 +444,9 @@ ADR 0003 records why the Portfolio Manager judges within a Playbook rather than 
   - fundamentals;
   - its recent and coming events from the Feeds;
   - the strategy and signal behind its order.
+
+  It holds a copy of what it read, not a pointer to the latest fetch, so a Decision record can be checked against it later.
+- **The analysts each name needs:** Events for a name with results or another event in the next 5 sessions, or a new event since its last view; Chart for each buy; Risk for each Book with buys. A sale needs none.
 
 ### Reviews (figures from ash_new, words from the Portfolio Manager)
 
@@ -421,7 +459,8 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
   - Disaster stops not yet marked placed;
   - the override scorecard;
   - the demotion checks;
-  - each real Book's gap to its paper Book.
+  - each real Book's gap to its paper Book;
+  - each paper Book's gap to its rules-only paper Book.
 - **Monthly:**
   - attribution of each Book's return to Sleeve weights, the picks within Sleeves, gold, cash, costs, Overrides and, for the US Book in INR, the currency;
   - the correlation between Sleeves;
@@ -432,7 +471,7 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
   - new Sleeve weights;
   - where new money goes;
   - the India/US split.
-- **The override scorecard** scores each Override against its counterfactual: what the Rule plan's order would have made, taken from the strategy's own track, until that track closed the position. It is tallied per Lever, per analyst and per Lesson.
+- **The override scorecard** scores each Override against its counterfactual: what the Rule plan's order would have made, taken from the strategy's own track, until that track closed the position. It is tallied per Lever, per analyst and per Lesson, and each Override is judged on the session its Decision record named when it was made. The scores interact, so their sum isn't the paper Book's gap to its rules-only paper Book. That gap, not the sum, is the gate for moving a real Book to Playbook mode, at a bar fixed before the 3 months start.
 
 ### Agents
 
@@ -452,6 +491,7 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
 
 - The Brief shows each item waiting on Saransh with its id. The Save answers button downloads one Answers file, naming the Run and each item's Answer: placed, skipped, approve, reject, keep or dismiss, with an optional note.
 - The Answers Step reads every Answers file it finds and applies them oldest first. A later Answer to the same item applies only while that item is still open.
+- An Answer never expires, but an order's validity ends with its session. An Answer that marks an order after its session is recorded and never revives it.
 
 ### ash_backend
 
@@ -514,7 +554,8 @@ There are two seams, and both are a command with files in and files out.
   - each gets its inputs;
   - each falls back to its other Worker;
   - a failure is recorded.
-- **Check:** sends the Rule plan unchanged when the Portfolio Manager failed, and shows each dropped change with its reason in the Brief.
+- **Desk:** calls only the analysts `pd plan` asks for, and skips itself when none is.
+- **Check:** sends the Rule plan unchanged when the Portfolio Manager failed, records nothing when the Plan Step failed, and shows each dropped change with its reason in the Brief.
 - **Save state:** applies the Journal and queues Lessons.
 - **Brief:**
   - is written with every section after earlier Steps fail;
@@ -533,6 +574,9 @@ There are two seams, and both are a command with files in and files out.
 - **Disaster stops:** fills on daily bars are right, including a gap through the stop.
 - **Stages:** each Stage's scaling is right, and a paper Book holds full shares.
 - **Order-size guard:** an order over 1% of the 20-day average traded value is cut.
+- **Limit prices:** a buy that opens above its limit isn't filled.
+- **Book state:** the same ledger gives the same state and id; a placed buy reserves its cash; an unsettled security isn't traded.
+- **Strategy versions:** a changed parameter makes a new version.
 - **Legacy holdings:** they are wound down in the right order, and a winner near long-term waits.
 - **Market condition and exposure level:**
   - each condition is read right from a fixture Lake at the configured thresholds;
@@ -542,13 +586,17 @@ There are two seams, and both are a command with files in and files out.
   - in subtract only mode, accepts an exposure cut, a dropped buy, a trim and a wait, and rejects a swap or a size above 1×;
   - in Playbook mode, accepts a swap to a name in the Pool and rejects one outside it;
   - rejects a change outside its Lever's range, one without a complete Decision record, and one citing a figure that isn't in the inputs;
-  - drops a failing change and keeps the rest, and falls back to the Rule plan when what remains breaks the Mandate.
+  - rejects a change that drops an exit;
+  - drops a failing change and keeps the rest, catches changes that pass alone but break a cap together, and falls back to the Rule plan when what remains breaks the Mandate;
+  - sends only exits and stops when the Rule plan fails the whole-Book check too;
+  - refuses an output made from an old Book state or version.
 - **Imports:**
   - sample ICICI Direct and moomoo files become the right ledger;
   - fills are matched to orders, including partial fills;
+  - an order expires after its session, and a late Answer doesn't revive it;
   - a fill with no order is flagged.
 - **Reconciliation:** finds each difference.
-- **Paper Books:** fill at the next open.
+- **Paper Books:** both paper Books fill at the next open from their own lists, once the Health report passes.
 - **Corrections:**
   - a proposal waits;
   - an approved one is applied by the next refresh;
@@ -604,17 +652,25 @@ There are two seams, and both are a command with files in and files out.
      - ash_new's schedule turned off;
      - the Broker inbox with ICICI Direct's and moomoo's import presets, and Reconciliation;
      - a Stocks Brief showing data status and holdings.
-  2. **The evidence:** activate CW2's variant, load the ash ports, build the Book engine and its backtest with the exposure level by Market condition, and pick each Book's Candidates.
+  2. **The evidence:**
+     - version every strategy, audit the ash ports and activate CW2's variant;
+     - take the India Book end to end in shadow: its state and a Rule plan with one strategy (issue 47);
+     - build the Book engine and its backtest with the exposure level by Market condition, and pick each Book's Candidates.
   3. **Paper Books:**
-     - the Rule plan, the Playbook, the final check and the Portfolio Manager, in Playbook mode;
+     - the Rule plan, the Playbook, the final check and the Portfolio Manager, in Playbook mode, with a rules-only paper Book beside each paper Book;
      - the Journal, the Order list and Answers;
      - the weekly and monthly reviews.
 
      The 3-month Paper clock starts here.
   4. **The Desk, on the paper Books** within those 3 months: the Feeds, dossiers, override scorecard and Lessons.
-  5. **Real money:** Legacy and Kept holdings, then the first Real-small promotions after 3 months of Paper. Real Books run in subtract only mode until Saransh moves one to Playbook, after 3 months in which the paper Book's Overrides at least matched the Rule plan alone.
+  5. **Real money:** Legacy and Kept holdings, then the first Real-small promotions after 3 months of Paper. Real Books run in subtract only mode until Saransh moves one to Playbook, after 3 months in which the paper Book matched its rules-only paper Book.
 - **Waiting on Saransh:**
   - each Book's capital;
+  - confirming the Mandate's numbers as its first version;
+  - which strategy versions the Candidate test may choose from, once the ash ports' audit is out;
+  - what counts as a paper Book matching its rules-only paper Book (placeholder: at least its return over the 3 months, with no deeper max drawdown);
+  - each Book's limit tolerance for buys (placeholder: 3% above the last close);
+  - whether ICICI Direct and moomoo let a sale's proceeds pay for a buy at the same open (assumed yes until then);
   - the Market condition's thresholds, the exposure levels and the Playbook's ranges (placeholders until then);
   - what happens to the Sash app, before ash_backend is archived;
   - one tradebook and one holdings export from each broker, to build the import presets;
@@ -627,6 +683,7 @@ There are two seams, and both are a command with files in and files out.
   - **Web search permission:** how Claude Code's web search is allowed for the Events and Risk analysts, given that the Worker denies every command that isn't read-only.
 - **Defaults chosen while writing this PRD, not discussed:**
   - **Breaker recovery:** new buys resume once a Book recovers above −5%, and full exposure above −9%. Both are tested in the Book backtest.
+  - **Drawdown** is measured on the Book's value per unit against its highest close, and "exposure halved" means at most half the exposure level in stocks.
   - **The yearly review** falls on the first Saturday of April, when India's financial year and the LRS limit start again.
   - **A Retired strategy's Sleeve** is wound down through the strategy's own exits.
   - **The deflated Sharpe bar** is 95%, and the holdout is 2013–2016, as in ash_new's research.
@@ -654,5 +711,8 @@ There are two seams, and both are a command with files in and files out.
   - **Remittances under the LRS** carry 20% TCS above ₹10 lakh a year. That's one reason the Books never pass money to each other.
 - **The daily Pipeline's PRD** (`prd.md`, beside this one) leaves Windows out of scope. This PRD changes that for the stocks Pipeline only.
 - **The Pipeline's machinery runs only on macOS today.** Its lock and process records use a macOS-only file lock, it stops processes by process group, and the tests' stand-ins are `sh` scripts. Issue 16 makes it run on Windows before anything else is built there.
-- **Issues:** 15–46 in this repo's issues folder. The nine that touch only ash_new are mirrored as ash_new's tickets 50–58; issue 46 and the reworked issue 22 are not mirrored yet.
-- **Research:** `docs/research/portfolio-agent-research.md` holds the sources behind the Playbook, the Decision record and the override scorecard.
+- **Issues:** 15–47 in this repo's issues folder. The nine that touch only ash_new are mirrored as ash_new's tickets 50–58; issue 46 and the reworked issue 22 are not mirrored yet, and issue 47 touches both repos, so it lives only here.
+- **Research:**
+  - `docs/research/portfolio-agent-research.md` holds the sources behind the Playbook, the Decision record and the override scorecard.
+  - `docs/research/portfolio-consolidation-plan.md` and its evidence memo are behind the Book state, versioning, the whole-Book check, order validity, the targeted Desk and the rules-only paper Book.
+- **Not taken from the research yet:** a challenge of a large change from the other Worker, before the check. It waits until the scorecard shows a need.

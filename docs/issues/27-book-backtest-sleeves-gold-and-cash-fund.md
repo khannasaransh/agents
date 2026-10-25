@@ -12,8 +12,9 @@
   - market, currency, broker and benchmark (the Nifty 500 TRI; the S&P 500 total return);
   - capital (a setting, with ash_new's preset capital standing in until set);
   - cash fund and gold ETF;
-  - the Mandate's numbers;
+  - the Mandate's numbers, under a version: changing any of them makes a new version;
   - its real portfolio.
+- [ ] The engine builds on ash_new's portfolio code that exists today (sizing, costs, drift and order proposals, paper follow) rather than making a second copy.
 - [ ] A Book backtest runs each Sleeve's strategy on its own and lays the Book over it. The strategy's orders become the Book's at the Sleeve's weight, in whole shares (lots where a market has them), paying the cost presets (brokerage ₹0 / $0).
 - [ ] The Book keeps each Sleeve's holdings apart, so a strategy's sale sells only its own Sleeve's shares.
 - [ ] Sleeve weights:
@@ -25,7 +26,7 @@
 - [ ] The result reports, against the Book's benchmark:
   - CAGR, max drawdown, the 2013–2016 holdout CAGR and Sharpe;
   - the distribution of rolling 12-month returns and of drawdowns.
-- [ ] `pd book-backtest` writes the result as JSON, with a JSON Schema. The same Book, data and dates always give the same result.
+- [ ] `pd book-backtest` writes the result as JSON, with a JSON Schema, naming the data version, each strategy's version and the Mandate's version. The same Book, data, versions and dates always give the same result.
 - [ ] Tests on a fixture Lake:
   - a one-Sleeve Book returns its strategy's return, diluted by gold and cash;
   - weights follow inverse volatility;

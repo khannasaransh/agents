@@ -8,6 +8,7 @@
 
 **Status:** ready-for-agent
 
+- [ ] Only the versions Saransh approved (issue 25) are tested.
 - [ ] Each strategy in a Book's market is tested for:
   - holdout CAGR against the benchmark's over the same years (2013–2016);
   - a deflated Sharpe that clears 95%, counting every variant tried in its family as a trial (using the robustness tools from ash_new's ticket 44);

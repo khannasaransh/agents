@@ -16,6 +16,7 @@
   - costs;
   - Overrides;
   - for the US Book in INR, the currency.
+- [ ] For a paper Book, the Overrides' part is its gap to its rules-only paper Book. It is not the sum of the Overrides' own scores, which interact.
 - [ ] It also reports:
   - the correlation between Sleeves;
   - each Book's drawdown against its limits;

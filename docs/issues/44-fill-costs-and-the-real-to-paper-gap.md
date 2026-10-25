@@ -9,7 +9,7 @@
 **Status:** ready-for-agent
 
 - [ ] For each broker, the weekly review compares each fill with its session's open price, against the slippage the cost presets assume. It flags a broker whose fills cost more.
-- [ ] It shows each real Book's gap to its paper Book, split into fills, skips and Stage scaling.
+- [ ] It shows each real Book's gap to its paper Book, split into fills, skips, expired orders and Stage scaling.
 - [ ] Tests:
   - the cost of a fill against the open;
   - the flag;

@@ -13,6 +13,6 @@ Judgement still starts by subtracting. Real Books run in *subtract only* mode un
 ## Consequences
 
 - Every position traces to a strategy: the Portfolio Manager buys only names in its Book's Pool, those an approved strategy surfaced in the last 2 months.
-- The Book backtest includes the exposure level by Market condition, so the rule part of the judgement is tested. The Portfolio Manager's own choices earn their record forward, on the paper Books, scored by Lever against the Rule plan alone.
+- The Book backtest includes the exposure level by Market condition, so the rule part of the judgement is tested. The Portfolio Manager's own choices earn their record forward, on the paper Books, scored by Lever against the Rule plan alone. Whether a real Book moves to Playbook mode is decided by the paper Book's gap to a rules-only paper Book (ADR 0004).
 - A Book's Judgement mode and its Playbook ranges change only by Saransh's Answer. A Lesson may propose a range change; a wider range needs the scorecard's support.
 - The Desk still only subtracts: its analysts veto, trim or propose exits, and their views are evidence in the Portfolio Manager's Decision records.

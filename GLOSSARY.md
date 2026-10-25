@@ -75,8 +75,12 @@ The Agent that manages Saransh's portfolios, real and paper, end to end: startin
 _Avoid_: PM (that is the daily Pipeline's PM Agent), fund manager, advisor, trader
 
 **Book**:
-The real money in one market, managed as one: the India Book in INR at ICICI Direct, the US Book in USD at moomoo. Each has its own Mandate, objective, benchmark and gold Sleeve. Their combined value in INR is shown but limits nothing. Beside each is a **paper Book**, run exactly like it but filled automatically at the next open, holding every strategy from Paper up at its full share; the real Book's gap to it is what Saransh's fills, skips and the Stages cost.
+The real money in one market, managed as one: the India Book in INR at ICICI Direct, the US Book in USD at moomoo. Each has its own Mandate, objective, benchmark and gold Sleeve. Their combined value in INR is shown but limits nothing. Beside each is a **paper Book**, run exactly like it but filled automatically at the next open, holding every strategy from Paper up at its full share; the real Book's gap to it is what Saransh's fills, skips and the Stages cost. Beside each paper Book is a **rules-only paper Book**, which trades the Rule plan unchanged from the same start; the paper Book's gap to it is what the Portfolio Manager's judgement added.
 _Avoid_: account, fund, portfolio (ash_new's Portfolio is one ledger)
+
+**Book state**:
+What a Book holds as each Rule plan starts from it: holdings and cash replayed from its ledger, Reconciliation's open differences, open orders and the cash they reserve, its Disaster stops, and which holdings are Legacy. Each has an id. A decision made from a state that is no longer current is refused, and a security with an open Reconciliation difference is neither bought nor sold on a signal until it is settled.
+_Avoid_: snapshot, positions (ash_new's), portfolio
 
 **Legacy holding**:
 A holding from before the Books that Saransh hasn't marked kept. It sits in its Book and is sold as the Sleeves need the cash: losses first, and a winner close to turning long-term only once it has.
@@ -87,7 +91,7 @@ A holding Saransh marks to stay outside the Books. The Portfolio Manager never s
 _Avoid_: core holding, frozen holding
 
 **Mandate**:
-The hard limits the Portfolio Manager works within in each Book, and the objective its strategies are chosen by: the benchmark, the drawdown limits, the most in one position and in one sector, how much cash it may hold, and how tax counts. It caps what the strategies buy but never sizes it. The risk per trade is a warning: a position whose stop would lose more than that is flagged.
+The hard limits the Portfolio Manager works within in each Book, and the objective its strategies are chosen by: the benchmark, the drawdown limits, the most in one position and in one sector, how much cash it may hold, and how tax counts. It caps what the strategies buy but never sizes it. The risk per trade is a warning: a position whose stop would lose more than that is flagged. Each change to it makes a new version, and every plan and decision names the version it was made under.
 _Avoid_: policy, risk settings, constraints
 
 **Sleeve**:
@@ -95,11 +99,11 @@ One strategy's share of a Book, or gold's. A strategy's Sleeve is larger the cal
 _Avoid_: bucket, allocation, member (a Composite's members are ash_new's)
 
 **Stage**:
-Where a strategy stands on its way to real money: Candidate, Paper (held only in the paper Book), Real-small (a quarter of its target capital), Real-full, or Retired. A Candidate need not meet the objective alone: its holdout beats the benchmark, its deflated Sharpe clears the bar, and adding it improves its Book's backtest. A **promotion** moves it up a Stage when the Portfolio Manager proposes it and Saransh approves; a **demotion** moves it down when its live record breaks the demotion rule. A strategy whose rules change is a new strategy and starts again as a Candidate.
+Where a strategy stands on its way to real money: Candidate, Paper (held only in the paper Book), Real-small (a quarter of its target capital), Real-full, or Retired. A Candidate need not meet the objective alone: its holdout beats the benchmark, its deflated Sharpe clears the bar, and adding it improves its Book's backtest. A **promotion** moves it up a Stage when the Portfolio Manager proposes it and Saransh approves; a **demotion** moves it down when its live record breaks the demotion rule. A strategy's version is its rules, parameters and code hash; a strategy whose version changes is a new strategy and starts again as a Candidate, and the Candidate test chooses only from versions Saransh approved.
 _Avoid_: status, tier, level
 
 **Rule plan**:
-The Order list as code makes it, before any Agent sees it: what the strategies trade, sized and capped by the Mandate, with the Data gate, Quarantines, breakers, the exposure level and Stages applied. It is where the Portfolio Manager starts, and what every Override is scored against.
+The Order list as code makes it from the Book state, before any Agent sees it: what the strategies trade, sized and capped by the Mandate, with the Data gate, Quarantines, breakers, the exposure level and Stages applied. It is where the Portfolio Manager starts, and what every Override is scored against.
 _Avoid_: draft, signals, Strategy plan
 
 **Market condition**:
@@ -119,11 +123,11 @@ What the Portfolio Manager writes for each difference from the Rule plan, and fo
 _Avoid_: rationale, explanation, reason (a sale's reason is ash_new's)
 
 **Desk**:
-The analyst Agents, one each for events, the chart and risk, that read what rules can't (results, news and announcements, pledges and governance, the chart) in the Lake and the Feeds, and argue over the Rule plan. They search the web only to check one item, and cite what they find. They can only subtract: veto a new position, trim a size, or propose an early exit for Saransh to approve. They never add size or break the Mandate. Their views are evidence in the Portfolio Manager's Decision records.
+The analyst Agents, one each for events, the chart and risk, that read what rules can't (results, news and announcements, pledges and governance, the chart) in the Lake and the Feeds, and argue over the Rule plan. Each name is reviewed only by the analysts it needs, and a view is reused while nothing it read has changed. They search the web only to check one item, and cite what they find. They can only subtract: veto a new position, trim a size, or propose an early exit for Saransh to approve. They never add size or break the Mandate. Their views are evidence in the Portfolio Manager's Decision records.
 _Avoid_: committee, analysts' team (a Team is a Repo's discipline), advisors
 
 **Override**:
-One difference from the Rule plan that the final check accepted, made under a Lever and carried by its Decision record, scored afterwards against what the Rule plan alone would have done. The **override scorecard** is their running tally by Lever, by analyst and by Lesson, which decides whether a Lever's range widens or narrows.
+One difference from the Rule plan that the final check accepted, made under a Lever and carried by its Decision record, scored afterwards against what the Rule plan alone would have done. The **override scorecard** is their running tally by Lever, by analyst and by Lesson, which decides whether a Lever's range widens or narrows. The scores interact, so whether a real Book moves to Playbook mode is decided instead by its paper Book's gap to the rules-only paper Book.
 _Avoid_: exception, manual change
 
 **Journal**:
@@ -147,7 +151,7 @@ A fixed outside source of company events that the stocks Pipeline fetches only f
 _Avoid_: news feed, data source
 
 **Order list**:
-What the Portfolio Manager advises Saransh to do at the next session: each buy and sale, and each Disaster stop to place or raise. An order is **proposed** until Saransh marks it **placed** or **skipped**, and a placed order is **filled** once a tradebook shows it.
+What the Portfolio Manager advises Saransh to do at the next session: each buy and sale, and each Disaster stop to place or raise. A buy carries a limit price, and a buy that needs a sale's cash is listed under that sale. An order is valid only for its own session. It is **proposed** until Saransh marks it **placed** or **skipped**, a placed order is **filled** once a tradebook shows it, and an order its session passes unfilled is **expired**.
 _Avoid_: trade list (ash_new's Trade is a holding from its buy to its sale), recommendations, signals
 
 **Broker inbox**:
@@ -189,5 +193,5 @@ Something pending on Saransh, such as a PRD link he has to download by hand. The
 _Avoid_: task, action item
 
 **Answer**:
-Saransh's reply, given in the Stocks Brief, to one item waiting on him: an order placed or skipped, an approval or a rejection, a holding kept, a flag dismissed. An Answer never expires, and an item without one appears again in the next Brief.
+Saransh's reply, given in the Stocks Brief, to one item waiting on him: an order placed or skipped, an approval or a rejection, a holding kept, a flag dismissed. An Answer never expires, and an item without one appears again in the next Brief. An order's validity still ends with its session, and a later Answer never revives it.
 _Avoid_: response, approval (an approval is one kind of Answer), feedback
