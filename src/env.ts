@@ -20,9 +20,11 @@ export interface DiscordConfig {
   userId: string
   /** Whether a DM with the bot among the channels is read, or fails the Step. On unless DISCORD_READ_DMS=false. */
   readDms: boolean
+  /** The channel where each sprint's task list is posted, from DISCORD_SPRINT_CHANNEL_ID, or null when it isn't set. */
+  sprintChannelId: string | null
 }
 
-/** The Discord config from the env file, or the keys it is missing. */
+/** The Discord config from the env file, or the keys it is missing. Throws when DISCORD_USER_ID isn't a user ID. */
 export function discordConfig(): DiscordConfig | { missing: string[] } {
   const env = readEnvFile()
   const token = env.DISCORD_BOT_TOKEN?.trim() ?? ''
@@ -33,7 +35,11 @@ export function discordConfig(): DiscordConfig | { missing: string[] } {
   const userId = env.DISCORD_USER_ID?.trim() ?? ''
   const missing = [!token && 'DISCORD_BOT_TOKEN', !channelIds.length && 'DISCORD_CHANNEL_IDS', !userId && 'DISCORD_USER_ID'].filter((key) => key !== false)
   const readDms = env.DISCORD_READ_DMS?.trim().toLowerCase() !== 'false'
-  return missing.length ? { missing } : { token, channelIds, userId, readDms }
+  const sprintChannelId = env.DISCORD_SPRINT_CHANNEL_ID?.trim() || null
+  if (missing.length) return { missing }
+  // A username here would never match, and leave every mention of Saransh unflagged.
+  if (!/^\d+$/.test(userId)) throw new Error(`DISCORD_USER_ID is ${userId}, but it must be Saransh's numeric user ID: with Developer Mode on in Discord, right-click his name and Copy User ID`)
+  return { token, channelIds, userId, readDms, sprintChannelId }
 }
 
 /** Saransh's own checkout of the org wiki, from WIKI_FOLDER in the env file, or null when it isn't set. `~` stands for the home folder. */

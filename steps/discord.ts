@@ -1,10 +1,17 @@
 // Discord: reads the watched channels and their threads through a read-only bot over Discord's REST
 // API, since the last successful read, and writes their messages to the Run folder with mentions of
 // Saransh flagged. A DM with the bot among the channels is read too, unless DISCORD_READ_DMS=false.
+// A forwarded message is read as the message it forwards.
 // It saves the Word, PDF and Markdown files attached to them into the PRD inbox, the APKs into the APK
 // inbox and every other file into the other folder, each with the message it came from in that
 // folder's sources.json, and records links to documents that need a login, such as Google Docs, for
 // the PM Agent's To-dos. A dry run saves nothing.
+// With a sprint channel set, it also reads that channel's latest sprint post, whenever it was posted,
+// and writes its tasks as sprint.json, with every message posted since in the watched channels, the
+// sprint channel, and the bot's DMs with Saransh and with each assignee, for the PM Agent's task
+// status report. Those messages are read only for the report: their files aren't saved. Saransh's
+// own DMs are out of a bot's reach, so he forwards the bot those that say how a task stands. Opening
+// the bot's DMs, which Discord asks of it before it can read them, is all it ever asks besides reads.
 // It is skipped, not failed, until the env file holds the bot token, the channel list and Saransh's
 // Discord user ID.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -16,6 +23,7 @@ import { apkInboxDir, otherFilesDir, prdInboxDir } from '../src/paths.ts'
 import { readInboxSources, writeInboxSources } from '../src/prd-inbox.ts'
 import { readRun } from '../src/run.ts'
 import { readDiscordState, readWeeklyDiscordState, writeDiscordState, writeWeeklyDiscordState } from '../src/state.ts'
+import { latestPost, parseTasks, sprintTitle, type SprintPost } from '../src/sprint.ts'
 import { runAsStep, StepSkipped } from '../src/step.ts'
 import { isWeekly, weeklyDays } from '../src/weekly.ts'
 
@@ -34,10 +42,10 @@ type FileKind = 'prd' | 'apk' | 'other'
 const kindOf = (filename: string): FileKind => (isPrdFile(filename) ? 'prd' : isApkFile(filename) ? 'apk' : 'other')
 const folderOf: Record<FileKind, () => string> = { prd: prdInboxDir, apk: apkInboxDir, other: otherFilesDir }
 const folderName: Record<FileKind, string> = { prd: 'PRD inbox', apk: 'APK inbox', other: 'other folder' }
-/** Where documents need a login, so the Pipeline can't download them and Saransh does by hand. A host counts with its subdomains. */
+/** Where files need a login, so the Pipeline can't download them and Saransh does by hand. A host counts with its subdomains. */
 const loginHosts = ['docs.google.com', 'drive.google.com', 'notion.so', 'notion.site', 'atlassian.net', 'sharepoint.com', 'onedrive.live.com', '1drv.ms', 'dropbox.com']
 
-/** The links in a message's text to documents that need a login, without the punctuation of the sentence around them. Text that only looks like a link is left out. */
+/** The links in a message's text to files that need a login, without the punctuation of the sentence around them. Text that only looks like a link is left out. */
 function loginLinks(content: string): string[] {
   return (content.match(/https?:\/\/[^\s<>]+/g) ?? [])
     .map((link) => link.replace(/[.,;:!?)\]]+$/, ''))
@@ -51,6 +59,7 @@ interface ApiUser {
   id: string
   username: string
   global_name: string | null
+  bot?: boolean
 }
 
 /** A file attached to a message, which Discord serves from its CDN at a signed URL. */
@@ -66,8 +75,11 @@ interface ApiMessage {
   author: ApiUser
   content: string
   timestamp: string
-  mentions: { id: string }[]
+  /** Each user it mentions, with their nickname on the server when it has one. */
+  mentions: (ApiUser & { member?: { nick?: string | null } })[]
   attachments: ApiAttachment[]
+  /** For a forwarded message, the message forwarded, which Discord gives without its author. */
+  message_snapshots?: { message: { content: string; attachments: ApiAttachment[] } }[]
 }
 
 /** A channel on a server. */
@@ -124,8 +136,11 @@ export interface DiscordMessage {
   apkFiles: string[]
   /** Every other file attached to it, by its name on Discord, which a real Run saves into the other folder. */
   otherFiles: string[]
-  /** Links in it to documents that need a login, such as Google Docs, for Saransh to download into the PRD inbox by hand. */
-  prdLinks: string[]
+  /**
+   * Links in it to files that need a login, such as on Google Drive, for Saransh to download by hand:
+   * into the PRD inbox when it is a PRD, and into the APK inbox when it is an app build to test.
+   */
+  loginLinks: string[]
 }
 
 /** The span of time a read covers: from where the last successful read ended to when this one began. */
@@ -150,24 +165,37 @@ interface Attached {
 /** Discord's IDs grow with time, so a time's ID asks for the messages after it. */
 const snowflakeAt = (time: string) => String((BigInt(Date.parse(time)) - 1420070400000n) << 22n)
 
-async function get<T>(config: DiscordConfig, path: string, query: Record<string, string> = {}): Promise<T> {
+async function call<T>(config: DiscordConfig, method: 'GET' | 'POST', path: string, query: Record<string, string> = {}, body?: unknown): Promise<T> {
   const url = `${api}${path}${Object.keys(query).length ? `?${new URLSearchParams(query)}` : ''}`
-  let response = await fetch(url, { headers: { authorization: `Bot ${config.token}` } })
+  const init = {
+    method,
+    headers: { authorization: `Bot ${config.token}`, ...(body === undefined ? {} : { 'content-type': 'application/json' }) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  }
+  let response = await fetch(url, init)
   while (response.status === 429) {
     const { retry_after: seconds } = (await response.json()) as { retry_after: number }
-    console.log(`Rate limited on GET ${path}, waiting ${seconds}s`)
+    console.log(`Rate limited on ${method} ${path}, waiting ${seconds}s`)
     await setTimeout(seconds * 1000)
-    response = await fetch(url, { headers: { authorization: `Bot ${config.token}` } })
+    response = await fetch(url, init)
   }
-  if (!response.ok) throw new Error(`Discord answered ${response.status} to GET ${path}: ${await response.text()}`)
+  if (!response.ok) throw new Error(`Discord answered ${response.status} to ${method} ${path}: ${await response.text()}`)
   return (await response.json()) as T
 }
+
+const get = <T>(config: DiscordConfig, path: string, query: Record<string, string> = {}) => call<T>(config, 'GET', path, query)
+
+/**
+ * The bot's DM with a user. Discord doesn't let a bot list its DMs, but opening one gives the DM
+ * there already is, or makes an empty one: it sends nothing, and the user isn't told.
+ */
+const dmWith = (config: DiscordConfig, userId: string) => call<ApiDm & { id: string }>(config, 'POST', '/users/@me/channels', {}, { recipient_id: userId })
 
 /** The files attached to the messages read so far. */
 const attached: Attached[] = []
 
 /** The messages posted within `window` in a conversation. */
-async function readMessages(config: DiscordConfig, at: Conversation, window: Window): Promise<DiscordMessage[]> {
+async function readMessages(config: DiscordConfig, at: Conversation, window: Window, saveFiles: boolean): Promise<DiscordMessage[]> {
   const messages: ApiMessage[] = []
   for (let after = snowflakeAt(window.since); ; ) {
     const page = await get<ApiMessage[]>(config, `/channels/${at.id}/messages`, { after, limit: String(pageSize) })
@@ -179,8 +207,12 @@ async function readMessages(config: DiscordConfig, at: Conversation, window: Win
   const end = BigInt(snowflakeAt(window.until))
   return messages.filter((m) => BigInt(m.id) < end).map((m) => {
     const link = `https://discord.com/channels/${at.guild}/${at.id}/${m.id}`
-    attached.push(...m.attachments.map((attachment) => ({ attachment, kind: kindOf(attachment.filename), message: link })))
-    const filesOf = (kind: FileKind) => m.attachments.filter((a) => kindOf(a.filename) === kind).map((a) => a.filename)
+    // A forward carries the message forwarded, and any comment comes as a message of its own.
+    const forwarded = m.message_snapshots?.[0]?.message
+    const content = forwarded ? `Forwarded: ${forwarded.content}` : m.content
+    const attachments = [...m.attachments, ...(forwarded?.attachments ?? [])]
+    if (saveFiles) attached.push(...attachments.map((attachment) => ({ attachment, kind: kindOf(attachment.filename), message: link })))
+    const filesOf = (kind: FileKind) => attachments.filter((a) => kindOf(a.filename) === kind).map((a) => a.filename)
     return {
       id: m.id,
       channel: at.channel,
@@ -188,14 +220,14 @@ async function readMessages(config: DiscordConfig, at: Conversation, window: Win
       dm: at.dm,
       author: displayName(m.author),
       timestamp: m.timestamp,
-      content: m.content,
+      content,
       link,
       mentionsSaransh: m.mentions.some((u) => u.id === config.userId),
       fromSaransh: m.author.id === config.userId,
       prdFiles: filesOf('prd'),
       apkFiles: filesOf('apk'),
       otherFiles: filesOf('other'),
-      prdLinks: loginLinks(m.content),
+      loginLinks: loginLinks(content),
     }
   })
 }
@@ -246,16 +278,73 @@ async function threadsOf(config: DiscordConfig, channel: ApiChannel, { since }: 
   return [...active, ...archived]
 }
 
-async function readChannel(config: DiscordConfig, channelId: string, window: Window): Promise<DiscordMessage[]> {
+/** The messages posted within `window` in a channel and its threads, or a DM with the bot. Their attached files are saved only with `saveFiles`. */
+async function readChannel(config: DiscordConfig, channelId: string, window: Window, saveFiles = true): Promise<DiscordMessage[]> {
   const channel = await get<ApiChannel | ApiDm>(config, `/channels/${channelId}`)
   if (channel.guild_id === undefined) {
     if (!config.readDms) throw new Error(`Channel ${channelId} is a DM, and DISCORD_READ_DMS is false. Remove it from DISCORD_CHANNEL_IDS, or turn DMs on.`)
-    return readMessages(config, { id: channel.id, channel: channel.recipients.map(displayName).join(', '), thread: null, dm: true, guild: '@me' }, window)
+    return readMessages(config, { id: channel.id, channel: channel.recipients.map(displayName).join(', '), thread: null, dm: true, guild: '@me' }, window, saveFiles)
   }
   const at: Conversation = { id: channel.id, channel: channel.name, thread: null, dm: false, guild: channel.guild_id }
-  const messages = await readMessages(config, at, window)
-  for (const thread of await threadsOf(config, channel, window)) messages.push(...(await readMessages(config, { ...at, id: thread.id, thread: thread.name }, window)))
+  const messages = await readMessages(config, at, window, saveFiles)
+  for (const thread of await threadsOf(config, channel, window)) messages.push(...(await readMessages(config, { ...at, id: thread.id, thread: thread.name }, window, saveFiles)))
   return messages
+}
+
+/** A message's text with each mention of a user written as `@` and their name on the server. */
+const withNames = (m: ApiMessage) =>
+  m.content.replace(/<@!?(\d+)>/g, (mention, id: string) => {
+    const user = m.mentions.find((u) => u.id === id)
+    return user ? `@${user.member?.nick || displayName(user)}` : mention
+  })
+
+/**
+ * The sprint channel's latest sprint post, from its last messages, whenever it was posted, with every
+ * message posted after it until `until` in the watched channels and the sprint channel itself; null
+ * when none of its last messages lists tasks.
+ */
+async function readSprintPost(config: DiscordConfig, channelId: string, until: string): Promise<SprintPost | null> {
+  const channel = await get<ApiChannel>(config, `/channels/${channelId}`)
+  const messages = (await get<ApiMessage[]>(config, `/channels/${channelId}/messages`, { limit: String(pageSize) }))
+    .toSorted((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .map((m) => ({
+      id: m.id,
+      authorId: m.author.id,
+      author: displayName(m.author),
+      timestamp: m.timestamp,
+      link: `https://discord.com/channels/${channel.guild_id}/${channel.id}/${m.id}`,
+      content: withNames(m),
+      assigneeIds: m.mentions.filter((u) => !u.bot).map((u) => u.id),
+    }))
+  const post = latestPost(messages)
+  if (!post) return null
+  const kept = post.map(({ authorId, assigneeIds, ...m }) => m)
+  const last = kept.at(-1)!
+  const window = { since: new Date(Date.parse(last.timestamp)).toISOString(), until }
+  const updates: DiscordMessage[] = []
+  for (const id of new Set([...config.channelIds, channelId])) updates.push(...(await readChannel(config, id, window, false)))
+  // The bot's DMs with Saransh, who forwards it the updates he is sent in his own DMs, and with each
+  // assignee, who can tell it how their task stands.
+  if (config.readDms) {
+    const read = new Set(config.channelIds)
+    for (const userId of new Set([config.userId, ...post.flatMap((m) => m.assigneeIds)])) {
+      const dm = await dmWith(config, userId)
+      if (read.has(dm.id)) continue
+      read.add(dm.id)
+      updates.push(...(await readMessages(config, { id: dm.id, channel: dm.recipients.map(displayName).join(', '), thread: null, dm: true, guild: '@me' }, window, false)))
+    }
+  }
+  const after = updates.filter((m) => BigInt(m.id) > BigInt(last.id)).sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+  return {
+    channel: channel.name,
+    author: kept[0].author,
+    postedAt: kept[0].timestamp,
+    link: kept[0].link,
+    title: sprintTitle(kept),
+    messages: kept,
+    tasks: parseTasks(kept),
+    updates: after,
+  }
 }
 
 await runAsStep(async ({ runId, runFolder, force }) => {
@@ -278,8 +367,14 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   const messages: DiscordMessage[] = []
   for (const channelId of config.channelIds) messages.push(...(await readChannel(config, channelId, { since, until })))
   messages.sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+  // Read before anything is written, so a failure leaves the whole read to the Step's re-run.
+  const sprint = config.sprintChannelId ? await readSprintPost(config, config.sprintChannelId, until) : undefined
   const dryRun = readRun(runId).dryRun
   if (!dryRun) await saveAttachments(attached)
+  if (sprint) {
+    writeJson(join(runFolder, 'sprint.json'), sprint)
+    console.log(`Read the sprint post of ${sprint.postedAt} in #${sprint.channel}: ${sprint.tasks.length} tasks, and ${sprint.updates.length} messages posted since`)
+  } else if (sprint === null) console.log('None of the sprint channel\'s last messages lists tasks, so there is no sprint post')
   writeJson(out, { since, until, messages } satisfies DiscordRead)
   console.log(`Read ${messages.length} Discord messages since ${since}, ${messages.filter((m) => m.mentionsSaransh).length} mentioning Saransh`)
   if (dryRun) console.log('A dry run, so no attached file was saved, and the next real Run reads these messages again')

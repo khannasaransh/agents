@@ -3,7 +3,7 @@ import { afterEach, test } from 'node:test'
 import type { DiscordMessage, DiscordRead } from '../steps/discord.ts'
 import type { DocsResult } from '../steps/docs.ts'
 import type { FetchResult } from '../steps/fetch.ts'
-import type { PmResult } from '../steps/pm.ts'
+import type { PmResult, TaskReport } from '../steps/pm.ts'
 import type { Finding, ReviewResult } from '../steps/review.ts'
 import { makeWorkspace, type Workspace } from './helpers.ts'
 
@@ -505,7 +505,7 @@ const discordMessage = (n: number, fields: Partial<DiscordMessage> = {}): Discor
   prdFiles: [],
   apkFiles: [],
   otherFiles: [],
-  prdLinks: [],
+  loginLinks: [],
   ...fields,
 })
 
@@ -607,4 +607,60 @@ test("the HTML Brief keeps the links, code and bold in the PM Agent's lines, and
 
   assert.ok(html.includes('<li>Download the <a href="https://docs.google.com/document/d/1Qc/edit?a=1&amp;b=2">Finance PRD</a> for <code>inpix</code> — <strong>today</strong> &lt;b&gt;now&lt;/b&gt;</li>'), html)
   assert.ok(html.includes('<li>Not a link: [x](javascript:alert(1))</li>'), html)
+})
+
+const taskReport: TaskReport = {
+  post: { channel: 'sprint-assignments', author: 'Subhash Yadav', postedAt: '2026-10-21T12:05:26.362+00:00', link: 'https://discord.com/channels/1/2/9', title: 'tasks for this sprint-(oct 21 - oct 27)' },
+  tasks: [
+    { id: 'tender-tracker', title: 'Tender Tracker', product: null, pm: null, assignees: [{ name: 'Neha', team: 'Backend' }], status: 'no-signal', note: 'Nothing about it yet.', evidence: [], was: null },
+    {
+      id: 'paywall',
+      title: 'Crux | Paywall',
+      product: 'Crux',
+      pm: 'Aditya Manchanda',
+      assignees: [{ name: 'Asha', team: 'Flutter' }, { name: 'Ravi', team: 'iOS' }],
+      status: 'in-testing',
+      note: 'Merged, waiting for QA.',
+      evidence: ['crux_flutter `2222222` Add paywall', '[Priya: build 4.2 is up for QA](https://discord.com/channels/1/2/10)'],
+      was: 'in-progress',
+    },
+    { id: 'football-center', title: 'Football Center', product: null, pm: 'Prakhar Shukla', assignees: [{ name: 'Neha', team: 'Backend' }], status: 'blocked', note: 'Waits on the scores API.', evidence: [], was: null },
+  ],
+}
+
+test("the Brief gives the PM Agent's sprint task status report, blocked tasks first, with each task's evidence", async () => {
+  prepareRun([], { pm: pmAnswered({ taskReport }) })
+
+  const text = await brief()
+
+  assert.match(text, /- \*\*Sprint tasks:\*\* 3, 1 blocked, 1 in testing, 1 no signal\n/)
+  assert.equal(
+    text.slice(text.indexOf('## Sprint task status'), text.indexOf('## Code review')).trim(),
+    [
+      '## Sprint task status',
+      '',
+      "From Subhash Yadav's [sprint post](https://discord.com/channels/1/2/9) in #sprint-assignments, 2026-10-21: tasks for this sprint-(oct 21 - oct 27)",
+      '',
+      '### Blocked (1)',
+      '',
+      '- **Football Center**: Waits on the scores API. PM Prakhar Shukla; Neha (Backend).',
+      '',
+      '### In testing (1)',
+      '',
+      '- **Crux | Paywall** (was in progress): Merged, waiting for QA. PM Aditya Manchanda; Asha (Flutter), Ravi (iOS).',
+      '  - crux_flutter `2222222` Add paywall',
+      '  - [Priya: build 4.2 is up for QA](https://discord.com/channels/1/2/10)',
+      '',
+      '### No signal (1)',
+      '',
+      '- **Tender Tracker**: Nothing about it yet. PM not named; Neha (Backend).',
+    ].join('\n'),
+  )
+
+  const html = ws.readRunFile(runId, 'brief.html')
+  assert.match(html, /<a class="card bad" href="#sprint"><span class="value">3<\/span><span class="label">Sprint tasks<\/span>/)
+  const sprint = html.slice(html.indexOf('<section id="sprint">'), html.indexOf('</section>', html.indexOf('<section id="sprint">')))
+  assert.ok(sprint.indexOf('Football Center') < sprint.indexOf('Crux | Paywall') && sprint.indexOf('Crux | Paywall') < sprint.indexOf('Tender Tracker'), sprint)
+  assert.match(sprint, /<summary><span class="status in-testing">In testing<\/span> <span class="name">Crux \| Paywall<\/span> <span class="chip">was in progress<\/span><span class="muted">Asha, Ravi<\/span><\/summary>/)
+  assert.ok(sprint.includes('<li><a href="https://discord.com/channels/1/2/10">Priya: build 4.2 is up for QA</a></li>'), sprint)
 })

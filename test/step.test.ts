@@ -31,7 +31,7 @@ test('re-running a failed Step retries what failed and updates the Run record', 
   const good = ws.addRepo('crux_flutter')
   const broken = ws.addBrokenRepo('gone')
   ws.writeRepoList()
-  const pmAnswer = { repoLines: [], highlights: [], todos: [], memory: null }
+  const pmAnswer = { repoLines: [], highlights: [], todos: [], memory: null, taskStatus: [] }
   ws.setWorkerCli('claude', { stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: pmAnswer }) })
   await ws.agents('run', 'daily')
   const [id] = ws.runIds()

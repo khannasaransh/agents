@@ -151,7 +151,7 @@ test('the weekly PM is given the weekly backlog, not the daily one', async () =>
       is_error: false,
       num_turns: 1,
       result: '{}',
-      structured_output: { repoLines: [], highlights: [], todos: [], memory: null },
+      structured_output: { repoLines: [], highlights: [], todos: [], memory: null, taskStatus: [] },
     }),
   })
 

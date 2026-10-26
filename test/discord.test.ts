@@ -187,7 +187,7 @@ test('the Discord Step reads a watched channel since the last successful read as
       prdFiles: [],
       apkFiles: [],
       otherFiles: [],
-      prdLinks: [],
+      loginLinks: [],
     },
     {
       id: reply.id,
@@ -203,7 +203,7 @@ test('the Discord Step reads a watched channel since the last successful read as
       prdFiles: [],
       apkFiles: [],
       otherFiles: [],
-      prdLinks: [],
+      loginLinks: [],
     },
   ])
   assert.deepEqual(ws.readDiscordState(), { lastRead: read.until })
@@ -381,7 +381,7 @@ test('a DM with the bot among the configured channels is read by default, with n
       prdFiles: [],
       apkFiles: [],
       otherFiles: [],
-      prdLinks: [],
+      loginLinks: [],
     },
   ])
   const asked = api!.requests.map((r) => r.path)
@@ -647,7 +647,7 @@ test('links to documents that need a login, such as Google Docs, are recorded wi
 
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(
-    readMessages().messages.map((m: any) => [m.link, m.prdLinks]),
+    readMessages().messages.map((m: any) => [m.link, m.loginLinks]),
     [
       [`https://discord.com/channels/${guildId}/${payments.id}/${docs.id}`, ['https://docs.google.com/document/d/1AbC/edit?usp=sharing', 'https://drive.google.com/file/d/9XyZ/view']],
       [
@@ -683,4 +683,128 @@ test('a dry run lists the PRD files attached in discord.json but saves nothing i
   assert.deepEqual(ws.prdInboxFiles(), [])
   assert.deepEqual(dataFiles('other'), [])
   assert.equal(cdn!.requests.length, 0)
+})
+
+test("with a sprint channel set, its latest sprint post is read whenever it was posted, with mentions as names and every message posted since, and written as sprint.json", async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const sprints = channel('1306524433187602432', 'sprint-assignments')
+  const subhash = { ...priya, id: '690123456789012345', username: 'subhash', global_name: 'Subhash Yadav' }
+  const rahul = { ...priya, id: '790123456789012345', username: 'rahul', global_name: 'Rahul', member: { nick: 'Rahul (Backend)' } }
+  const intro = message(sprints.id, '2026-10-14T12:05:26.000Z', subhash, 'Hello Team,\nhere is the list of tasks for this sprint-(oct 14 - oct 20)\n\n**Backend Team**\n\n<@790123456789012345> \n- Smaran | Video Feed Algorithm. PM - Arhaan Akhtar', [rahul])
+  const ios = message(sprints.id, '2026-10-14T12:12:16.000Z', subhash, `**iOS Team**\n\n<@${priya.id}> \n- Football Center. PM - Prakhar Shukla`, [priya])
+  const question = message(sprints.id, '2026-10-15T09:00:00.000Z', saransh, 'Is Tender Tracker on this sprint?')
+  const [apk] = await uploaded(payments.id, { filename: 'football.apk', contentType: 'application/vnd.android.package-archive', content: 'PK apk' })
+  const build = message(payments.id, '2026-10-16T10:00:00.000Z', priya, 'Football Center build is up for QA')
+  const today = message(payments.id, '2026-10-21T09:00:00.000Z', priya, 'Paywall copy is final')
+  const before = message(payments.id, '2026-10-13T09:00:00.000Z', priya, 'Last sprint wrapped')
+  const release = thread('1200000000000000001', payments.id, 'Release 4.2', '2026-10-17T08:00:00.000Z')
+  // Archived before the last read, so only the read since the post reaches it.
+  const inThread = message(release.id, '2026-10-17T07:00:00.000Z', priya, 'Football Center is live', [], [apk])
+  await workspaceWithDiscord({
+    ...watched(payments, [before, build, today], { archived: [[release, [inThread]]] }),
+    [`/channels/${sprints.id}`]: { body: sprints },
+    [`/channels/${sprints.id}/messages`]: { body: newestFirst([intro, ios, question]) },
+    [`/channels/${sprints.id}/threads/archived/public`]: { body: { threads: [], members: [], has_more: false } },
+  }, `${envFile}DISCORD_SPRINT_CHANNEL_ID=${sprints.id}\nDISCORD_READ_DMS=false\n`)
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.ok(api!.requests.every((r) => r.method === 'GET'), 'with DMs off, no DM is opened')
+  const { updates, ...sprint } = JSON.parse(ws.readRunFile(runId, 'sprint.json'))
+  assert.deepEqual(updates.map((m: any) => [m.channel, m.thread, m.content]), [
+    ['sprint-assignments', null, 'Is Tender Tracker on this sprint?'],
+    ['payments', null, 'Football Center build is up for QA'],
+    ['payments', 'Release 4.2', 'Football Center is live'],
+    ['payments', null, 'Paywall copy is final'],
+  ])
+  assert.deepEqual(updates[2].apkFiles, ['football.apk'])
+  assert.deepEqual(dataFiles('apk-inbox'), [], "the files of messages read only for the report aren't saved")
+  assert.deepEqual(
+    { ...sprint, messages: sprint.messages.map((m: any) => m.content) },
+    {
+      channel: 'sprint-assignments',
+      author: 'Subhash Yadav',
+      postedAt: '2026-10-14T12:05:26.000+00:00',
+      link: `https://discord.com/channels/${guildId}/${sprints.id}/${intro.id}`,
+      title: 'here is the list of tasks for this sprint-(oct 14 - oct 20)',
+      messages: [intro.content.replace('<@790123456789012345>', '@Rahul (Backend)'), ios.content.replace(`<@${priya.id}>`, '@Priya')],
+      tasks: [
+        { id: 'smaran-video-feed-algorithm', title: 'Smaran | Video Feed Algorithm', product: 'Smaran', pm: 'Arhaan Akhtar', assignees: [{ name: 'Rahul (Backend)', team: 'Backend' }] },
+        { id: 'football-center', title: 'Football Center', product: null, pm: 'Prakhar Shukla', assignees: [{ name: 'Priya', team: 'iOS' }] },
+      ],
+    },
+  )
+  assert.equal(api!.requests.find((r) => r.path === `/channels/${sprints.id}/messages` && !r.query.after)?.query.limit, '100')
+})
+
+test("the sprint report also reads the bot's DMs with Saransh and with each assignee, once each, and a forwarded message as the message it forwards", async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const sprints = channel('1306524433187602432', 'sprint-assignments')
+  const rahul = { ...priya, id: '790123456789012345', username: 'rahul', global_name: 'Rahul' }
+  const helper = { ...priya, id: '890123456789012345', username: 'helper', global_name: 'Helper', bot: true }
+  const post = message(sprints.id, '2026-10-14T12:05:26.000Z', saransh, `**Backend Team**\n<@${rahul.id}> <@${helper.id}>\n- Paywall. PM - Saransh\n**iOS Team**\n<@${priya.id}>\n- Football Center. PM - Saransh`, [rahul, helper, priya])
+  const withSaransh = dmWith('1300000000000000001', saransh)
+  const withRahul = dmWith('1300000000000000002', rahul)
+  const withPriya = dmWith('1300000000000000003', priya)
+  const forward = { ...message(withSaransh.id, '2026-10-16T10:00:00.000Z', saransh, ''), message_snapshots: [{ message: { content: 'Paywall is blocked on the pricing API', attachments: [] } }] }
+  const oldNews = message(withRahul.id, '2026-10-10T10:00:00.000Z', rahul, 'Paywall starts next sprint')
+  const live = message(withPriya.id, '2026-10-17T10:00:00.000Z', priya, 'Football Center is live')
+  await workspaceWithDiscord(
+    {
+      ...watched(payments, []),
+      [`/channels/${sprints.id}`]: { body: sprints },
+      [`/channels/${sprints.id}/messages`]: { body: [post] },
+      [`/channels/${sprints.id}/threads/archived/public`]: { body: { threads: [], members: [], has_more: false } },
+      [`/channels/${withPriya.id}`]: { body: withPriya },
+      [`/channels/${withSaransh.id}/messages`]: { body: [forward] },
+      [`/channels/${withRahul.id}/messages`]: { body: [oldNews] },
+      [`/channels/${withPriya.id}/messages`]: { body: [live] },
+      '/users/@me/channels': [{ body: withSaransh }, { body: withRahul }, { body: withPriya }],
+    },
+    // Priya's DM is a watched channel too, so the read since the post has it already.
+    envFile.replace(/^DISCORD_CHANNEL_IDS=.*$/m, `DISCORD_CHANNEL_IDS=${payments.id},${withPriya.id}`) + `DISCORD_SPRINT_CHANNEL_ID=${sprints.id}\n`,
+  )
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  const { updates } = JSON.parse(ws.readRunFile(runId, 'sprint.json'))
+  assert.deepEqual(
+    updates.map((m: any) => [m.channel, m.dm, m.author, m.content]),
+    [
+      ['Saransh', true, 'Saransh', 'Forwarded: Paywall is blocked on the pricing API'],
+      ['Priya', true, 'Priya', 'Football Center is live'],
+    ],
+  )
+  assert.deepEqual(
+    api!.requests.filter((r) => r.method === 'POST').map((r) => [r.path, r.body]),
+    [saransh, rahul, priya].map((u) => ['/users/@me/channels', { recipient_id: u.id }]),
+    "a bot mentioned in the post isn't an assignee",
+  )
+  assert.equal(api!.requests.filter((r) => r.path === `/channels/${withPriya.id}/messages`).length, 2, 'once in the read of the day, and once since the post')
+})
+
+test('a DISCORD_USER_ID that is a username, not a user ID, fails the Discord Step and says how to find the ID', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  await workspaceWithDiscord(watched(payments, []), envFile.replace(/^DISCORD_USER_ID=.*$/m, 'DISCORD_USER_ID=saransh_123'))
+
+  const result = await discord()
+
+  assert.notEqual(result.status, 0)
+  assert.match(ws.readRunFile(runId, 'logs', 'discord.log'), /DISCORD_USER_ID is saransh_123, but it must be Saransh's numeric user ID/)
+  assert.deepEqual(api!.requests, [])
+})
+
+test('without a sprint channel set, no sprint post is read', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  await workspaceWithDiscord(watched(payments, []))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.throws(() => ws.readRunFile(runId, 'sprint.json'))
 })

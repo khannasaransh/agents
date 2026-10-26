@@ -8,7 +8,8 @@ import { severities, type Severity } from '../agents/reviewer/config.ts'
 import type { DiscordMessage, DiscordRead } from '../steps/discord.ts'
 import type { DocsResult } from '../steps/docs.ts'
 import type { Commit, FetchResult } from '../steps/fetch.ts'
-import type { PmResult } from '../steps/pm.ts'
+import type { TaskStatus } from '../agents/pm/config.ts'
+import type { PmResult, TaskReport, TaskReportItem } from '../steps/pm.ts'
 import type { Finding, ReviewResult } from '../steps/review.ts'
 import type { MemoryProposal } from './memory.ts'
 import { apkInboxDir, otherFilesDir } from './paths.ts'
@@ -78,6 +79,24 @@ const severityCounts = (findings: Finding[]) =>
     return n ? [`${n} ${s}`] : []
   })
 
+/** The order the task status report lists its groups in: what needs Saransh first. */
+export const statusOrder: TaskStatus[] = ['blocked', 'in-progress', 'in-testing', 'done', 'no-signal']
+export const statusLabel: Record<TaskStatus, string> = { blocked: 'Blocked', 'in-progress': 'In progress', 'in-testing': 'In testing', done: 'Done', 'no-signal': 'No signal' }
+
+/** The PM's task status report, when it made one. A pm.json from before the report has none. */
+export const taskReportOf = (pm: PmResult | null): TaskReport | null => (pm?.status === 'answered' ? (pm.taskReport ?? null) : null)
+
+/** The tasks of each status, in the report's order, leaving out the statuses no task has. */
+export function byStatus(report: TaskReport): { status: TaskStatus; tasks: TaskReportItem[] }[] {
+  return statusOrder.flatMap((status) => {
+    const tasks = report.tasks.filter((t) => t.status === status)
+    return tasks.length ? [{ status, tasks }] : []
+  })
+}
+
+/** Who a task is assigned to, with their Teams. */
+export const assigneesOf = (task: TaskReportItem) => task.assignees.map((a) => (a.team ? `${a.name} (${a.team})` : a.name)).join(', ')
+
 export type Tone = 'ok' | 'warn' | 'bad' | 'quiet'
 
 /** One line of the at-a-glance summary, and the part of the Brief it points to. */
@@ -116,6 +135,12 @@ export function glance(inputs: BriefInputs): GlanceItem[] {
     items.push({ id: 'code-review', label: 'Findings', value: String(findings.length), note, tone: worst ? 'bad' : findings.length ? 'warn' : 'ok' })
   }
 
+  const report = taskReportOf(pm)
+  if (report) {
+    const note = byStatus(report).map(({ status, tasks }) => `${tasks.length} ${statusLabel[status].toLowerCase()}`).join(', ')
+    const blocked = report.tasks.some((t) => t.status === 'blocked')
+    items.push({ id: 'sprint', label: 'Sprint tasks', value: String(report.tasks.length), note: note || 'none listed', tone: blocked ? 'bad' : 'quiet' })
+  }
   if (docs?.waiting) items.push({ id: 'docs', label: 'Wiki pages to review', value: String(docs.waiting.pages.length), note: `on ${docs.branch}`, tone: 'warn' })
   if (proposals.length) items.push({ id: 'memory', label: 'Memory changes', value: String(proposals.length), note: 'waiting for you', tone: 'warn' })
 
@@ -262,6 +287,33 @@ function repoHtml(inputs: BriefInputs, r: Exclude<FetchResult, { status: 'failed
   ])}\n</details>`
 }
 
+function sprintHtml({ pm }: BriefInputs): string {
+  const report = taskReportOf(pm)
+  if (!report) return ''
+  const { post } = report
+  const about = `<p>From ${esc(post.author)}'s ${link(post.link, 'sprint post')} in #${esc(post.channel)}, ${esc(post.postedAt.slice(0, 10))}${post.title ? `: <em>${esc(post.title)}</em>` : ''}</p>`
+  const bar = `<div class="statusbar">${byStatus(report)
+    .map(({ status, tasks }) => `<span class="status ${status}">${tasks.length} ${esc(statusLabel[status].toLowerCase())}</span>`)
+    .join('')}</div>`
+  const task = (t: TaskReportItem) => {
+    const was = t.was ? `<span class="chip">was ${esc(statusLabel[t.was].toLowerCase())}</span>` : ''
+    const people = [...new Set(t.assignees.map((a) => a.name))].join(', ')
+    const facts = [
+      ...(t.product ? [['Product', esc(t.product)]] : []),
+      ['PM', esc(t.pm ?? '—')],
+      ['Assignees', esc(assigneesOf(t))],
+    ]
+    const evidence = t.evidence.length ? `<p class="muted">Evidence</p>\n${list(t.evidence.map(inline))}` : ''
+    return `<details class="task"><summary><span class="status ${t.status}">${esc(statusLabel[t.status])}</span> <span class="name">${esc(t.title)}</span> ${was}<span class="muted">${esc(people)}</span></summary>
+<div class="task-body"><p>${inline(t.note)}</p>
+<dl class="facts">${facts.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
+${evidence}</div></details>`
+  }
+  const groups = byStatus(report).map(({ status, tasks }) => `<h3>${esc(statusLabel[status])} <span class="count">${tasks.length}</span></h3>\n${tasks.map(task).join('\n')}`)
+  const body = report.tasks.length ? [about, bar, ...groups].join('\n') : `${about}\n<p class="muted">The post lists no tasks.</p>`
+  return part('sprint', 'Sprint task status', body, { count: report.tasks.length, open: true })
+}
+
 function codeReviewHtml(inputs: BriefInputs): string {
   const { results, pm } = inputs
   const repoLines = new Map(pm?.status === 'answered' ? pm.repoLines.map((r) => [r.repo, r.line]) : [])
@@ -403,6 +455,13 @@ dl.facts { display: grid; grid-template-columns: max-content 1fr; gap: 0.25rem 1
 dl.facts dt { color: var(--muted); } dl.facts dd { margin: 0; }
 ul.commits { list-style: none; padding: 0; } ul.commits li { padding: 0.3rem 0; border-bottom: 1px solid var(--line); }
 .finding { border-left: 3px solid var(--line); padding: 0.4rem 0 0.4rem 0.75rem; margin: 0.5rem 0; }
+.statusbar { display: flex; flex-wrap: wrap; gap: 0.4rem; margin: 0.5rem 0; }
+.status { display: inline-block; font-size: 0.75rem; font-weight: 600; padding: 0.05rem 0.5rem; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+.status.blocked { color: var(--bad); } .status.in-progress { color: var(--accent); } .status.in-testing { color: var(--warn); } .status.done { color: var(--ok); } .status.no-signal { color: var(--muted); }
+details.task { border-bottom: 1px solid var(--line); }
+details.task > summary { cursor: pointer; padding: 0.45rem 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem; }
+details.task > summary .name { font-weight: 600; }
+.task-body { padding: 0 0 0.6rem 0.9rem; }
 .finding.critical { border-left-color: var(--critical); } .finding.high { border-left-color: var(--high); } .finding.medium { border-left-color: var(--medium); }
 footer { margin-top: 2rem; font-size: 0.85rem; }
 `
@@ -425,6 +484,7 @@ ${dryRun}${glanceHtml(glance(inputs))}
 ${todosHtml(inputs)}
 ${discordHtml(inputs)}
 ${filesHtml(inputs)}
+${sprintHtml(inputs)}
 ${codeReviewHtml(inputs)}
 ${docsHtml(inputs)}
 ${memoryHtml(inputs)}

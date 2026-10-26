@@ -196,6 +196,14 @@ _Avoid_: doctor, debugger, monitor
 The daily summary written for Saransh alone at the end of a Run: an HTML page that opens with a summary at a glance, where each part of the details, such as the code review of each Repo, opens with a tap, and the same in Markdown beside it. The stocks Pipeline's is the **Stocks Brief**: an HTML page read at the Windows machine, never a notification, and where Saransh answers whatever waits on him.
 _Avoid_: status update, report, digest
 
+**Sprint post**:
+The task list a lead posts in the sprint channel at the start of each sprint, often as a few messages sent minutes apart, one per Team: each assignee with their tasks and each task's PM. The Discord Step reads the latest one every Run, however long ago it was posted.
+_Avoid_: sprint message, assignments, tickets
+
+**Task status report**:
+The PM Agent's account, in the Brief, of how each task of the latest Sprint post stands (blocked, in progress, in testing, done, or no signal), judged from every message since the post, the bot's DMs and the updates Saransh forwards it among them, and the commits since it, merged or still on another branch, with the evidence it rests on. Each Run starts from the last report on the same post.
+_Avoid_: sprint report, standup, task tracker
+
 **To-do**:
 Something pending on Saransh, such as a PRD link he has to download by hand. The full rules for what counts are not settled yet.
 _Avoid_: task, action item
