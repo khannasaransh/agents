@@ -35,7 +35,7 @@ test("on a weekday the MarketSmith Step skips itself, asking nothing of pd", asy
   assert.match(log(tuesday), /MarketSmith is fetched on Saturdays, and this Run started on a Tuesday/)
 })
 
-test("on a Saturday it fetches India and the US with pd marketsmith and records the fetch", async () => {
+test("on a Saturday it fetches India, the US and Hong Kong with pd marketsmith and records the fetch", async () => {
   prepare(saturday)
   ws.setPd({ marketsmith: { example: 'marketsmith.fetched.json', stderr: 'IN: fetching 2599 symbols from MarketSmith\n' } })
 
@@ -45,7 +45,8 @@ test("on a Saturday it fetches India and the US with pd marketsmith and records 
   assert.equal(JSON.parse(ws.readRunFile(saturday, 'run.json')).steps[0].status, 'succeeded')
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['marketsmith']],
+    [['marketsmith', '--region', 'IN', '--region', 'US', '--region', 'HK']],
+    "each Book's market, Hong Kong's too",
   )
   assert.deepEqual(recorded(saturday), example('marketsmith.fetched.json'))
   assert.deepEqual(todos(saturday), [])
@@ -112,17 +113,17 @@ test('run again, the Step fetches only the regions not yet fetched, and once all
   await ws.agents('step', 'marketsmith', '--run', saturday)
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['marketsmith'], ['marketsmith', '--region', 'IN']],
+    [['marketsmith', '--region', 'IN', '--region', 'US', '--region', 'HK'], ['marketsmith', '--region', 'IN']],
     'the second run asked again only for India, whose cookie was rejected, and the third for nothing',
   )
   const regions = recorded(saturday).regions
   assert.deepEqual(
     regions.map((r: { region: string; status: string; ok: number }) => [r.region, r.status, r.ok]),
-    [['IN', 'fetched', 2571], ['US', 'fetched', 5969]],
+    [['IN', 'fetched', 2571], ['US', 'fetched', 5969], ['HK', 'fetched', 2440]],
     "India's second fetch, and the US's first",
   )
   assert.deepEqual(todos(saturday), [], "the fetch that worked dropped the cookie's To-do")
 
   await ws.agents('step', 'marketsmith', '--run', saturday, '--force')
-  assert.deepEqual(ws.pdCalls()[2].args, ['marketsmith'], 'forced, it fetches every region again')
+  assert.deepEqual(ws.pdCalls()[2].args, ['marketsmith', '--region', 'IN', '--region', 'US', '--region', 'HK'], 'forced, it fetches every region again')
 })

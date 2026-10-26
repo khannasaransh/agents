@@ -8,7 +8,7 @@
 
 **Status:** done
 
-**Waiting on Saransh:** which versions the Candidate test may choose from, once the report is out.
+**Waiting on Saransh:** nothing. He approved versions on 26 October (issue 48 lists them).
 
 - [x] Every strategy has a version: its rules, its parameters and its code hash. A change to any of them makes a new version, which is a new strategy and starts as a Candidate.
 - [x] CW2's selected variant is a strategy of its own for India and the US, next to the original. Its rules:
@@ -41,7 +41,7 @@
 - **Approvals** are in ash_new's `config/approved_versions.yaml`, each naming a strategy and its version.
   - An approval of a version that is no longer the strategy's is stale: `pd versions` lists it, and it approves nothing.
   - `candidates(settings)` gives the built-in strategies whose current version is approved. Issue 30's Candidate test reads it.
-  - **None is approved yet.** That is Saransh's call, from the report.
+  - **21 are approved,** from 26 October, at Saransh's word. The rule: a version a Book can trade whose CAGR beat its benchmark's in both 2016–2026 and the 2013–2016 holdout. Issue 48 lists them.
 - **The engine's version is part of every strategy's.** CW2's SuperTrend and up-day ranking, and every port's slot trading rules, live in ash_new's engine (`pdash.engine.trading`), not the plugin's file. A change there bumps `ENGINE_VERSION`, so it is a new version of every strategy and unapproves them all, even one whose trades it doesn't change. Saransh then approves again from `pd versions`.
 - **"Starts as a Candidate"** means, until the Stages exist (issue 31), that a new version has no approval.
 - **Each port's versions**, in ash_new's plugins. A plugin's `strategies` may now name `"IN:next-open"`, which makes `in-<plugin>-next-open`.
@@ -49,7 +49,7 @@
   - **`-next-open`**, in India and the US: the same settings, filled at the next open. This is the version a Book can trade.
   - **`-tuned`**, in India and the US, where ash_new's cross-market study of 20 October changed something: its setup, filled at the next open.
   - **`-selected`** is CW2's: the research's selected variant. So `in-cw2-selected` and `us-cw2-selected` sit next to the original `in-cw2` and `us-cw2`.
-  - **Hong Kong** keeps ash's version only, since no Book trades it.
+  - **Hong Kong** kept ash's version only, since no Book traded it. Issue 48 made it a Book and gave it the same versions: `-next-open` for each port; `-tuned` for HAMA, Investor and Swing; `-selected` for CW2.
 
   Since 20 October each region had traded the study's setup at the next open, under the plain id. Now ash's setup and the study's are both kept, each under an id of its own.
 - **CW2's selected variant reproduces its research exactly.** That holds on the current Lake and on the panels the research pinned:

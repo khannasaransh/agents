@@ -6,6 +6,8 @@
 
 **Blocked by:** 26: Gold ETFs and cash funds in the Lake
 
+**The Hong Kong Book holds the US Book's gold ETF and cash fund** (Saransh, 26 October 2026; issue 48), in dollars: nothing is chosen for Hong Kong. Its backtest values them in Hong Kong dollars at each day's rate (the peg keeps the rate within 7.75–7.85), and its cash fund earns the US's risk-free rate.
+
 **Status:** ready-for-agent
 
 - [ ] The India and US Books are declared in ash_new's config, each with:

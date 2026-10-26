@@ -1,4 +1,5 @@
-// MarketSmith: on Saturdays, fetches MarketSmith's India and US data through ash_new
+// MarketSmith: on Saturdays, fetches MarketSmith's data for the Books' markets (India, the US and
+// Hong Kong) through ash_new
 // (`pd marketsmith`) before the Lake Step refreshes, so the fundamentals it builds and MarketSmith's
 // snapshot are never more than a week old. ash_new writes the raw store and keeps the fetch as a
 // dated snapshot; this Step records what it printed as marketsmith.json. It skips itself on other
@@ -10,7 +11,7 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, writeJson } from '../../src/files.ts'
 import { capitalised } from '../../src/answers.ts'
-import { fetchLine, regionName } from '../../src/marketsmith.ts'
+import { bookRegions, fetchLine, regionName } from '../../src/marketsmith.ts'
 import { runPd, type PdMarketSmith } from '../../src/pd.ts'
 import { readRun } from '../../src/run.ts'
 import { weekdays } from '../../src/schedule.ts'
@@ -50,7 +51,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     console.log('MarketSmith was already fetched in this Run, skipping')
     return
   }
-  const args = ['marketsmith', ...left.flatMap((region) => ['--region', region])]
+  const args = ['marketsmith', ...(left.length ? left : bookRegions).flatMap((region) => ['--region', region])]
 
   const { code, stdout, stderr, timedOut } = await runPd(args, { cwd: runFolder, timeoutMs: fetchMs })
   // pd marketsmith logs on stderr as it goes, and prints its JSON on stdout.

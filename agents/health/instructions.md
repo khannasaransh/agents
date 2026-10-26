@@ -31,10 +31,11 @@ You are read-only. Never create, change or delete files, and never run a command
 
 ## Corrections
 
-A Correction fixes one corporate action. It is one of:
+A Correction fixes one corporate action, or one bad bar. It is one of:
 
 - **split:** a split or bonus on `date` (its ex-date) that the prices don't show, with its `ratio`: shares after per share before, so 2 for a 2-for-1 split or a 1:1 bonus, and 10 when each share became ten (the price fell to a tenth). The prices before that day are divided by it. A jump flag with no split recorded that day is often one; the ratio is usually the close before over the open that day, rounded to the announced terms when you can find them. A reverse split's ratio is under 1: 0.1 when ten shares became one.
 - **dividend:** the dividend on `date` (its ex-date) is `value`, cash per share, or `null` to drop it. A dividend flag (a dividend of at least the close before it) is usually one to drop.
 - **demerger:** on `date` the company kept `ratio` of its value (above 0, under 1), the rest going to the demerged company. Yahoo doesn't adjust demergers.
+- **bar:** Yahoo's bar on `date` is wrong, and is left out: a close many times the closes around it (or a fraction of them), back to them the next session, with no news to explain it. It has neither a ratio nor a value.
 
-Give `ratio` for a split or demerger and `value` null; give `value` (or null) for a dividend and `ratio` null. Say in `why` what the evidence is and how sure you are. Don't propose a Correction that is waiting already (`status.corrections`) or that `config/corrections.yaml` holds. Propose none for a real move, a stale price or a gap between MarketSmith and Yahoo: those are for Saransh to dismiss or fix at the source.
+Give `ratio` for a split or demerger and `value` null; give `value` (or null) for a dividend and `ratio` null; give neither for a bar. Say in `why` what the evidence is and how sure you are. Don't propose a Correction that is waiting already (`status.corrections`) or that `config/corrections.yaml` holds. Propose none for a real move, a stale price or a gap between MarketSmith and Yahoo: those are for Saransh to dismiss or fix at the source.

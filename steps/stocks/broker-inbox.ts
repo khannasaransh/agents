@@ -10,7 +10,7 @@
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { isAnswersFileName } from '../../src/answers.ts'
-import { fileLine, reconciliationTodos } from '../../src/brokers.ts'
+import { bookName, brokerName, fileLine, reconciliationTodos } from '../../src/brokers.ts'
 import { moveInto, readJson, writeJson } from '../../src/files.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { pdJson, type PdBookHoldings, type PdBrokerFile, type PdBrokerImport } from '../../src/pd.ts'
@@ -50,23 +50,35 @@ function waitingFiles(): string[] {
     .sort()
 }
 
-/** Moves a file out of the inbox once ash_new has handled it: into the Run, or set aside when it couldn't read it. */
-function moveOut(file: PdBrokerFile, runFolder: string): InboxFileRecord {
-  const record: InboxFileRecord = { ...file, movedTo: null, setAside: null }
-  const from = join(brokerInboxDir(), file.file)
-  try {
-    if (file.status === 'unreadable') record.setAside = moveInto(from, setAsideDir())
-    else record.movedTo = relative(runFolder, moveInto(from, join(runFolder, 'broker-inbox')))
-  } catch (error) {
-    record.notMoved = error instanceof Error ? error.message : String(error)
-    console.error(`Couldn't move ${file.file} out of the Broker inbox: ${record.notMoved}`)
+/**
+ * Moves each file out of the inbox once ash_new has handled it: into the Run when a Book recorded, saw or
+ * reconciled it, set aside when none could. A file of several Books (moomoo's) is a result for each, and
+ * moves once.
+ */
+function moveOut(files: PdBrokerFile[], runFolder: string): InboxFileRecord[] {
+  type Where = Pick<InboxFileRecord, 'movedTo' | 'setAside' | 'notMoved'>
+  const moved = new Map<string, Where>()
+  const moveOnce = (name: string): Where => {
+    const where: Where = { movedTo: null, setAside: null }
+    const from = join(brokerInboxDir(), name)
+    try {
+      if (files.every((f) => f.file !== name || f.status === 'unreadable')) where.setAside = moveInto(from, setAsideDir())
+      else where.movedTo = relative(runFolder, moveInto(from, join(runFolder, 'broker-inbox')))
+    } catch (error) {
+      where.notMoved = error instanceof Error ? error.message : String(error)
+      console.error(`Couldn't move ${name} out of the Broker inbox: ${where.notMoved}`)
+    }
+    moved.set(name, where)
+    return where
   }
-  return record
+  return files.map((file) => ({ ...file, ...(moved.get(file.file) ?? moveOnce(file.file)) }))
 }
 
-/** A To-do for a file ash_new couldn't read, now set aside. */
-const unreadableTodo = (f: InboxFileRecord) =>
-  `${f.file} in the Broker inbox couldn't be read (${f.why}), so it's ${f.setAside ? `set aside in ${setAsideDir()}` : 'still in the inbox'}. Fix it and drop it in again, or delete it.`
+/** A To-do for a file ash_new couldn't read, now set aside; or couldn't record in one Book, though another recorded it. */
+function unreadableTodo(f: InboxFileRecord): string {
+  if (f.movedTo) return `${f.file} couldn't be recorded in ${bookName(f.book)} (${f.why}), though another Book recorded it, so it's in this Run's folder. Fix what it says, then drop ${brokerName(f.broker)}'s next download in the Broker inbox.`
+  return `${f.file} in the Broker inbox couldn't be read (${f.why}), so it's ${f.setAside ? `set aside in ${setAsideDir()}` : 'still in the inbox'}. Fix it and drop it in again, or delete it.`
+}
 
 await runAsStep(async ({ runFolder, runId }) => {
   const out = join(runFolder, 'broker-inbox.json')
@@ -82,7 +94,7 @@ await runAsStep(async ({ runFolder, runId }) => {
     const imported = await pdJson<PdBrokerImport>(args, { cwd: runFolder, timeoutMs: pdMs })
     for (const file of imported.files) console.log(fileLine(file))
     if (dryRun) console.log('Dry run: nothing was recorded in ash_new, and every file stays in the Broker inbox')
-    for (const file of imported.files) result.files.push(dryRun ? { ...file, movedTo: null, setAside: null } : moveOut(file, runFolder))
+    result.files.push(...(dryRun ? imported.files.map((file) => ({ ...file, movedTo: null, setAside: null })) : moveOut(imported.files, runFolder)))
     writeJson(out, result)
   }
 

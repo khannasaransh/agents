@@ -31,6 +31,7 @@
   - **A split** gives a date and a ratio: shares after per share before. The prices and dividends before that date are divided by the ratio, and the split is stored among the actions, so ledgers and EPS follow it. Where Yahoo records a split that day, its prices are taken to reflect Yahoo's own ratio, so they move by the Correction's ratio over Yahoo's.
   - **A dividend** sets that ex-date's dividend, or drops it when its value is null.
   - **A demerger** gives the share of the value the company kept. The prices and dividends before it are multiplied by that share, and nothing is stored among the actions.
+  - **A bar** (added by issue 49) leaves out Yahoo's bar on its date: a close many times the closes around it, or a fraction of them, back the next session. It has neither a ratio nor a value.
 - **How an approved Correction gets applied:** the lake records which of each security's Corrections its stored history was built with (`corrections/region=*/built.json`). When that record no longer matches the file, the next refresh fetches the security's whole history again and builds it with the Correction. This holds even when the Lake is already current, so long as the security is active.
   - A top-up corrects only what Yahoo sends. The stored bars it keeps already carry their Corrections, and one dated before the top-up's first day is left to the stored history.
   - The new prices give the panels a new data version.

@@ -75,7 +75,7 @@ test('each Reconciliation difference becomes a To-do, from the latest holdings e
   ])
 })
 
-test("moomoo's trade history and positions are handed in unchanged, and the US Book's differences become To-dos", async () => {
+test("moomoo's trade history and positions are handed in unchanged, and the US and Hong Kong Books' differences become To-dos", async () => {
   prepare({ pd: { broker: { example: 'broker-import.moomoo.json' }, 'book-holdings': { example: 'book-holdings.books.json' } } })
   // As moomoo names them: spaces and parentheses.
   const history = 'History Transactions-Margin Account(3901)-20220802-20260815.csv'
@@ -87,12 +87,29 @@ test("moomoo's trade history and positions are handed in unchanged, and the US B
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(ws.pdCalls()[0].args.slice(2).map((file) => basename(file)), [history, positions])
   assert.deepEqual(inInbox(), [])
+  // Each file is read for both of moomoo's Books, and moves into the Run once.
   assert.deepEqual(ws.runFiles(runId, 'broker-inbox').sort(), [history, positions])
+  assert.deepEqual(
+    recorded().files.map((f: { book: string; movedTo: string }) => [f.book, f.movedTo]),
+    [
+      ['US', join('broker-inbox', history)],
+      ['HK', join('broker-inbox', history)],
+      ['US', join('broker-inbox', positions)],
+      ['HK', join('broker-inbox', positions)],
+    ],
+  )
+  assert.ok(recorded().files.every((f: { notMoved?: string }) => !f.notMoved), 'no Book tried to move a file another had moved')
   const log = ws.readRunFile(runId, 'logs', 'broker-inbox.log')
-  assert.match(log, /History Transactions-Margin Account\(3901\)-20220802-20260815\.csv: moomoo's trade history, 7 trades recorded in the US Book, 3 rows set aside as not the Book's trades/)
+  assert.match(log, /History Transactions-Margin Account\(3901\)-20220802-20260815\.csv: moomoo's trade history, 7 trades recorded in the US Book, 5 rows set aside as not the Book's trades/)
+  assert.match(log, /History Transactions-Margin Account\(3901\)-20220802-20260815\.csv: moomoo's trade history, 2 trades recorded in the Hong Kong Book, 10 rows set aside as not the Book's trades/)
   assert.match(log, /Positions-Margin Account\(3901\)-20260815-043000\.csv: moomoo's positions of 2026-08-14, reconciled with the US Book: 3 match, 5 differences/)
+  assert.match(log, /Positions-Margin Account\(3901\)-20260815-043000\.csv: moomoo's positions of 2026-08-15, reconciled with the Hong Kong Book: 1 match, 2 differences/)
   const us = todos().filter((todo) => todo.startsWith('Reconciliation, US Book'))
-  assert.equal(todos().length, 10, "the India Book's five, then the US Book's")
+  assert.equal(todos().length, 12, "the India Book's five, then the US Book's, then the Hong Kong Book's")
+  assert.deepEqual(todos().slice(10), [
+    "Reconciliation, Hong Kong Book, as of 2026-08-15: moomoo holds 300 of Tencent Holdings Ltd (HK:0700), its ledger 200: 3 for 2, as a split or bonus the Lake hasn't got would give.",
+    "Reconciliation, Hong Kong Book, as of 2026-08-15: moomoo holds 10600 of CSOP Hang Seng TECH Index ETF (symbol 03033), which ash_new's securities table hasn't got, so it can't be reconciled.",
+  ])
   assert.deepEqual(us, [
     'Reconciliation, US Book, as of 2026-08-14: moomoo holds 6.24 of Apple (US:AAPL), its ledger 6. Drop the trade history with the missing buys in the Broker inbox.',
     'Reconciliation, US Book, as of 2026-08-14: moomoo holds 0.8 of Nvidia Corp (US:NVDA), which its ledger has none of. Drop the trade history with its buys in the Broker inbox.',
@@ -100,6 +117,24 @@ test("moomoo's trade history and positions are handed in unchanged, and the US B
     'Reconciliation, US Book, as of 2026-08-14: its ledger holds 4 of Waters Corp (US:WAT), which moomoo holds none of. Drop the trade history with its sales in the Broker inbox.',
     "Reconciliation, US Book, as of 2026-08-14: moomoo holds 235 of iShares Latin America 40 ETF (symbol ILF), which ash_new's securities table hasn't got, so it can't be reconciled.",
   ])
+})
+
+test("a moomoo file one Book recorded and the other couldn't moves into the Run, with a To-do for the Book that couldn't", async () => {
+  prepare({ pd: { broker: { example: 'broker-import.partial.json' }, 'book-holdings': { example: 'book-holdings.empty.json' } } })
+  const history = 'History Transactions-Margin Account(3901)-20220802-20260815.csv'
+  drop(history)
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(inInbox(), [], 'not set aside: the US Book recorded it')
+  assert.deepEqual(ws.runFiles(runId, 'broker-inbox'), [history])
+  assert.deepEqual(todos(), [
+    `${history} couldn't be recorded in the Hong Kong Book (It sells 300 HK:0700 on 2026-08-20, but holds 200 then. Nothing in it was recorded), though another Book recorded it, so it's in this Run's folder. Fix what it says, then drop moomoo's next download in the Broker inbox.`,
+  ])
+  const log = ws.readRunFile(runId, 'logs', 'broker-inbox.log')
+  assert.match(log, /moomoo's trade history, 1 trade recorded in the US Book, 6 in its ledger already, 6 rows set aside/)
+  assert.match(log, /History Transactions-Margin Account\(3901\)-20220802-20260815\.csv: can't be read for the Hong Kong Book: It sells 300 HK:0700/)
 })
 
 test("a file pd can't read is set aside in the inbox with a To-do, and one seen before moves into the Run", async () => {

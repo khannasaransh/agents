@@ -1,0 +1,29 @@
+{
+  "dry_run": false,
+  "files": [
+    {
+      "file": "History Transactions-Margin Account(3901)-20220802-20260815.csv",
+      "sha256": "3c1f0e9d8b7a69584736251403f2e1d0c9b8a7968574635241302f1e0d9c8b7a",
+      "broker": "moomoo",
+      "kind": "tradebook",
+      "book": "US",
+      "portfolio_id": 5,
+      "status": "recorded",
+      "why": null,
+      "trades": { "recorded": 1, "in_ledger": 6, "set_aside": 6 },
+      "reconciliation": null
+    },
+    {
+      "file": "History Transactions-Margin Account(3901)-20220802-20260815.csv",
+      "sha256": "3c1f0e9d8b7a69584736251403f2e1d0c9b8a7968574635241302f1e0d9c8b7a",
+      "broker": "moomoo",
+      "kind": "tradebook",
+      "book": "HK",
+      "portfolio_id": 6,
+      "status": "unreadable",
+      "why": "It sells 300 HK:0700 on 2026-08-20, but holds 200 then. Nothing in it was recorded",
+      "trades": null,
+      "reconciliation": null
+    }
+  ]
+}

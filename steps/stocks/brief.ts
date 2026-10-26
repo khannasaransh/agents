@@ -87,6 +87,7 @@ function proposalsLine(proposals: Proposals, proposed: number): string {
 function correctionText(c: PdStatus['corrections'][number]): string {
   if (c.kind === 'split') return `Split of ${c.ratio} for 1 on ${c.date}`
   if (c.kind === 'demerger') return `Demerger on ${c.date}, the company keeping ${Math.round((c.ratio ?? 0) * 1000) / 10}% of its value`
+  if (c.kind === 'bar') return `Bar of ${c.date} left out`
   return c.value === null ? `No dividend on ${c.date}` : `Dividend of ${c.value} on ${c.date}`
 }
 

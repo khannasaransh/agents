@@ -2,6 +2,7 @@
   "fetched_at": "2026-10-31T09:40:51.003000+00:00",
   "regions": [
     { "region": "IN", "status": "cookie_rejected", "cookie": "PDASH_MS_INDIA_AUTH", "run_id": null, "universe": 2599, "ok": 0, "skipped": 0, "failed": 0, "snapshot": null, "error": "MarketSmith India answered 403: the token has expired, or this IP is blocked" },
-    { "region": "US", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-10-31T01-31-02Z", "universe": 5971, "ok": 5969, "skipped": 0, "failed": 2, "snapshot": "US:2026-10-31", "error": null }
+    { "region": "US", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-10-31T01-31-02Z", "universe": 5971, "ok": 5969, "skipped": 0, "failed": 2, "snapshot": "US:2026-10-31", "error": null },
+    { "region": "HK", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-10-31T01-31-02Z", "universe": 2447, "ok": 2440, "skipped": 7, "failed": 0, "snapshot": "HK:2026-10-31", "error": null }
   ]
 }

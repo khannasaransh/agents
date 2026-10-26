@@ -70,12 +70,16 @@ _Avoid_: database, data store
 One simulated run of a strategy over past data in ash_new, which ash_new itself calls a Run.
 _Avoid_: Run (here, a Run is a Pipeline's), simulation
 
+**Frozen backtest**:
+A strategy version's backtest over 2006-01-01 to 2016-08-15, on data built once from the Lake and pinned, worked out once and kept (issue 49). Its result never changes, whatever the Lake learns later. A strategy that changes is a new version, with a frozen backtest of its own.
+_Avoid_: holdout (the 2013–2016 window the studies test on, on the current Lake)
+
 **Portfolio Manager**:
 The Agent that manages Saransh's portfolios, real and paper, end to end: starting from the Rule plan, what to buy, sell and hold, and at what size, within the Mandate and its Book's Playbook. It advises; Saransh places every order.
 _Avoid_: PM (that is the daily Pipeline's PM Agent), fund manager, advisor, trader
 
 **Book**:
-The real money in one market, managed as one: the India Book in INR at ICICI Direct, the US Book in USD at moomoo. Each has its own Mandate, objective, benchmark and gold Sleeve. Their combined value in INR is shown but limits nothing. Beside each is a **paper Book**, run exactly like it but filled automatically at the next open, holding every strategy from Paper up at its full share; the real Book's gap to it is what Saransh's fills, skips and the Stages cost. Beside each paper Book is a **rules-only paper Book**, which trades the Rule plan unchanged from the same start; the paper Book's gap to it is what the Portfolio Manager's judgement added.
+The real money in one market, managed as one: the India Book in INR at ICICI Direct, the US Book in USD at moomoo and the Hong Kong Book in HKD at moomoo (issue 48). Each has its own Mandate, objective, benchmark and gold Sleeve; the Hong Kong Book's gold ETF and cash fund are the US Book's, in dollars. Their combined value in INR is shown but limits nothing. Beside each is a **paper Book**, run exactly like it but filled automatically at the next open, holding every strategy from Paper up at its full share; the real Book's gap to it is what Saransh's fills, skips and the Stages cost. Beside each paper Book is a **rules-only paper Book**, which trades the Rule plan unchanged from the same start; the paper Book's gap to it is what the Portfolio Manager's judgement added.
 _Avoid_: account, fund, portfolio (ash_new's Portfolio is one ledger)
 
 **Book state**:

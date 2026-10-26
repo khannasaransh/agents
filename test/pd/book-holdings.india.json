@@ -42,6 +42,19 @@
       "cash": 0,
       "holdings": [],
       "reconciliation": null
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "currency": "HKD",
+      "portfolio_id": null,
+      "as_of": null,
+      "value": 0,
+      "cash": 0,
+      "holdings": [],
+      "reconciliation": null
     }
   ]
 }

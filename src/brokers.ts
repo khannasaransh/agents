@@ -4,11 +4,17 @@
 import type { PdBook, PdBrokerFile, PdDifference } from './pd.ts'
 
 const brokerNames: Record<string, string> = { icici_direct: 'ICICI Direct', moomoo: 'moomoo' }
-const bookNames: Record<string, string> = { IN: 'the India Book', US: 'the US Book' }
+const bookNames: Record<string, string> = { IN: 'the India Book', US: 'the US Book', HK: 'the Hong Kong Book' }
 const fileNames: Record<string, { tradebook: string; holdings: string }> = {
   icici_direct: { tradebook: 'tradebook', holdings: 'holdings' },
   moomoo: { tradebook: 'trade history', holdings: 'positions' },
 }
+
+/** A broker as a sentence names it: "ICICI Direct", "moomoo". */
+export const brokerName = (broker: string | null) => brokerNames[broker ?? ''] ?? broker ?? ''
+
+/** A Book as a sentence names it: "the India Book", "the Hong Kong Book". */
+export const bookName = (book: string | null) => bookNames[book ?? ''] ?? book ?? ''
 
 /** What a broker calls its tradebook and its holdings ("trade history", "positions"). */
 export const brokerFiles = (broker: string | null) => fileNames[broker ?? ''] ?? fileNames.icici_direct
@@ -27,13 +33,14 @@ export function securityName(d: Pick<PdDifference, 'security_id' | 'isin' | 'sym
 
 /**
  * What became of a file, as the Step logs it: "orderBook.csv: ICICI Direct's tradebook, 6 trades
- * recorded in the India Book, 1 in its ledger already".
+ * recorded in the India Book, 1 in its ledger already". A file of several Books (moomoo's, the US Book's
+ * and the Hong Kong Book's) has a line for each.
  */
 export function fileLine(f: PdBrokerFile): string {
-  const broker = brokerNames[f.broker ?? ''] ?? f.broker
-  const book = bookNames[f.book ?? ''] ?? f.book
+  const broker = brokerName(f.broker)
+  const book = bookName(f.book)
   const files = brokerFiles(f.broker)
-  if (f.status === 'unreadable') return `${f.file}: can't be read: ${f.why}`
+  if (f.status === 'unreadable') return f.book ? `${f.file}: can't be read for ${book}: ${f.why}` : `${f.file}: can't be read: ${f.why}`
   if (f.status === 'seen') return `${f.file}: seen before, not recorded again: ${f.why}`
   if (f.status === 'recorded' && f.trades) {
     const { recorded, in_ledger, set_aside } = f.trades

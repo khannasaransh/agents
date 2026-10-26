@@ -33,10 +33,10 @@ export interface PdStatus {
   corrections: (PdCorrection & { name: string | null; effect: string })[]
 }
 
-/** A Correction as the Corrections file holds it: what the Health Agent proposes. */
+/** A Correction as the Corrections file holds it: what the Health Agent proposes. A bar is Yahoo's bar on its date, left out. */
 export interface CorrectionChange {
   security_id: string
-  kind: 'split' | 'dividend' | 'demerger'
+  kind: 'split' | 'dividend' | 'demerger' | 'bar'
   date: string
   /** A split's shares after per share before; a demerger's share of the value the company kept. */
   ratio: number | null
@@ -144,19 +144,20 @@ export interface PdBrokerFile {
   sha256: string
   broker: 'icici_direct' | 'moomoo' | null
   kind: 'tradebook' | 'holdings' | null
-  book: 'IN' | 'US' | null
+  book: 'IN' | 'US' | 'HK' | null
   portfolio_id: number | null
-  /** seen: a tradebook with the same content was recorded already, so nothing is. unreadable: nothing in it was recorded, and `why` says why. */
+  /** seen: a tradebook with the same content was recorded already in this Book, so nothing is. unreadable: nothing in it was recorded, and `why` says why. */
   status: 'recorded' | 'seen' | 'reconciled' | 'unreadable'
   why: string | null
-  /** set_aside: rows that aren't the Book's trades: not a buy or sale, another market's (moomoo's Hong Kong fills), or, in the US Book, a security ash_new hasn't got. */
+  /** set_aside: rows that aren't the Book's trades: not a buy or sale, another market's (moomoo's Hong Kong fills, to the US Book), or, in the US and Hong Kong Books, a security ash_new hasn't got. */
   trades: { recorded: number; in_ledger: number; set_aside: number } | null
   reconciliation: PdReconciliation | null
 }
 
 /**
  * What `pd broker import` prints (contract/broker-import.schema.json): each file handed in, identified
- * by its columns, tradebooks recorded first, then holdings exports reconciled, the unreadable last.
+ * by its columns, tradebooks recorded first, then holdings exports reconciled, the unreadable last. A file
+ * of several Books (moomoo's: the US Book's and the Hong Kong Book's) is an entry for each.
  */
 export interface PdBrokerImport {
   dry_run: boolean
@@ -165,7 +166,7 @@ export interface PdBrokerImport {
 
 /** A Book's real money, as `pd book-holdings` prints it (contract/book-holdings.schema.json). */
 export interface PdBook {
-  book: 'IN' | 'US'
+  book: 'IN' | 'US' | 'HK'
   name: string
   broker: 'icici_direct' | 'moomoo'
   broker_name: string
@@ -179,7 +180,7 @@ export interface PdBook {
   reconciliation: (PdReconciliation & { file: string; reconciled_at: string }) | null
 }
 
-/** What `pd book-holdings` prints: each Book's real money, India first. */
+/** What `pd book-holdings` prints: each Book's real money, India first, then the US and Hong Kong. */
 export interface PdBookHoldings {
   books: PdBook[]
 }

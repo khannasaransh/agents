@@ -3,6 +3,9 @@ import type { PdMarketSmith } from './pd.ts'
 
 const regionNames: Record<string, string> = { IN: 'India', US: 'the US', HK: 'Hong Kong' }
 
+/** The markets the Books trade, whose MarketSmith data is fetched each Saturday: India, the US and Hong Kong. */
+export const bookRegions = ['IN', 'US', 'HK']
+
 /** A MarketSmith region's name in a sentence: India, the US, Hong Kong. */
 export const regionName = (code: string) => regionNames[code] ?? code
 

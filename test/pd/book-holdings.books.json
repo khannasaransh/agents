@@ -61,6 +61,31 @@
           { "kind": "unknown_security", "security_id": null, "isin": null, "symbol": "ILF", "name": "iShares Latin America 40 ETF", "ledger_qty": null, "broker_qty": 235, "ratio": null }
         ]
       }
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "currency": "HKD",
+      "portfolio_id": 6,
+      "as_of": "2026-08-14",
+      "value": 145000,
+      "cash": 0,
+      "holdings": [
+        { "security_id": "HK:0388", "name": "Hong Kong Exchanges and Clearing Ltd", "qty": 100, "avg_cost": 402.4, "price": 410, "priced_on": "2026-08-14", "value": 41000 },
+        { "security_id": "HK:0700", "name": "Tencent Holdings Ltd", "qty": 200, "avg_cost": 512.5, "price": 520, "priced_on": "2026-08-14", "value": 104000 }
+      ],
+      "reconciliation": {
+        "file": "Positions-Margin Account(3901)-20260815-043000.csv",
+        "reconciled_at": "2026-08-14T20:31:07.391000+00:00",
+        "as_of": "2026-08-15",
+        "matched": 1,
+        "differences": [
+          { "kind": "quantity", "security_id": "HK:0700", "isin": null, "symbol": "00700", "name": "Tencent Holdings Ltd", "ledger_qty": 200, "broker_qty": 300, "ratio": "3 for 2" },
+          { "kind": "unknown_security", "security_id": null, "isin": null, "symbol": "03033", "name": "CSOP Hang Seng TECH Index ETF", "ledger_qty": null, "broker_qty": 10600, "ratio": null }
+        ]
+      }
     }
   ]
 }

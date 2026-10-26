@@ -23,7 +23,7 @@ A stocks Pipeline in the agents repo, run on the Windows machine that holds the 
 1. **Records what Saransh did:** his Answers from the last Stocks Brief, and the tradebooks and holdings exports he dropped in the Broker inbox.
 2. **Fetches MarketSmith's data** through ash_new, on Saturdays, keeping each fetch as a dated snapshot.
 3. **Brings the Lake up to date** with ash_new's daily chain. It clears a stuck refresh and retries a failed one once. If something still breaks, the Health Agent works out why. The Data gate decides whether the Portfolio Manager may act at all (Hold mode otherwise), and a single flagged security goes into Quarantine.
-4. **Makes the Rule plan in code** for each Book: India and the US, each real and paper. It starts from the Book's state: its reconciled holdings and cash, and what open orders reserve. It uses the same engine that backtests the Book, so live trades what was tested. It reads each market's Market condition, which sets how much of the Book may be in stocks.
+4. **Makes the Rule plan in code** for each Book: India, the US and Hong Kong, each real and paper. It starts from the Book's state: its reconciled holdings and cash, and what open orders reserve. It uses the same engine that backtests the Book, so live trades what was tested. It reads each market's Market condition, which sets how much of the Book may be in stocks.
 5. **Puts the plan to the Desk and the Portfolio Manager.** The Events, Chart and Risk analysts read the Feeds and the Lake for the Rule plan's names and argue over it. The Portfolio Manager decides what to change within the Book's Playbook, and writes a Decision record with the evidence for each change. A final check holds it to the Mandate, the Playbook and the Book's Judgement mode.
 6. **Reviews the Books** on Saturdays: weekly, monthly with attribution, and yearly, when strategies are chosen again.
 7. **Writes the Stocks Brief:** an HTML page holding the Order list for India's open and the US's evening open, everything waiting on Saransh, and buttons to answer.
@@ -73,16 +73,16 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 ### Books and the Mandate
 
-31. As Saransh, I want an India Book in INR at ICICI Direct and a US Book in USD at moomoo, each managed on its own, so that one market's losses never force sales in the other.
-32. As Saransh, I want each Book to have its own Mandate, objective and benchmark (the Nifty 500 TRI; the S&P 500 total return), so that each is judged against its own market.
+31. As Saransh, I want an India Book in INR at ICICI Direct, a US Book in USD at moomoo and a Hong Kong Book in HKD at moomoo, each managed on its own, so that one market's losses never force sales in another.
+32. As Saransh, I want each Book to have its own Mandate, objective and benchmark (the Nifty 500 TRI; the S&P 500 total return; the Hang Seng total return), so that each is judged against its own market.
 33. As Saransh, I want no more than 15% of a Book in one position and 30% in one sector, so that no single name or sector can sink it.
 34. As Saransh, I want a Book that falls 10% from its high to stop new buys, and one that falls 18% to halve its exposure, so that drawdowns are cut before they reach the 25% I won't accept.
-35. As Saransh, I want a Book's idle cash held in its cash fund (a liquid ETF in India, a T-bill ETF in the US), so that money waiting for a strategy still earns.
+35. As Saransh, I want a Book's idle cash held in its cash fund (a liquid ETF in India, a T-bill ETF in the US, which the Hong Kong Book holds too), so that money waiting for a strategy still earns.
 36. As Saransh, I want tax to decide only between otherwise equal choices, so that it never overrides what the strategies say.
 37. As Saransh, I want a position flagged when its Disaster stop would lose more than 1% of its Book, so that I see oversized risk without the strategies' sizing being changed.
-38. As Saransh, I want the Books' combined value shown in INR with no limit on it, so that I see my whole wealth but the dollar's moves never trip a breaker.
+38. As Saransh, I want the Books' combined value shown in INR with no limit on it, so that I see my whole wealth but the dollar's and the Hong Kong dollar's moves never trip a breaker.
 39. As Saransh, I want each Book's capital to be a setting, with ash_new's preset capital used in backtests until I set it, so that the work can start before I decide the amounts.
-40. As Saransh, I want Hong Kong left out of the Books, so that a market with no real money and weak evidence takes none of the Portfolio Manager's attention.
+40. As Saransh, I want my Hong Kong holdings at moomoo managed as a Book of their own, with their fills and positions read from the same moomoo exports as the US Book's, so that all the money I hold at moomoo is managed. (Changed on 26 October 2026, issue 48: Hong Kong had been left out of the Books, as a market with no real money and weak evidence. Its evidence is still weak, so the Candidate test decides what it may trade.)
 
 ### Strategies and Stages
 
@@ -93,6 +93,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 45. As Saransh, I want a strategy whose rules change to be a new strategy that starts again as a Candidate, while the old one keeps its Stage until replaced, so that no tweak inherits a live record it didn't earn.
 46. As Saransh, I want a strategy entering Paper to be launched in ash_new, so that its live track starts the day its Paper Stage does.
 47. As Saransh, I want CW2's selected variant activated, and the ash ports audited against ash's own with a version each, before Candidates are picked, so that the selection sees only the versions I approved.
+143. As Saransh, I want each strategy version backtested once over 2006 to 2016, on data frozen from the Lake and pinned, so that I have one result per version that never changes as the Lake is corrected and refreshed (issue 49).
 48. As Saransh, I want a Retired strategy's Sleeve wound down through the strategy's own exits, so that retiring it doesn't dump positions on one day.
 
 ### The Book backtest
@@ -233,9 +234,9 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
      - cash;
      - costs;
      - Overrides;
-     - for the US Book in INR, the dollar.
+     - for the US Book and the Hong Kong Book in INR, the dollar and the Hong Kong dollar.
 110. As Saransh, I want the monthly review to show the correlation between Sleeves, each Book's drawdown against its limits and the promotions due, so that risk is reviewed as well as return.
-111. As Saransh, I want the yearly review to be the only time strategies are chosen again, Sleeves re-weighted, new money put in and the India/US split revisited, so that backtest overfitting doesn't creep into live money.
+111. As Saransh, I want the yearly review to be the only time strategies are chosen again, Sleeves re-weighted, new money put in and the split between the Books revisited, so that backtest overfitting doesn't creep into live money.
 112. As Saransh, I want each Override scored against what the Rule plan alone would have done, so that each Lever and the Desk earn more say only on evidence.
 
 ### The Stocks Brief
@@ -292,7 +293,7 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
 2. **Broker inbox** (command). It records each tradebook in its real Book and matches fills to orders. When a holdings export is present, it runs Reconciliation.
    - Processed files move out of the inbox. A file it can't read is set aside, with a To-do.
    - On a Book's first import, every holding no strategy bought becomes a Legacy holding, and the Brief asks whether to keep each one.
-3. **MarketSmith** (command, Saturdays only; it skips itself otherwise). It runs `pd marketsmith` for India and the US, which writes the raw store and keeps the fetch as a dated snapshot. An expired cookie skips the Step, with a To-do naming the cookie.
+3. **MarketSmith** (command, Saturdays only; it skips itself otherwise). It runs `pd marketsmith` for India, the US and Hong Kong, which writes the raw store and keeps the fetch as a dated snapshot. An expired cookie skips the Step, with a To-do naming the cookie.
 4. **Lake** (command):
    - It checks that ash_new's own schedule is off, and raises a To-do if it isn't.
    - It clears a refresh left running by a dead process.
@@ -337,7 +338,7 @@ A dry run changes nothing in ash_new:
 
 ### The Book engine (ash_new)
 
-- **A Book** is declared in ash_new's config: its market, currency, broker, benchmark, capital, cash fund, gold ETF and the numbers in its Mandate, under a version. Changing any of them makes a new version, and every plan and result names the version it used. Its Sleeves and their Stages are kept in the app database, along with every Stage change, its date and who approved it. They change only through `pd` commands.
+- **A Book** is declared in ash_new's config: its market, currency, broker, benchmark, capital, cash fund, gold ETF and the numbers in its Mandate, under a version. The Hong Kong Book's cash fund and gold ETF are the US Book's, in dollars, valued in Hong Kong dollars at each day's rate. Changing any of them makes a new version, and every plan and result names the version it used. Its Sleeves and their Stages are kept in the app database, along with every Stage change, its date and who approved it. They change only through `pd` commands.
 - **One engine serves both the Book backtest and the daily Rule plan.** Unlike a Composite, it doesn't blend return series. It trades securities across the Sleeves, because caps on positions and sectors only exist at the level of holdings.
 - **Each Sleeve follows its strategy's own track unchanged.** The strategy runs on its own (simulated in a backtest, live-tracked in the Rule plan), and the Book lays its rules over it. A strategy's orders become the Book's at the Sleeve's weight, and then these rules apply, in order:
   1. Quarantines and the Data gate;
@@ -356,7 +357,7 @@ A dry run changes nothing in ash_new:
 - **Disaster stops** are set at entry, at twice the strategy's stop distance, or 15% below the entry for a strategy without a stop. They are raised only on Saturdays. On daily bars, a low under the stop fills at the stop, or at the open when the price opens below it.
 - **Strategy exits** stay end-of-day, as each strategy's spec says.
 - **Legacy holdings** are sold to pay for the Sleeves' buys: losses first, then gains. A winner within two months of turning long-term (12 months in India, 24 in the US) is held until it has. Kept holdings are never sold.
-- **Costs** come from the cost presets, with brokerage at ₹0 for ICICI Direct and $0 for moomoo for now. In the backtest, the cash fund earns the region's risk-free rate.
+- **Costs** come from the cost presets, with brokerage at ₹0 for ICICI Direct and $0 for moomoo for now. In the backtest, the cash fund earns its own region's risk-free rate (the US's for the Hong Kong Book's, which is the US Book's).
 - **The Book backtest reports:**
   - CAGR, max drawdown, holdout CAGR and deflated Sharpe;
   - the range of rolling 12-month returns and drawdowns, which the demotion rule and the weekly review compare against.
@@ -421,7 +422,7 @@ ADR 0003 records why the Portfolio Manager judges within a Playbook rather than 
 
 ### Real Books, paper Books and orders (ash_new)
 
-- **Real Books:** each real Book is one of ash_new's real portfolios. New import presets read ICICI Direct's and moomoo's tradebooks and holdings exports, built from sample files Saransh provides.
+- **Real Books:** each real Book is one of ash_new's real portfolios. New import presets read ICICI Direct's and moomoo's tradebooks and holdings exports, built from sample files Saransh provides. moomoo's exports cover its whole account, so each is read for both the US Book and the Hong Kong Book.
 - **Orders:** each item on an Order list has an id and a state: proposed, placed, skipped, filled, partly filled, expired or superseded.
   - An order is valid only for its own session. One not filled on its session is expired, and so is the unfilled part of a partial fill. An Answer that comes later is recorded but never revives it.
   - A buy that needs a sale's cash is listed under that sale, to be placed only once the sale is.
@@ -462,7 +463,7 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
   - each real Book's gap to its paper Book;
   - each paper Book's gap to its rules-only paper Book.
 - **Monthly:**
-  - attribution of each Book's return to Sleeve weights, the picks within Sleeves, gold, cash, costs, Overrides and, for the US Book in INR, the currency;
+  - attribution of each Book's return to Sleeve weights, the picks within Sleeves, gold, cash, costs, Overrides and, for the US and Hong Kong Books in INR, the currency;
   - the correlation between Sleeves;
   - drawdown against the limits;
   - promotions due.
@@ -619,7 +620,6 @@ There are two seams, and both are a command with files in and files out.
 ## Out of Scope
 
 - **Broker access:** placing orders, any broker API, reading broker accounts, and storing broker credentials.
-- **Hong Kong** in the Books. It stays in ash_new's catalog, unmanaged.
 - **Delivery:** notifications of any kind, posting the Brief, and reaching the Brief or ash_new from a phone. That comes later, as ash_new served over a private network.
 - **ash_new's Portfolios inbox for real portfolios.** Answers come through the Brief.
 - **Real brokerage costs**, until Saransh provides contract notes.

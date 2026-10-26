@@ -90,7 +90,7 @@ test("on a Saturday the Brief says what MarketSmith's fetch brought, region by r
 
   const page = text(await brief())
 
-  assert.match(page, /MarketSmith India wasn't fetched: MarketSmith India answered 403: the token has expired, or this IP is blocked\. The US: fetched 5969 of 5971, snapshot US:2026-10-31; 2 failed\. The Lake/)
+  assert.match(page, /MarketSmith India wasn't fetched: MarketSmith India answered 403: the token has expired, or this IP is blocked\. The US: fetched 5969 of 5971, snapshot US:2026-10-31; 2 failed\. Hong Kong: fetched 2440 of 2447, snapshot HK:2026-10-31; 7 MarketSmith has nothing for\. The Lake/)
 
   ws.cleanup()
   prepare()
@@ -373,7 +373,27 @@ test("the Stocks Brief shows the US Book in dollars at moomoo, with its position
   assert.match(page, /Reconciled with Positions-Margin Account\(3901\)-20260815-043000\.csv, moomoo's positions of 2026-08-14: 3 match, and these 5 differ/)
   assert.match(page, /Apple \(US:AAPL\) 6 6\.24 moomoo holds 6\.24 of Apple \(US:AAPL\), its ledger 6\. Drop the trade history with the missing buys in the Broker inbox\./)
   assert.match(page, /iShares Latin America 40 ETF \(symbol ILF\) — 235 moomoo holds 235/)
-  assert.match(page, /moomoo's trade history, 7 trades recorded in the US Book, 3 rows set aside as not the Book's trades/)
+  assert.match(page, /moomoo's trade history, 7 trades recorded in the US Book, 5 rows set aside as not the Book's trades/)
+})
+
+test("the Stocks Brief shows the Hong Kong Book in Hong Kong dollars at moomoo, after the US Book", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  const imported = JSON.parse(example('broker-import.moomoo.json'))
+  ws.writeRunFile(runId, 'broker-inbox.json', {
+    dryRun: false,
+    files: imported.files.map((f: { file: string }) => ({ ...f, movedTo: `broker-inbox/${f.file}`, setAside: null })),
+    books: JSON.parse(example('book-holdings.books.json')),
+  })
+
+  const page = text(await brief())
+
+  assert.ok(page.indexOf('US Book $') < page.indexOf('Hong Kong Book HK$'), 'the US first')
+  assert.match(page, /Hong Kong Book HK\$145,000 at moomoo on the closes of 2026-08-14, HK\$0 of it in cash\./)
+  assert.match(page, /HK:0700 Tencent Holdings Ltd 200 HK\$512\.50 HK\$520\.00 on 2026-08-14 HK\$104,000/)
+  assert.match(page, /Reconciled with Positions-Margin Account\(3901\)-20260815-043000\.csv, moomoo's positions of 2026-08-15: 1 match, and these 2 differ/)
+  assert.match(page, /CSOP Hang Seng TECH Index ETF \(symbol 03033\) — 10600 moomoo holds 10600/)
+  assert.match(page, /moomoo's trade history, 2 trades recorded in the Hong Kong Book, 10 rows set aside as not the Book's trades/)
 })
 
 test("a Broker inbox Step that failed before recording anything leaves a Real Books section saying so", async () => {

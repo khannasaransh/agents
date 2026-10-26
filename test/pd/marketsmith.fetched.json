@@ -2,6 +2,7 @@
   "fetched_at": "2026-10-31T11:52:07.412000+00:00",
   "regions": [
     { "region": "IN", "status": "fetched", "cookie": "PDASH_MS_INDIA_AUTH", "run_id": "2026-10-31T01-31-02Z", "universe": 2599, "ok": 2571, "skipped": 26, "failed": 2, "snapshot": "IN:2026-10-31", "error": null },
-    { "region": "US", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-10-31T01-31-02Z", "universe": 5971, "ok": 5971, "skipped": 0, "failed": 0, "snapshot": "US:2026-10-31", "error": null }
+    { "region": "US", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-10-31T01-31-02Z", "universe": 5971, "ok": 5971, "skipped": 0, "failed": 0, "snapshot": "US:2026-10-31", "error": null },
+    { "region": "HK", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-10-31T01-31-02Z", "universe": 2447, "ok": 2440, "skipped": 7, "failed": 0, "snapshot": "HK:2026-10-31", "error": null }
   ]
 }
