@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
+import type { WorkerName } from './agent.ts'
 import { readJson, writeJson } from './files.ts'
 import { runDir, runsDir } from './paths.ts'
 
@@ -24,6 +25,8 @@ export interface RunRecord {
   status: RunStatus
   /** Every Agent Step runs on the fake Worker. */
   dryRun?: boolean
+  /** Every Agent Step runs on this Worker, using the model that Agent already names for it. */
+  worker?: WorkerName
   startedAt: string
   endedAt?: string
   steps: StepRecord[]
@@ -41,7 +44,7 @@ export function writeRun(run: RunRecord): void {
 }
 
 /** Creates the Run folder, named by local start date and time, and its record. */
-export function createRun(pipeline: string, steps: string[], { dryRun = false } = {}): RunRecord {
+export function createRun(pipeline: string, steps: string[], { dryRun = false, worker }: { dryRun?: boolean; worker?: WorkerName } = {}): RunRecord {
   const now = new Date()
   mkdirSync(runsDir(), { recursive: true })
   const base = localStamp(now)
@@ -60,6 +63,7 @@ export function createRun(pipeline: string, steps: string[], { dryRun = false } 
     pipeline,
     status: 'running',
     dryRun,
+    ...(worker ? { worker } : {}),
     startedAt: now.toISOString(),
     steps: steps.map((name) => ({ name, status: 'pending', log: `logs/${name}.log` })),
   }

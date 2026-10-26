@@ -1,9 +1,10 @@
 // Discord: reads the watched channels and their threads through a read-only bot over Discord's REST
 // API, since the last successful read, and writes their messages to the Run folder with mentions of
 // Saransh flagged. A DM with the bot among the channels is read too, unless DISCORD_READ_DMS=false.
-// It saves the Word, PDF and Markdown files attached to them into the PRD inbox, with the message
-// each came from in the inbox's sources.json, and records links to documents that need a login, such
-// as Google Docs, for the PM Agent's To-dos. A dry run saves nothing into the inbox.
+// It saves the Word, PDF and Markdown files attached to them into the PRD inbox, the APKs into the APK
+// inbox and every other file into the other folder, each with the message it came from in that
+// folder's sources.json, and records links to documents that need a login, such as Google Docs, for
+// the PM Agent's To-dos. A dry run saves nothing.
 // It is skipped, not failed, until the env file holds the bot token, the channel list and Saransh's
 // Discord user ID.
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
@@ -11,11 +12,12 @@ import { join } from 'node:path'
 import { setTimeout } from 'node:timers/promises'
 import { discordConfig, type DiscordConfig } from '../src/env.ts'
 import { freeName, readJson, writeJson } from '../src/files.ts'
-import { prdInboxDir } from '../src/paths.ts'
+import { apkInboxDir, otherFilesDir, prdInboxDir } from '../src/paths.ts'
 import { readInboxSources, writeInboxSources } from '../src/prd-inbox.ts'
 import { readRun } from '../src/run.ts'
-import { readDiscordState, writeDiscordState } from '../src/state.ts'
+import { readDiscordState, readWeeklyDiscordState, writeDiscordState, writeWeeklyDiscordState } from '../src/state.ts'
 import { runAsStep, StepSkipped } from '../src/step.ts'
+import { isWeekly, weeklyDays } from '../src/weekly.ts'
 
 const api = process.env.AGENTS_DISCORD_API_URL ?? 'https://discord.com/api/v10'
 /** How far back the first Run reads, with no earlier read to start from. */
@@ -24,6 +26,14 @@ const firstRunHours = 24
 const pageSize = 100
 /** Word, PDF and Markdown: the kinds of file a PRD comes as. */
 const isPrdFile = (filename: string) => /\.(docx?|pdf|md)$/i.test(filename)
+/** An Android build: an APK, an app bundle, or a split APK set. */
+const isApkFile = (filename: string) => /\.(apk|aab|apks|xapk)$/i.test(filename)
+
+/** Where an attached file is saved. */
+type FileKind = 'prd' | 'apk' | 'other'
+const kindOf = (filename: string): FileKind => (isPrdFile(filename) ? 'prd' : isApkFile(filename) ? 'apk' : 'other')
+const folderOf: Record<FileKind, () => string> = { prd: prdInboxDir, apk: apkInboxDir, other: otherFilesDir }
+const folderName: Record<FileKind, string> = { prd: 'PRD inbox', apk: 'APK inbox', other: 'other folder' }
 /** Where documents need a login, so the Pipeline can't download them and Saransh does by hand. A host counts with its subdomains. */
 const loginHosts = ['docs.google.com', 'drive.google.com', 'notion.so', 'notion.site', 'atlassian.net', 'sharepoint.com', 'onedrive.live.com', '1drv.ms', 'dropbox.com']
 
@@ -110,6 +120,10 @@ export interface DiscordMessage {
   fromSaransh: boolean
   /** The Word, PDF and Markdown files attached to it, by their names on Discord, which a real Run saves into the PRD inbox. */
   prdFiles: string[]
+  /** The APKs attached to it, by their names on Discord, which a real Run saves into the APK inbox to be tested. */
+  apkFiles: string[]
+  /** Every other file attached to it, by its name on Discord, which a real Run saves into the other folder. */
+  otherFiles: string[]
   /** Links in it to documents that need a login, such as Google Docs, for Saransh to download into the PRD inbox by hand. */
   prdLinks: string[]
 }
@@ -126,9 +140,10 @@ export interface DiscordRead extends Window {
   messages: DiscordMessage[]
 }
 
-/** A PRD file attached to a message read, and the link of that message. */
+/** A file attached to a message read, where it is saved, and the link of that message. */
 interface Attached {
   attachment: ApiAttachment
+  kind: FileKind
   message: string
 }
 
@@ -148,7 +163,7 @@ async function get<T>(config: DiscordConfig, path: string, query: Record<string,
   return (await response.json()) as T
 }
 
-/** The PRD files attached to the messages read so far. */
+/** The files attached to the messages read so far. */
 const attached: Attached[] = []
 
 /** The messages posted within `window` in a conversation. */
@@ -164,8 +179,8 @@ async function readMessages(config: DiscordConfig, at: Conversation, window: Win
   const end = BigInt(snowflakeAt(window.until))
   return messages.filter((m) => BigInt(m.id) < end).map((m) => {
     const link = `https://discord.com/channels/${at.guild}/${at.id}/${m.id}`
-    const prdFiles = m.attachments.filter((a) => isPrdFile(a.filename))
-    attached.push(...prdFiles.map((attachment) => ({ attachment, message: link })))
+    attached.push(...m.attachments.map((attachment) => ({ attachment, kind: kindOf(attachment.filename), message: link })))
+    const filesOf = (kind: FileKind) => m.attachments.filter((a) => kindOf(a.filename) === kind).map((a) => a.filename)
     return {
       id: m.id,
       channel: at.channel,
@@ -177,29 +192,32 @@ async function readMessages(config: DiscordConfig, at: Conversation, window: Win
       link,
       mentionsSaransh: m.mentions.some((u) => u.id === config.userId),
       fromSaransh: m.author.id === config.userId,
-      prdFiles: prdFiles.map((a) => a.filename),
+      prdFiles: filesOf('prd'),
+      apkFiles: filesOf('apk'),
+      otherFiles: filesOf('other'),
       prdLinks: loginLinks(m.content),
     }
   })
 }
 
-/** Downloads each attached PRD file from Discord's CDN into the PRD inbox, recording the message it came from. */
-async function saveToInbox(files: Attached[]): Promise<void> {
-  const sources = readInboxSources()
-  for (const { attachment, message } of files) {
+/** Downloads each attached file from Discord's CDN into the folder for its kind, recording the message it came from. */
+async function saveAttachments(files: Attached[]): Promise<void> {
+  for (const { attachment, kind, message } of files) {
+    const folder = folderOf[kind]()
+    const sources = readInboxSources(folder)
     if (Object.values(sources).some((s) => s.attachment === attachment.id)) {
-      console.log(`${attachment.filename} from ${message} is in the PRD inbox already`)
+      console.log(`${attachment.filename} from ${message} is in the ${folderName[kind]} already`)
       continue
     }
     // The URL is signed, so it needs no bot token, and the token stays with Discord's API.
     const response = await fetch(attachment.url)
     if (!response.ok) throw new Error(`Discord's CDN answered ${response.status} for ${attachment.filename} from ${message}`)
-    const file = freeName(prdInboxDir(), attachment.filename)
-    mkdirSync(prdInboxDir(), { recursive: true })
-    writeFileSync(join(prdInboxDir(), file), Buffer.from(await response.arrayBuffer()))
+    const file = freeName(folder, attachment.filename)
+    mkdirSync(folder, { recursive: true })
+    writeFileSync(join(folder, file), Buffer.from(await response.arrayBuffer()))
     sources[file] = { message, attachment: attachment.id }
-    writeInboxSources(sources)
-    console.log(`Saved ${file} from ${message} into the PRD inbox`)
+    writeInboxSources(sources, folder)
+    console.log(`Saved ${file} from ${message} into the ${folderName[kind]}`)
   }
 }
 
@@ -251,15 +269,19 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   if ('missing' in config) throw new StepSkipped(`Discord isn't set up: the env file has no ${config.missing.join(', ')}`)
   const now = new Date()
   const until = now.toISOString()
+  const weekly = isWeekly(readRun(runId).pipeline)
+  const readState = weekly ? readWeeklyDiscordState : readDiscordState
   // A forced re-read starts where this Run's read did, since that read has moved the read time on.
-  const since = earlier?.since ?? readDiscordState()?.lastRead ?? new Date(now.getTime() - firstRunHours * 60 * 60 * 1000).toISOString()
+  // The weekly Pipeline's first read covers the week; the daily Pipeline's covers the last day.
+  const firstReadHours = weekly ? weeklyDays * 24 : firstRunHours
+  const since = earlier?.since ?? readState()?.lastRead ?? new Date(now.getTime() - firstReadHours * 60 * 60 * 1000).toISOString()
   const messages: DiscordMessage[] = []
   for (const channelId of config.channelIds) messages.push(...(await readChannel(config, channelId, { since, until })))
   messages.sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
   const dryRun = readRun(runId).dryRun
-  if (!dryRun) await saveToInbox(attached)
+  if (!dryRun) await saveAttachments(attached)
   writeJson(out, { since, until, messages } satisfies DiscordRead)
   console.log(`Read ${messages.length} Discord messages since ${since}, ${messages.filter((m) => m.mentionsSaransh).length} mentioning Saransh`)
-  if (dryRun) console.log('A dry run, so nothing went into the PRD inbox, and the next real Run reads these messages again')
-  else writeDiscordState({ lastRead: until })
+  if (dryRun) console.log('A dry run, so no attached file was saved, and the next real Run reads these messages again')
+  else (weekly ? writeWeeklyDiscordState : writeDiscordState)({ lastRead: until })
 })

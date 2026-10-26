@@ -50,6 +50,10 @@ _Avoid_: project, codebase (the wiki's Codebase is a group of Repos)
 Where PRD files wait until the Docs Agent turns them into wiki pages, whether they came from Discord or from Saransh.
 _Avoid_: drop folder, queue
 
+**APK inbox**:
+Where the APKs attached on Discord wait to be tested, for the QA Agent to come. Every other file attached there that is neither a PRD nor an APK goes into the **other folder**.
+_Avoid_: downloads, builds folder
+
 **Team**:
 The discipline a Repo belongs to: flutter, android, ios, backend, data, frontend or other.
 _Avoid_: category, group, stack
@@ -185,7 +189,7 @@ _Avoid_: doctor, debugger, monitor
 ### Outputs
 
 **Brief**:
-The daily summary written for Saransh alone at the end of a Run. The stocks Pipeline's is the **Stocks Brief**: an HTML page read at the Windows machine, never a notification, and where Saransh answers whatever waits on him.
+The daily summary written for Saransh alone at the end of a Run: an HTML page that opens with a summary at a glance, where each part of the details, such as the code review of each Repo, opens with a tap, and the same in Markdown beside it. The stocks Pipeline's is the **Stocks Brief**: an HTML page read at the Windows machine, never a notification, and where Saransh answers whatever waits on him.
 _Avoid_: status update, report, digest
 
 **To-do**:

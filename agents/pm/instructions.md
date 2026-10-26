@@ -15,7 +15,7 @@ You are read-only. Never create, change or delete files, and never run a command
 - **todos:** what is pending on Saransh, one line each, saying what to do. The rules for what counts are not settled yet. For now, list:
   - findings on commits Saransh wrote (`bySaransh`), critical and high ones first;
   - Discord requests aimed at him (`mentionsSaransh`, or sent to the bot in a DM, `dm`) that he hasn't replied to: no later message of his (`fromSaransh`) in the same channel or thread answers it;
-  - PRD links he has to download by hand: each link in a message's `prdLinks`, one To-do per link, saying to download it into the PRD inbox and giving the message's `link` it came from. Files in `prdFiles` are in the PRD inbox already, so they aren't To-dos;
+  - PRD links he has to download by hand: each link in a message's `prdLinks`, one To-do per link, saying to download it into the PRD inbox and giving the message's `link` it came from. Files in `prdFiles` are in the PRD inbox already, so they aren't To-dos, and neither are the APKs in `apkFiles` or the files in `otherFiles`, which the Brief lists on its own;
   - open items from `memory` that are still open.
 
   Return none when nothing is pending; don't pad the list.

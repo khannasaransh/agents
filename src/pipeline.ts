@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process'
 import { closeSync, existsSync, mkdirSync, openSync, writeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import type { WorkerName } from './agent.ts'
 import { acquireLock } from './lock.ts'
 import { agentsRoot, runDir } from './paths.ts'
 import { recordProcess, stopRecordedProcesses } from './processes.ts'
@@ -27,11 +28,11 @@ export async function loadPipeline(name: string): Promise<Pipeline> {
  * Starts a Run of the named Pipeline and runs every Step in order, even after one fails.
  * Refuses to start while another Run is active. A dry run runs every Agent Step on the fake Worker.
  */
-export async function runPipeline(name: string, { dryRun = false } = {}): Promise<RunRecord> {
+export async function runPipeline(name: string, { dryRun = false, worker }: { dryRun?: boolean; worker?: WorkerName } = {}): Promise<RunRecord> {
   const pipeline = await loadPipeline(name)
   const release = acquireLock()
   try {
-    const run = createRun(name, pipeline.steps, { dryRun })
+    const run = createRun(name, pipeline.steps, { dryRun, worker })
     try {
       for (const step of pipeline.steps) await runStep(run.id, step)
       const done = readRun(run.id)

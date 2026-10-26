@@ -8,7 +8,8 @@
 // It records how far the Docs Step brought the wiki per Repo, once it finished, and keeps a Run
 // whose PM failed in the PM backlog, until a PM answer covers what it held.
 // A Repo whose state has moved on since this Run fetched it is left alone, so re-running an older
-// Run's Save state never moves state back.
+// Run's Save state never moves state back. The weekly Pipeline keeps its own cursor and PM backlog,
+// and leaves the daily Pipeline's, including how far the wiki was brought.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadAgent, type Agent } from '../src/agent.ts'
@@ -16,8 +17,20 @@ import { readJson, readJsonFiles } from '../src/files.ts'
 import { buildsOnCurrent, byRunStart, isSettled, queueProposal, settleProposal, type MemoryProposal } from '../src/memory.ts'
 import { holdsPmInputs } from '../src/pm-inputs.ts'
 import { readRun, type RunRecord } from '../src/run.ts'
-import { readDocsState, readPmBacklog, readRepoState, writeDocsState, writePmBacklog, writeRepoState } from '../src/state.ts'
+import {
+  readDocsState,
+  readPmBacklog,
+  readRepoState,
+  readWeeklyPmBacklog,
+  readWeeklyRepoState,
+  writeDocsState,
+  writePmBacklog,
+  writeRepoState,
+  writeWeeklyPmBacklog,
+  writeWeeklyRepoState,
+} from '../src/state.ts'
 import { runAsStep } from '../src/step.ts'
+import { isWeekly } from '../src/weekly.ts'
 import { pmMemory } from '../agents/pm/config.ts'
 import type { DocsResult } from './docs.ts'
 import type { FetchResult } from './fetch.ts'
@@ -72,15 +85,17 @@ function recordDocsProgress(docs: DocsResult, run: RunRecord) {
 }
 
 /** Takes the Runs a PM answer covered out of the PM backlog, or adds this Run when its PM didn't answer on what it holds. */
-function settlePmBacklog(runId: string, pm: PmResult | null) {
-  const backlog = readPmBacklog()
+function settlePmBacklog(runId: string, pm: PmResult | null, weekly: boolean) {
+  const readBacklog = weekly ? readWeeklyPmBacklog : readPmBacklog
+  const writeBacklog = weekly ? writeWeeklyPmBacklog : writePmBacklog
+  const backlog = readBacklog()
   let next = backlog
   if (pm?.status === 'answered') {
     const covered = pm.runs ?? [runId]
     next = backlog.filter((id) => !covered.includes(id))
   } else if (holdsPmInputs(runId) && !backlog.includes(runId)) next = [...backlog, runId].sort(byRunStart)
   if (next.length === backlog.length) return
-  writePmBacklog(next)
+  writeBacklog(next)
   if (next.includes(runId)) console.log("The PM didn't answer in this Run, so the next PM is given what this Run held too")
   else console.log(`The PM answered on what Runs ${backlog.filter((id) => !next.includes(id)).join(', ')} held, so they left the PM backlog`)
 }
@@ -88,14 +103,16 @@ function settlePmBacklog(runId: string, pm: PmResult | null) {
 await runAsStep(async ({ runId, runFolder }) => {
   const run = readRun(runId)
   const dryRun = run.dryRun ?? false
+  const weekly = isWeekly(run.pipeline)
   const reviewer = await loadAgent('reviewer')
-  const state = readRepoState()
+  const state = weekly ? readWeeklyRepoState() : readRepoState()
   const reviews = new Map(readJsonFiles<ReviewResult>(join(runFolder, 'review')).map((r) => [r.repo, r]))
 
   for (const fetched of readJsonFiles<FetchResult>(join(runFolder, 'fetch'))) {
     if (fetched.status !== 'baseline' && fetched.status !== 'new-commits') continue
     const current = state[fetched.repo]?.lastReviewed ?? null
-    if (current !== fetched.previous) {
+    // A weekly Repo's first window has no saved cursor, so its start is the commit Fetch chose.
+    if ((current !== null || !weekly) && current !== fetched.previous) {
       console.log(`${fetched.repo}: state has moved on to ${short(current)} since this Run fetched it, leaving it`)
       continue
     }
@@ -114,7 +131,8 @@ await runAsStep(async ({ runId, runFolder }) => {
     state[fetched.repo] = { lastReviewed: fetched.head }
     console.log(`${fetched.repo}: last reviewed ${short(fetched.previous)} -> ${short(fetched.head)}`)
   }
-  writeRepoState(state)
+  const writeState = weekly ? writeWeeklyRepoState : writeRepoState
+  writeState(state)
 
   const docsFile = join(runFolder, 'docs.json')
   const pmFile = join(runFolder, 'pm.json')
@@ -124,8 +142,8 @@ await runAsStep(async ({ runId, runFolder }) => {
     if (pmResult?.status === 'answered' && pmResult.memory !== null) console.log('The pm Agent ran only on the fake Worker, so its proposed Memory is dropped')
     return
   }
-  if (existsSync(docsFile)) recordDocsProgress(readJson<DocsResult>(docsFile), run)
-  settlePmBacklog(runId, pmResult)
+  if (!weekly && existsSync(docsFile)) recordDocsProgress(readJson<DocsResult>(docsFile), run)
+  settlePmBacklog(runId, pmResult, weekly)
 
   if (pmResult?.status === 'answered' && pmResult.memory !== null) {
     const pm = await loadAgent('pm')

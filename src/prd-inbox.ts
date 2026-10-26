@@ -17,14 +17,15 @@ export type InboxSources = Record<string, { message: string; attachment: string 
 /** Where the Docs Step moves a file it handled: done/ for a PRD it turned into a PRD page, skipped/ for one that isn't a PRD. */
 export type HandledArea = 'done' | 'skipped'
 
-const sourcesFile = () => join(prdInboxDir(), 'sources.json')
+/** The Discord Step keeps the same record for the APK inbox and the other files, each in its own folder. */
+const sourcesFile = (folder: string) => join(folder, 'sources.json')
 
-export function readInboxSources(): InboxSources {
-  return existsSync(sourcesFile()) ? readJson<InboxSources>(sourcesFile()) : {}
+export function readInboxSources(folder = prdInboxDir()): InboxSources {
+  return existsSync(sourcesFile(folder)) ? readJson<InboxSources>(sourcesFile(folder)) : {}
 }
 
-export function writeInboxSources(sources: InboxSources): void {
-  writeJson(sourcesFile(), sources)
+export function writeInboxSources(sources: InboxSources, folder = prdInboxDir()): void {
+  writeJson(sourcesFile(folder), sources)
 }
 
 /** The files waiting in the inbox, by name: every file at its top level, but sources.json and hidden files such as .DS_Store. */

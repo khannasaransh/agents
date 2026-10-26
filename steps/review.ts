@@ -58,7 +58,7 @@ export type ReviewResult =
 const reviewsAtOnce = 3
 
 await runAsStep(async ({ runId, runFolder, force }) => {
-  const { dryRun = false } = readRun(runId)
+  const { dryRun = false, worker } = readRun(runId)
   const reviewer = await loadAgent('reviewer')
   const repos = new Map((await loadRepos()).map((repo) => [repo.name, repo]))
   const changed = readJsonFiles<FetchResult>(join(runFolder, 'fetch')).flatMap((r) => (r.status === 'new-commits' ? [r] : []))
@@ -86,7 +86,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
       const memory = readMemory(reviewer.name, range.repo)
       const inputs = { repo: range.repo, branch: range.branch, from: range.from, to: range.to, commits: fetched.commits, memory }
       const log = (line: string) => console.log(`${range.repo}: ${line}`)
-      const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun, log }))) as ReviewerAnswer
+      const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun, worker, log }))) as ReviewerAnswer
       const findings = answer.findings.map((f) => markAuthor(f, fetched.commits))
       result = { ...range, status: 'reviewed', summary: answer.summary, findings, memory: answer.memory, memoryRead: memory }
       console.log(`${range.repo}: reviewed, ${result.findings.length} findings`)

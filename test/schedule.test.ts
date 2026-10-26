@@ -45,12 +45,25 @@ test('the stocks Schedule runs the stocks Pipeline on the Windows machine, Tuesd
   assert.deepEqual(await stocksSchedule(), { name: 'stocks', pipeline: 'stocks', machine: 'windows', days: ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], time: '09:30' })
 })
 
+test('the weekly Schedule runs the weekly Pipeline on the Mac, on Sunday at 05:30', async () => {
+  const weekly = (await loadSchedules()).find((schedule) => schedule.name === 'weekly')
+  assert.ok(weekly, 'there is a weekly Schedule')
+  assert.deepEqual(weekly, { name: 'weekly', pipeline: 'weekly', machine: 'mac', days: ['sunday'], time: '05:30' })
+
+  const { plist } = launchdEntry(weekly, install)
+  assert.deepEqual(
+    [...valueOf(plist, 'ProgramArguments')!.matchAll(/<string>(.*?)<\/string>/g)].map(([, arg]) => arg),
+    ['/opt/homebrew/bin/node', join(agentsRoot, 'src', 'cli.ts'), 'run', 'weekly', '--scheduled'],
+  )
+  assert.deepEqual(calendarTimes(plist), [[0, 5, 30]])
+})
+
 test('each machine installs only its own Schedules', async () => {
   const schedules = await loadSchedules()
 
   assert.deepEqual(
     machineSchedules(schedules, 'darwin').map((s) => s.name),
-    ['daily'],
+    ['daily', 'weekly'],
   )
   assert.deepEqual(
     machineSchedules(schedules, 'win32').map((s) => s.name),

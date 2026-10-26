@@ -24,23 +24,32 @@ export interface Worker {
 
 const workers: Record<WorkerName, Worker> = { codex: codexWorker, 'claude-code': claudeCodeWorker, antigravity: antigravityWorker }
 
+/** The Worker a call tries first, then its fallback. `override` swaps in the Agent's other Worker when that is the one named. */
+export function attemptOrder(agent: Agent, override?: WorkerName): [WorkerChoice, WorkerChoice] {
+  const { worker: main, fallbackWorker: fallback } = agent.config
+  if (override === undefined || override === main.name) return [main, fallback]
+  if (override === fallback.name) return [fallback, main]
+  throw new Error(`The ${agent.name} Agent isn't set up to run on ${override}`)
+}
+
 /**
  * Calls an Agent on its Worker, or on the fake Worker in a dry run, and returns its answer. A call
  * that fails, times out, hits a quota limit or answers in the wrong shape is retried once on the
- * Agent's fallback Worker, and `log` gets a line for each attempt. Throws when the inputs aren't
- * exactly those the Agent's config declares, or when both attempts fail.
+ * Agent's fallback Worker, and `log` gets a line for each attempt. `worker` runs it on that Worker
+ * instead, when the Agent names it. Throws when the inputs aren't exactly those the Agent's config
+ * declares, or when both attempts fail.
  */
 export async function callAgent(
   agent: Agent,
   inputs: Inputs,
-  { cwd, dryRun, log = console.log }: { cwd: string; dryRun: boolean; log?: (line: string) => void },
+  { cwd, dryRun, worker, log = console.log }: { cwd: string; dryRun: boolean; worker?: WorkerName; log?: (line: string) => void },
 ): Promise<unknown> {
   const declared = Object.keys(agent.config.inputs)
   const missing = declared.filter((name) => !(name in inputs))
   const undeclared = Object.keys(inputs).filter((name) => !declared.includes(name))
   if (missing.length) throw new Error(`The ${agent.name} Agent was called without its ${missing.join(', ')} input`)
   if (undeclared.length) throw new Error(`The ${agent.name} Agent was given inputs its config doesn't declare: ${undeclared.join(', ')}`)
-  const { worker: main, fallbackWorker: fallback } = agent.config
+  const [main, fallback] = attemptOrder(agent, worker)
   if (dryRun) return checkedAnswer(agent, await fakeWorker.call(agent, inputs, { cwd, model: main.model, effort: main.effort }))
 
   const attempt = async (choice: WorkerChoice) => {
