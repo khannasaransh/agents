@@ -77,8 +77,8 @@ export interface RepoEntry {
 export interface TestRepo {
   entry: RepoEntry
   folder: string
-  /** Pushes a commit, adding any given files, to the remote's production branch without touching the local clone. */
-  pushCommit(subject: string, options?: { files?: Record<string, string>; author?: string }): string
+  /** Pushes a commit, adding any given files, to the remote's production branch without touching the local clone. `date` is its author and committer time. */
+  pushCommit(subject: string, options?: { files?: Record<string, string>; author?: string; date?: string }): string
 }
 
 export interface CliResult {
@@ -92,6 +92,7 @@ export interface RunRecordShape {
   pipeline: string
   status: string
   dryRun?: boolean
+  worker?: string
   startedAt: string
   endedAt?: string
   steps: { name: string; status: string; startedAt?: string; endedAt?: string; log: string }[]
@@ -287,13 +288,19 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       return {
         entry,
         folder,
-        pushCommit(subject, { files = {}, author } = {}) {
+        pushCommit(subject, { files = {}, author, date } = {}) {
           for (const [path, content] of Object.entries(files)) {
             mkdirSync(join(upstream, path, '..'), { recursive: true })
             writeFileSync(join(upstream, path), content)
             git(upstream, 'add', path)
           }
-          git(upstream, 'commit', '-q', '--allow-empty', '-m', subject, ...(author ? [`--author=${author}`] : []))
+          const env = date ? { ...gitEnv, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date } : gitEnv
+          execFileSync('git', ['commit', '-q', '--allow-empty', '-m', subject, ...(author ? [`--author=${author}`] : [])], {
+            cwd: upstream,
+            env,
+            encoding: 'utf8',
+            windowsHide: true,
+          })
           git(upstream, 'push', '-q', 'origin', branch)
           return git(upstream, 'rev-parse', 'HEAD')
         },

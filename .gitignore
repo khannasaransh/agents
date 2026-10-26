@@ -1,4 +1,4 @@
 node_modules/
-# Runs, state, Memory, the PRD inbox and temporary worktrees. Never committed.
+# Runs, state, Memory, the PRD and APK inboxes, other files from Discord and temporary worktrees. Never committed.
 data/
 .env

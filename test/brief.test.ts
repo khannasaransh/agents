@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
+import type { DiscordMessage, DiscordRead } from '../steps/discord.ts'
 import type { DocsResult } from '../steps/docs.ts'
 import type { FetchResult } from '../steps/fetch.ts'
 import type { PmResult } from '../steps/pm.ts'
@@ -35,6 +36,9 @@ async function brief(): Promise<string> {
   return ws.readRunFile(runId, 'brief.md')
 }
 
+/** The Brief after its summary at a glance. */
+const details = (text: string) => text.slice(text.indexOf('# Details\n\n') + '# Details\n\n'.length)
+
 const commit = (n: number, subject: string) => ({ sha: sha(n), author: 'Asha', email: 'asha@example.com', date: '2026-10-21T10:00:00+05:30', subject })
 
 test("the Brief lists each Repo's new commits grouped by Team, in Team order", async () => {
@@ -46,16 +50,16 @@ test("the Brief lists each Repo's new commits grouped by Team, in Team order", a
 
   const text = await brief()
 
-  const flutterAt = text.indexOf('## flutter')
-  const backendAt = text.indexOf('## backend')
-  const frontendAt = text.indexOf('## frontend')
+  const flutterAt = text.indexOf('### flutter')
+  const backendAt = text.indexOf('### backend')
+  const frontendAt = text.indexOf('### frontend')
   assert.ok(flutterAt >= 0 && flutterAt < backendAt && backendAt < frontendAt, text)
   assert.equal(
     text.slice(flutterAt, backendAt).trim(),
     [
-      '## flutter',
+      '### flutter',
       '',
-      '### crux_flutter',
+      '#### crux_flutter',
       '',
       '2 new commits on main:',
       '',
@@ -72,7 +76,7 @@ test("the Brief lists each Repo's new commits grouped by Team, in Team order", a
 test("the Brief notes a Repo's baseline on its first Run", async () => {
   prepareRun([{ repo: 'crux_flutter', team: 'flutter', branch: 'main', previous: null, status: 'baseline', head: sha(7), commits: [] }])
 
-  assert.match(await brief(), /### crux_flutter\n\nBaseline recorded at `7777777` on main/)
+  assert.match(await brief(), /#### crux_flutter\n\nBaseline recorded at `7777777` on main/)
 })
 
 test('the Run health names failed Steps and the Repos that failed to fetch', async () => {
@@ -216,10 +220,8 @@ test("a full Brief opens with the PM Agent's To-dos and highlights, gives each c
   const text = await brief()
 
   assert.equal(
-    text.slice(0, text.indexOf('2 new commits on main:')),
+    details(text).slice(0, details(text).indexOf('2 new commits on main:')),
     [
-      '# Brief 2026-10-22-0530',
-      '',
       '## To-dos',
       '',
       '- Fix the paywall price that shows before it loads (your commit 3333333).',
@@ -229,9 +231,11 @@ test("a full Brief opens with the PM Agent's To-dos and highlights, gives each c
       '',
       '- Priya asked in #payments whether the paywall ships this week.',
       '',
-      '## flutter',
+      '## Code review',
       '',
-      '### crux_flutter',
+      '### flutter',
+      '',
+      '#### crux_flutter',
       '',
       'A paywall now guards premium stories, and its price can show before it loads.',
       '',
@@ -246,8 +250,8 @@ test('a Brief with no Discord input says no Discord messages were read, and one 
   prepareRun([changed], { pm: pmAnswered({ highlights: [], todos: [] }) })
 
   assert.match(
-    await brief(),
-    /^# Brief 2026-10-22-0530\n\n## To-dos\n\nNothing is waiting on you\.\n\n## Discord highlights\n\nNo Discord messages were read in this Run\.\n\n## flutter\n/,
+    details(await brief()),
+    /^## To-dos\n\nNothing is waiting on you\.\n\n## Discord highlights\n\nNo Discord messages were read in this Run\.\n\n## Code review\n\n### flutter\n/,
   )
 })
 
@@ -261,8 +265,8 @@ test('when the PM Agent failed, the Brief says its output is missing and why, an
   const text = await brief()
 
   assert.match(
-    text,
-    /^# Brief 2026-10-22-0530\n\nThe PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo\. The PM Agent failed: claude-code failed: Session limit reached\n\n## flutter\n/,
+    details(text),
+    /^The PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo\. The PM Agent failed: claude-code failed: Session limit reached\n\n## Code review\n\n### flutter\n/,
   )
   assert.match(text, /Review: Adds a paywall\.\n\n- \*\*high\*\* `lib\/paywall\.dart:42`/)
   assert.match(text.split('## Run health')[1], /- pm: failed\. Log: logs\/pm\.log/)
@@ -484,5 +488,123 @@ test('the Brief lists the Repos with new commits that the wiki has never documen
 test('a Brief written before the PM Agent answered says its output is missing', async () => {
   prepareRun([changed])
 
-  assert.match(await brief(), /^# Brief 2026-10-22-0530\n\nThe PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo\.\n\n## flutter\n/)
+  assert.match(details(await brief()), /^The PM output is missing, so this Brief has no To-dos, Discord highlights or line per Repo\.\n\n## Code review\n\n### flutter\n/)
+})
+
+const discordMessage = (n: number, fields: Partial<DiscordMessage> = {}): DiscordMessage => ({
+  id: String(n),
+  channel: 'payments',
+  thread: null,
+  dm: false,
+  author: 'Priya',
+  timestamp: '2026-10-21T09:15:00.000+00:00',
+  content: 'Build to test',
+  link: `https://discord.com/channels/1/2/${n}`,
+  mentionsSaransh: false,
+  fromSaransh: false,
+  prdFiles: [],
+  apkFiles: [],
+  otherFiles: [],
+  prdLinks: [],
+  ...fields,
+})
+
+test('the Brief opens with a summary at a glance, then gives the details', async () => {
+  prepareRun([changed], {
+    steps: [{ name: 'fetch', status: 'succeeded' }, { name: 'docs', status: 'failed' }, { name: 'brief', status: 'pending' }],
+    reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall.', findings: [finding('critical', 'Paywall can be skipped'), finding('high', 'Price shows before it loads', true)], memory: null }],
+    pm: pmAnswered(),
+  })
+  ws.writeRunFile(runId, 'discord.json', {
+    since: '2026-10-21T00:00:00.000Z',
+    until: '2026-10-22T00:00:00.000Z',
+    messages: [discordMessage(1, { mentionsSaransh: true, apkFiles: ['inshorts-4.2.0.apk'] }), discordMessage(2)],
+  } satisfies DiscordRead)
+
+  const text = await brief()
+
+  assert.equal(
+    text.slice(0, text.indexOf('## To-dos')),
+    [
+      '# Brief 2026-10-22-0530',
+      '',
+      '## At a glance',
+      '',
+      '- **To-dos:** 2, waiting on you',
+      '- **Mentions and DMs:** 1, of 2 Discord messages read',
+      '- **APKs to test:** 1, saved in the APK inbox',
+      '- **Repos with new commits:** 1, 1 reviewed',
+      '- **Findings:** 2, 1 critical, 1 high; 1 on your commits',
+      '- **Run health:** 1, docs failed',
+      '',
+      '# Details',
+      '',
+      '',
+    ].join('\n'),
+  )
+})
+
+test('the Brief lists the APKs to test and the other files saved from Discord, each with the message it came from', async () => {
+  prepareRun([])
+  ws.writeRunFile(runId, 'discord.json', {
+    since: '2026-10-21T00:00:00.000Z',
+    until: '2026-10-22T00:00:00.000Z',
+    messages: [discordMessage(1, { apkFiles: ['inshorts-4.2.0.apk'], otherFiles: ['screenshot.png'] }), discordMessage(2, { thread: 'Release', otherFiles: ['designs.zip'] })],
+  } satisfies DiscordRead)
+
+  const text = await brief()
+
+  assert.match(text, /## APKs to test\n\nSaved in the APK inbox, `[^`]+apk-inbox`\.\n\n- `inshorts-4\.2\.0\.apk` from Priya in \[#payments\]\(https:\/\/discord\.com\/channels\/1\/2\/1\)\n/)
+  assert.match(
+    text,
+    /## Other files from Discord\n\nSaved in the other folder, `[^`]+other`\.\n\n- `screenshot\.png` from Priya in \[#payments\]\([^)]+\/1\)\n- `designs\.zip` from Priya in \[#payments › Release\]\([^)]+\/2\)\n/,
+  )
+})
+
+test("a Repo on GitHub links its commits, its range and its findings' files there", async () => {
+  prepareRun([changed], { reviews: [{ ...range, status: 'reviewed', summary: 'Adds a paywall.', findings: [finding('high', 'Price shows before it loads')], memory: null }] })
+  ws.writeRepoList([{ name: 'crux_flutter', team: 'flutter', remote: 'git@github.com:NewsInShorts/crux_flutter.git', folder: '/nowhere', branch: 'main' }])
+
+  const text = await brief()
+
+  const web = 'https://github.com/NewsInShorts/crux_flutter'
+  assert.ok(text.includes(`2 new commits on main ([compare](${web}/compare/${sha(1)}...${sha(3)})):`), text)
+  assert.ok(text.includes(`- [\`3333333\`](${web}/commit/${sha(3)}) Fix paywall copy (Asha)`), text)
+  assert.ok(text.includes(`- **high** [\`lib/paywall.dart:42\`](${web}/blob/${sha(3)}/lib/paywall.dart#L42) in [\`2222222\`](${web}/commit/${sha(2)}) by Asha`), text)
+})
+
+test('the Brief is also an HTML page, where each changed Repo opens to its Overview, Commits and Review', async () => {
+  prepareRun([changed], {
+    reviews: [{ ...range, status: 'reviewed', summary: 'Adds a <paywall>.', findings: [finding('critical', 'Paywall can be skipped'), finding('low', 'Unused import', true)], memory: null }],
+    pm: pmAnswered(),
+  })
+  ws.writeRepoList([{ name: 'crux_flutter', team: 'flutter', remote: 'https://github.com/NewsInShorts/crux_flutter.git', folder: '/nowhere', branch: 'main' }])
+  await brief()
+
+  const html = ws.readRunFile(runId, 'brief.html')
+
+  assert.match(html, /^<!doctype html>/)
+  assert.doesNotMatch(html, /<script|<link|src="http/, 'the page loads nothing from the internet')
+  assert.match(html, /<nav class="glance"[\s\S]*<a class="card warn" href="#todos"><span class="value">2<\/span><span class="label">To-dos<\/span>/)
+  assert.match(html, /<a class="card bad" href="#code-review"><span class="value">2<\/span><span class="label">Findings<\/span>/)
+  const repo = html.slice(html.indexOf('<details class="repo">'), html.indexOf('</details>', html.indexOf('<details class="repo">')))
+  assert.match(repo, /<summary><span class="name">crux_flutter<\/span> <span class="muted">2 commits<\/span> <span class="sev critical">1 critical<\/span><span class="sev low">1 low<\/span><span class="chip yours">1 yours<\/span><\/summary>/)
+  assert.match(repo, /<label for="repo-crux_flutter-0">Overview<\/label>[\s\S]*<label for="repo-crux_flutter-1">Commits <span class="count">2<\/span><\/label>[\s\S]*<label for="repo-crux_flutter-2">Review <span class="count">2<\/span><\/label>/)
+  assert.match(repo, /A paywall now guards premium stories/)
+  assert.match(repo, /Adds a &lt;paywall&gt;\./, 'text from the review is escaped')
+  assert.ok(repo.includes(`<a href="https://github.com/NewsInShorts/crux_flutter/commit/${sha(3)}"><code>3333333</code></a> Fix paywall copy`), repo)
+  assert.ok(repo.indexOf('Unused import') < repo.indexOf('Paywall can be skipped'), "Saransh's own findings come first")
+  assert.match(html, /<a href="brief\.md">brief\.md<\/a>/)
+})
+
+test("the HTML Brief keeps the links, code and bold in the PM Agent's lines, and escapes the rest", async () => {
+  prepareRun([changed], {
+    pm: pmAnswered({ todos: ['Download the [Finance PRD](https://docs.google.com/document/d/1Qc/edit?a=1&b=2) for `inpix` — **today** <b>now</b>', 'Not a link: [x](javascript:alert(1))'] }),
+  })
+  await brief()
+
+  const html = ws.readRunFile(runId, 'brief.html')
+
+  assert.ok(html.includes('<li>Download the <a href="https://docs.google.com/document/d/1Qc/edit?a=1&amp;b=2">Finance PRD</a> for <code>inpix</code> — <strong>today</strong> &lt;b&gt;now&lt;/b&gt;</li>'), html)
+  assert.ok(html.includes('<li>Not a link: [x](javascript:alert(1))</li>'), html)
 })

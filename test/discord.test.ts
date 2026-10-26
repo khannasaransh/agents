@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { readJson, writeJson } from '../src/files.ts'
 import { makeWorkspace, replayDiscord, type RecordedResponse, type Workspace } from './helpers.ts'
 
 let ws: Workspace
+/** The files in a folder of the data area, such as the APK inbox. */
+const dataFiles = (folder: string) => (existsSync(join(ws.dataDir, folder)) ? readdirSync(join(ws.dataDir, folder)).sort() : [])
 let api: Awaited<ReturnType<typeof replayDiscord>> | undefined
 let cdn: Awaited<ReturnType<typeof replayDiscord>> | undefined
 afterEach(() => {
@@ -180,6 +185,8 @@ test('the Discord Step reads a watched channel since the last successful read as
       mentionsSaransh: true,
       fromSaransh: false,
       prdFiles: [],
+      apkFiles: [],
+      otherFiles: [],
       prdLinks: [],
     },
     {
@@ -194,6 +201,8 @@ test('the Discord Step reads a watched channel since the last successful read as
       mentionsSaransh: false,
       fromSaransh: true,
       prdFiles: [],
+      apkFiles: [],
+      otherFiles: [],
       prdLinks: [],
     },
   ])
@@ -370,6 +379,8 @@ test('a DM with the bot among the configured channels is read by default, with n
       mentionsSaransh: false,
       fromSaransh: false,
       prdFiles: [],
+      apkFiles: [],
+      otherFiles: [],
       prdLinks: [],
     },
   ])
@@ -442,6 +453,39 @@ test("re-running the Discord Step after it read asks Discord nothing, unless for
   assert.deepEqual(ws.readDiscordState(), { lastRead: reread.until })
 })
 
+test("the weekly Pipeline's first Discord read covers the last 7 days and leaves the daily read time", async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  await workspaceWithDiscord(watched(payments, []))
+  ws.writeDiscordState({ lastRead: '2026-10-01T00:00:00.000Z' })
+  ws.prepareRun(runId, { pipeline: 'weekly' })
+  const weekAgo = () => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+  const earliest = weekAgo()
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  const latest = weekAgo()
+  const { since, until } = readMessages()
+  assert.ok(earliest <= since && since <= latest, since)
+  assert.equal(api!.requests.find((r) => r.path === `/channels/${payments.id}/messages`)?.query.after, snowflake(since))
+  assert.deepEqual(ws.readDiscordState(), { lastRead: '2026-10-01T00:00:00.000Z' })
+  assert.deepEqual(readJson(join(ws.dataDir, 'state', 'weekly-discord.json')), { lastRead: until })
+})
+
+test('the weekly Pipeline reads Discord since its own last read, not the daily one', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  await workspaceWithDiscord(watched(payments, []))
+  ws.writeDiscordState({ lastRead: '2026-10-01T00:00:00.000Z' })
+  writeJson(join(ws.dataDir, 'state', 'weekly-discord.json'), { lastRead: '2026-10-20T00:00:00.000Z' })
+  ws.prepareRun(runId, { pipeline: 'weekly' })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(readMessages().since, '2026-10-20T00:00:00.000Z')
+  assert.deepEqual(ws.readDiscordState(), { lastRead: '2026-10-01T00:00:00.000Z' })
+})
+
 test('on the first Run the Discord Step covers the last 24 hours', async () => {
   const payments = channel('1100000000000000001', 'payments')
   await workspaceWithDiscord(watched(payments, []))
@@ -476,7 +520,7 @@ test('a PDF attached in a watched channel is saved into the PRD inbox, with the 
   assert.ok(cdn!.requests.length && cdn!.requests.every((r) => r.authorization === undefined), 'the bot token never goes to the CDN')
 })
 
-test('only Word, PDF and Markdown attachments go into the PRD inbox', async () => {
+test('only Word, PDF and Markdown attachments go into the PRD inbox, APKs go into the APK inbox, and every other file into the other folder', async () => {
   const payments = channel('1100000000000000001', 'payments')
   const files = await uploaded(
     payments.id,
@@ -486,15 +530,46 @@ test('only Word, PDF and Markdown attachments go into the PRD inbox', async () =
     { filename: 'onboarding.md', contentType: 'text/markdown; charset=utf-8', content: '# Onboarding' },
     { filename: 'screenshot.png', contentType: 'image/png', content: 'PNG' },
     { filename: 'designs.zip', contentType: 'application/zip', content: 'PK designs' },
+    { filename: 'inshorts-release-4.2.0.apk', contentType: 'application/vnd.android.package-archive', content: 'PK apk' },
+    { filename: 'inshorts-4.2.0.AAB', contentType: 'application/octet-stream', content: 'PK bundle' },
   )
-  await workspaceWithDiscord(watched(payments, [message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'Specs and designs', [], files)]))
+  const post = message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'Specs, designs and builds', [], files)
+  await workspaceWithDiscord(watched(payments, [post]))
   ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
 
   const result = await discord()
 
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(ws.prdInboxFiles(), ['Old_checkout.doc', 'Refunds.docx', 'Wallet.PDF', 'onboarding.md', 'sources.json'])
-  assert.ok(!cdn!.requests.some((r) => /\.(png|zip)$/.test(r.path)), 'other files are never downloaded')
+  assert.deepEqual(dataFiles('apk-inbox'), ['inshorts-4.2.0.AAB', 'inshorts-release-4.2.0.apk', 'sources.json'])
+  assert.equal(readFileSync(join(ws.dataDir, 'apk-inbox', 'inshorts-release-4.2.0.apk'), 'utf8'), 'PK apk')
+  assert.deepEqual(dataFiles('other'), ['designs.zip', 'screenshot.png', 'sources.json'])
+  const link = `https://discord.com/channels/${guildId}/${payments.id}/${post.id}`
+  assert.deepEqual(readJson(join(ws.dataDir, 'other', 'sources.json')), {
+    'screenshot.png': { message: link, attachment: files[4].id },
+    'designs.zip': { message: link, attachment: files[5].id },
+  })
+  const [read] = readMessages().messages
+  assert.deepEqual([read.prdFiles, read.apkFiles, read.otherFiles], [
+    ['Refunds.docx', 'Old_checkout.doc', 'Wallet.PDF', 'onboarding.md'],
+    ['inshorts-release-4.2.0.apk', 'inshorts-4.2.0.AAB'],
+    ['screenshot.png', 'designs.zip'],
+  ])
+})
+
+test('an APK already in the APK inbox from an earlier Run is not saved again', async () => {
+  const payments = channel('1100000000000000001', 'payments')
+  const [apk] = await uploaded(payments.id, { filename: 'inshorts.apk', contentType: 'application/vnd.android.package-archive', content: 'PK apk' })
+  const post = message(payments.id, '2026-10-21T09:15:00.000Z', priya, 'Build to test', [], [apk])
+  await workspaceWithDiscord(watched(payments, [post]))
+  ws.writeDiscordState({ lastRead: '2026-10-21T00:00:00.000Z' })
+  writeJson(join(ws.dataDir, 'apk-inbox', 'sources.json'), { 'tested/inshorts.apk': { message: `https://discord.com/channels/${guildId}/${payments.id}/${post.id}`, attachment: apk.id } })
+
+  const result = await discord()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(dataFiles('apk-inbox'), ['sources.json'])
+  assert.equal(cdn!.requests.length, 0)
 })
 
 test('a file already in the PRD inbox from an earlier Run is not saved again', async () => {
@@ -602,9 +677,10 @@ test('a dry run lists the PRD files attached in discord.json but saves nothing i
 
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(
-    readMessages().messages.map((m: any) => m.prdFiles),
-    [['Paywall_PRD.pdf']],
+    readMessages().messages.map((m: any) => [m.prdFiles, m.otherFiles]),
+    [[['Paywall_PRD.pdf'], ['screenshot.png']]],
   )
   assert.deepEqual(ws.prdInboxFiles(), [])
+  assert.deepEqual(dataFiles('other'), [])
   assert.equal(cdn!.requests.length, 0)
 })

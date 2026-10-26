@@ -175,3 +175,46 @@ test('a Run whose review fails ends partial, and its Brief says so', async () =>
   assert.equal(ws.readRun(id).status, 'partial')
   assert.match(ws.readRunFile(id, 'brief.md'), /Review failed: Quota limit reached[\s\S]*## Run health[\s\S]*- review: failed/)
 })
+
+/** What `codex exec --json` prints when its schema-checked answer is `answer`. */
+const codexAnswering = (answer: unknown) => ({
+  stdout: [
+    { type: 'thread.started', thread_id: 'thread-1' },
+    { type: 'turn.started' },
+    { type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: JSON.stringify(answer) } },
+    { type: 'turn.completed' },
+  ]
+    .map((event) => JSON.stringify(event))
+    .join('\n'),
+})
+
+test('agents run daily --worker codex runs the PM Agent on Codex, with the model its config names for Codex', async () => {
+  ws = makeWorkspace()
+  ws.addRepo('crux_flutter')
+  ws.writeRepoList()
+  ws.setWorkerCli('codex', codexAnswering({ repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null }))
+
+  const result = await ws.agents('run', 'daily', '--worker', 'codex')
+
+  assert.equal(result.status, 0, result.stderr)
+  const [id] = ws.runIds()
+  assert.equal(ws.readRun(id).worker, 'codex')
+  const [call, ...more] = ws.workerCliCalls('codex')
+  assert.deepEqual(more, [])
+  assert.ok(call.args.includes('gpt-6-astra'), call.args.join(' '))
+  assert.ok(call.args.includes('model_reasoning_effort="medium"'), call.args.join(' '))
+  assert.deepEqual(ws.workerCliCalls('claude'), [])
+})
+
+test('agents run refuses a Worker that can only be a fallback, and a dry run that also names a Worker', async () => {
+  ws = makeWorkspace()
+
+  const antigravity = await ws.agents('run', 'daily', '--worker', 'antigravity')
+  assert.equal(antigravity.status, 1)
+  assert.match(antigravity.stderr, /fallback Worker/)
+
+  const dry = await ws.agents('run', 'daily', '--dry-run', '--worker', 'codex')
+  assert.equal(dry.status, 1)
+  assert.match(dry.stderr, /fake Worker/)
+  assert.deepEqual(ws.runIds(), [])
+})

@@ -286,7 +286,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     return
   }
   if (!wiki) throw new StepSkipped('No WIKI_FOLDER in the env file, so there is no wiki to update')
-  const { dryRun = false } = readRun(runId)
+  const { dryRun = false, worker } = readRun(runId)
   const repos = new Map((await loadRepos()).map((repo) => [repo.name, repo]))
   const fetched = readJsonFiles<FetchResult>(join(runFolder, 'fetch')).flatMap((r) => (r.status === 'failed' ? [] : [r]))
   const progress = readDocsState()
@@ -397,7 +397,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
         writeText(prdPinsFile, fetched.flatMap((r) => (repos.has(r.repo) ? [`${r.repo} ${r.branch} ${repos.get(r.repo)!.folder} ${r.head}\n`] : [])).join(''))
       }
       const inputs = { pages, repos: pinned, pinsFile, prds, prdPinsFile: prds.length ? prdPinsFile : null }
-      const answer = (await callAgent(agent, inputs, { cwd: folder, dryRun })) as DocsAnswer
+      const answer = (await callAgent(agent, inputs, { cwd: folder, dryRun, worker })) as DocsAnswer
       rmSync(join(folder, stagingFolder), { recursive: true, force: true })
 
       const edits = await changesIn(folder)

@@ -2,6 +2,7 @@
 import './node-version.ts'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
+import { workerNames, type WorkerName } from './agent.ts'
 import { acquireLock } from './lock.ts'
 import { decideProposal, memoryFile, pendingProposals, proposalDiff } from './memory.ts'
 import { runDir } from './paths.ts'
@@ -10,13 +11,16 @@ import { installSchedules, recordScheduledStart } from './schedule.ts'
 import { captureConfig, defaultRoot, setupMachine } from './setup.ts'
 
 const usage = `Usage:
-  agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily or stocks; a
-             [--scheduled]                  dry run runs every Agent on the fake Worker and changes
-             [--env <name>=<value>]         nothing in ash_new; a scheduled one, as a Schedule
-                                            starts it, records in the data area's scheduled-starts.log
-                                            how it ended or why it didn't start; --env sets an
-                                            environment variable for the Run, as a Task Scheduler
-                                            entry does, which can't set one itself
+  agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily, weekly or stocks. A dry
+             [--worker <name>]              run runs every Agent on the fake Worker and changes
+             [--scheduled]                  nothing in ash_new. --worker (codex or claude-code) runs
+             [--env <name>=<value>]         every Agent on that Worker, using the model the Agent
+                                            already names for it, and can't be combined with a dry
+                                            run. A scheduled Run, as a Schedule starts it, records
+                                            in the data area's scheduled-starts.log how it ended or
+                                            why it didn't start. --env sets an environment variable
+                                            for the Run, as a Task Scheduler entry does, which can't
+                                            set one itself
   agents step <name> --run <id> [--force]   Run one Step inside an existing Run
   agents memory                             List the Memory changes Agents proposed, waiting for you
   agents memory accept <agent> <name>       Make a proposed change the Memory the next Run reads
@@ -41,13 +45,22 @@ async function main(argv: string[]): Promise<number> {
       const { values, positionals } = parseArgs({
         args: rest,
         allowPositionals: true,
-        options: { 'dry-run': { type: 'boolean', default: false }, scheduled: { type: 'boolean', default: false }, env: { type: 'string', multiple: true, default: [] } },
+        options: {
+          'dry-run': { type: 'boolean', default: false },
+          scheduled: { type: 'boolean', default: false },
+          worker: { type: 'string' },
+          env: { type: 'string', multiple: true, default: [] },
+        },
       })
       const [pipeline] = positionals
       const env = values.env.map((setting) => /^([^=]+)=(.*)$/s.exec(setting))
+      const worker = values.worker
       if (!pipeline || env.some((match) => !match)) return fail(usage)
+      if (worker !== undefined && !(workerNames as readonly string[]).includes(worker)) return fail(`--worker must be one of ${workerNames.join(', ')}`)
+      if (worker === 'antigravity') return fail("antigravity runs only as a fallback Worker, so it can't be --worker")
+      if (worker && values['dry-run']) return fail('A dry run uses the fake Worker, so it takes no --worker')
       for (const [, name, value] of env as RegExpExecArray[]) process.env[name] = value
-      const run = await runPipeline(pipeline, { dryRun: values['dry-run'] }).catch((error: unknown) => {
+      const run = await runPipeline(pipeline, { dryRun: values['dry-run'], worker: worker as WorkerName | undefined }).catch((error: unknown) => {
         if (values.scheduled) recordScheduledStart(pipeline, { error })
         throw error
       })

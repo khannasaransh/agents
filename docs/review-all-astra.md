@@ -1,152 +1,112 @@
-# Consolidated implementation, PRD and issue review — through issue 11
+# Consolidated implementation, PRD and issue review — through issue 14 and review fixes
 
-Updated **24 October 2026** against commit `81bb3e0` plus the staged issue 11 implementation. The incremental review covers changes since `6ab170c`, with earlier findings checked against the current implementation. This document retains its original filename so existing links keep working.
+Reviewed **25 October 2026** against commit **`82ba67e`** (`review fixes and improvements`), with a clean implementation working tree. Incremental scope: **`cc71556..82ba67e`**, covering the changes after the committed issue 11 implementation, including issues 12–14. Earlier C01–C18 findings were rechecked. The new stocks PRD and issues 15–45 were reviewed for contract consistency; their implementation in other repositories was not audited.
 
-This is the consolidated record of the original implementation review, the supplied “The pipeline’s shape holds together…” review, the issue 7 review, and the review through issue 11. Recommendations are proposals, not changes to product requirements.
+This is the consolidated report now located at `docs/review-all-astra.md`; the former `docs/review-through-issue-03.md` is absent from this checkout. It retains the original finding and decision identifiers, including the supplied “The pipeline’s shape holds together…” review. Recommendations are proposals, not silently changed requirements.
 
-**Assessment:** C01–C05 are fixed in the implementation. The five issue 7 findings, numbered C06–C10 below, remain pending. Eight new defects are confirmed through issues 8–11, C11–C18: **13 open implementation findings in total**. Resolved design questions are marked accordingly; pending decisions are retained. The review changes this document only, not application code, the PRD, issue checkboxes or staged implementation files.
+**Assessment: 15 earlier findings fixed, 3 partially fixed, and 5 new findings — 8 open implementation/test findings.** The remaining earlier findings are C06, C08 and C12. New findings are C19–C23. Typechecking passes; the full suite is **200/201 passing**, with the remaining test failure confirmed separately. Only this report was changed.
 
 ## 1. Open implementation findings
 
-### C06 — [P1] Preserve PM inputs until PM has processed them — pending from issue 7
+### C12 — [P1] Run trusted wiki tools throughout the Agent call — partially fixed
 
-**Evidence:** [steps/save-state.ts:61](/Users/khannasaransh/Saransh/agents/steps/save-state.ts:61), [steps/pm.ts:39](/Users/khannasaransh/Saransh/agents/steps/pm.ts:39), [steps/discord.ts:252](/Users/khannasaransh/Saransh/agents/steps/discord.ts:252).
+**Evidence:** [finish:17](/Users/khannasaransh/Saransh/agents/agents/docs/tools/finish:17), [steps/docs.ts:208](/Users/khannasaransh/Saransh/agents/steps/docs.ts:208), [Claude Code allowlist](/Users/khannasaransh/Saransh/agents/src/workers/claude-code.ts:25).
 
-When Review succeeds but PM and its fallback fail, Save state still advances the review cursor. The next PM call reads only that Run's reviews and commits plus previously saved Memory. The issue 7 reproduction lost a high-severity finding from subsequent PM inputs: reviews, commits and Memory were all empty. These paths remain unchanged.
+The post-call guard now rejects changed tools, templates and instructions before the Step validates or commits them. This closes the original altered-checker publication reproduction. However, the Agent still has write access to the whole worktree and an allowlisted `finish` command that executes `_wiki/tools/*.mjs` from that worktree **during** its call, before the guard. `prd` similarly invokes the mutable `docx2md.mjs`. A direct Tool-boundary reproduction replaced `regions.mjs` with a harmless marker writer; `finish` executed it and created a file outside the temporary wiki. No live Worker permission enforcement was tested. Rejecting the final diff cannot undo an earlier execution.
 
-Discord now has the same consumer gap: ingestion advances its cursor before PM succeeds, while PM reads only the current Run's messages. Requests and download links from a failed PM Run need manual replay to reach PM again. Historical Run files remain available; the loss is from automatic processing, not deletion.
+A second scope gap remains: every existing content page passes `isPage`, even when absent from the selected pages and unrelated to the PRD. A stand-in changed an unrelated repo page and Docs committed it successfully, without listing it in the Agent's output.
 
-**Fix and acceptance:** maintain a durable PM backlog or independent acknowledgement for reviews and messages. Fail PM after successful Review/Discord, then run again with no new inputs; PM must still receive the unprocessed items.
+**Acceptance:** use trusted, immutable tool code and dependencies for both Agent Tools and Step validation, and constrain edited pages to selected pages plus explicitly permitted PRD links/indexes. Test an attempted tool replacement before `finish`, and unrelated page edits.
 
-### C07 — [P1] Prevent older PM proposals from replacing newer Memory — pending from issue 7
+### C06 — [P1] Verify PM coverage before acknowledging its backlog — partially fixed
 
-**Evidence:** [steps/save-state.ts:74](/Users/khannasaransh/Saransh/agents/steps/save-state.ts:74), [src/memory.ts:51](/Users/khannasaransh/Saransh/agents/src/memory.ts:51).
+**Evidence:** [steps/save-state.ts:78](/Users/khannasaransh/Saransh/agents/steps/save-state.ts:78), [src/pm-inputs.ts:82](/Users/khannasaransh/Saransh/agents/src/pm-inputs.ts:82).
 
-PM proposals have no base-Memory version or freshness check. Saving a newer Run and then an older, previously unsaved Run replaces newer notes with the older proposal. The earlier reproduction changed “Newer open item” back to “Older open item.” A manual edit made after the Agent read Memory is likewise unprotected. Review-mode queue replacement also lacks a version/order check. The relevant code is unchanged.
+Ordinary PM failure is now recovered: Save state retains that Run in the PM backlog, and a later PM receives its reviews, commits and messages. But acknowledgement tests only `status === 'answered'` and the recorded Run IDs, without checking the stored input fingerprint. If upstream work is retried after PM answered and Save state is run without recomputing PM, the stale answer clears unprocessed inputs. Reproduction: PM answered on a backlog Run; another message was added to that Run; Save state emptied the backlog; the next PM never received the new request. Brief's stale warning does not restore the backlog.
 
-**Fix and acceptance:** record the Memory version supplied to the call and detect intervening changes before application or queue replacement. Test out-of-order saves and manual edits between proposal creation and application.
+**Acceptance:** acknowledge only matching input versions. Preserve/requeue changed covered Runs and the current Run until a fresh PM answer covers them. Add the upstream-retry → Save-state → quiet-next-Run test.
 
-### C11 — [P1] Retry unsuccessful Docs work independently of Review — new, issue 10
+### C21 — [P1] Remove complete TOML secret values during capture — new, issue 14
 
-**Evidence:** [steps/docs.ts:240](/Users/khannasaransh/Saransh/agents/steps/docs.ts:240), [steps/docs.ts:284](/Users/khannasaransh/Saransh/agents/steps/docs.ts:284), [steps/save-state.ts:61](/Users/khannasaransh/Saransh/agents/steps/save-state.ts:61).
+**Evidence:** [src/worker-config.ts:269](/Users/khannasaransh/Saransh/agents/src/worker-config.ts:269).
 
-Docs derives its code-update workload from Fetch's `new-commits` results, whose baseline is the last successful review. If Review succeeds and Docs fails, Save state advances that baseline anyway. A reproduction failed Docs, saved state, and ran again: Fetch returned `unchanged`, Docs returned `nothing-to-update`, and the stale wiki page was never retried. Changes missed while Docs is unconfigured have the same problem when it is enabled later.
+`captureText` removes one line when a key such as `password` contains a quoted value. A valid multiline TOML string loses only its opening assignment; its contents and closing delimiter are retained. The fallback scanner recognizes selected token formats, so an ordinary password is not caught. Capturing a temporary config with a synthetic multiline password wrote that password into the repo-shaped output and also made the TOML invalid. This contradicts issue 14's secret-exclusion requirement. No real secret was used or exposed in the reproduction.
 
-**Fix and acceptance:** give Docs independently acknowledged ranges or a durable work queue, including an initial-baseline policy. Test failed Docs work followed by a quiet Run and eventual successful documentation.
+**Acceptance:** parse TOML values or reject unsupported syntax before writing any captured files. Cover basic/literal multiline strings and validate the resulting config; no secret bytes should appear in captured files or error output.
 
-### C12 — [P1] Restrict modifications before running wiki tools — new, issues 10–11
+### C19 — [P2] Match resumed inbox moves to the original input — new, review fix
 
-**Evidence:** [steps/docs.ts:178](/Users/khannasaransh/Saransh/agents/steps/docs.ts:178), [steps/docs.ts:184](/Users/khannasaransh/Saransh/agents/steps/docs.ts:184), [steps/docs.ts:344](/Users/khannasaransh/Saransh/agents/steps/docs.ts:344).
+**Evidence:** [steps/docs.ts:278](/Users/khannasaransh/Saransh/agents/steps/docs.ts:278), [src/prd-inbox.ts](/Users/khannasaransh/Saransh/agents/src/prd-inbox.ts).
 
-`forbiddenEdits` accepts every ordinary modification (`M`), including unrelated pages, instructions and `_wiki/tools/*.mjs`. The Step executes wiki tools from that edited worktree and commits all changes. A stand-in Agent changed a page to contain `BROKEN` and replaced `check.mjs` with a script reporting zero errors; Docs succeeded and committed both. The Agent can therefore change the gate intended to validate its work. The Step launches those scripts outside the Worker permission configuration.
+Docs replays `moveOut(movesOf(earlier))` on every retry before checking `--force`. The recorded result identifies inputs only by filename. After an old file was processed, a different file arriving under the same name is therefore moved to done/skipped using the old decision. This also defeats restoring a skipped file and forcing the same Run. Reproduction: skip `notes.md`, place a new PRD at `notes.md`, then force Docs; it moved the new file into skipped without another Worker call.
 
-**Fix and acceptance:** explicitly allow relevant page/source/index/work-file edits and protect tooling and instructions. Execute trusted tool versions, including through the Agent's `finish` Tool. Reject modified checkers or unrelated files before execution or publication to the docs branch.
+**Acceptance:** record an input identity/content digest and explicit move completion. Resume only an unfinished move for that exact input. Test replacement files, deliberate restores, and forced retries after completed moves. The original commit-before-move recovery C14 is fixed; this is a distinct regression in its replay logic.
 
-### C08 — [P2] Invalidate PM output when its inputs change — pending from issue 7
+### C20 — [P2] Make Fetch use the destinations created by setup — new, issue 13
 
-**Evidence:** [steps/pm.ts:30](/Users/khannasaransh/Saransh/agents/steps/pm.ts:30), [steps/brief.ts:219](/Users/khannasaransh/Saransh/agents/steps/brief.ts:219).
+**Evidence:** [src/setup.ts:42](/Users/khannasaransh/Saransh/agents/src/setup.ts:42), [src/repos.ts:24](/Users/khannasaransh/Saransh/agents/src/repos.ts:24).
 
-A successful `pm.json` is reused without identifying its inputs, and Brief accepts it unconditionally. The earlier reproduction forced Fetch to include another commit, reran PM normally, and forced Brief: the new commit appeared beside the old PM summary and To-dos. Discord is now another independently changing input. The cache check remains unchanged.
+Setup clones to `<root>/<team>/<name>`, but persists no machine-local path mapping. `loadRepos` continues to use `repo.folder`, expanding only `~`. A custom root is ignored by subsequent Runs; even the default fresh-machine layout places data repos under `data/` while the committed inventory points to `backend/`. A temporary setup cloned successfully into the chosen root, but Fetch still attempted the old path and failed when it was absent. The setup checklist does not resolve this mismatch.
 
-**Fix and acceptance:** fingerprint PM inputs, invalidate mismatched output, and disclose stale/missing analysis in Brief. Test upstream Fetch, Review and Discord retries without corresponding PM recomputation.
+**Acceptance:** share machine-local path resolution between setup and the Pipeline while preserving existing clone overrides. Test setup followed by Fetch for a custom root and a data-team repo, without manually editing the inventory.
 
-### C09 — [P2] Track Memory decisions per proposal version — pending from issue 7
+### C08 — [P2] Include all effective PM inputs in freshness checks — partially fixed
 
-**Evidence:** [src/memory.ts:60](/Users/khannasaransh/Saransh/agents/src/memory.ts:60), [steps/save-state.ts:76](/Users/khannasaransh/Saransh/agents/steps/save-state.ts:76).
+**Evidence:** [steps/pm.ts:40](/Users/khannasaransh/Saransh/agents/steps/pm.ts:40), [steps/pm.ts:62](/Users/khannasaransh/Saransh/agents/steps/pm.ts:62).
 
-Decisions are identified only by Run, Agent and Memory filename. After the first PM proposal is applied, forcing PM to produce corrected Memory and forcing Save state still leaves the first version installed: the replacement is considered already settled. The earlier reproduction retained “First version” despite a “Corrected version” proposal. The implementation is unchanged.
+The new fingerprint correctly invalidates changed reviews, commits and Discord messages, and Brief warns about these mismatches. It excludes `memory` and `runHealth`, although both are supplied to PM, and tests only the old covered Run list rather than newly pending backlog Runs. Reproduction: PM answered, its Memory was manually edited with a new open item, then PM was rerun normally; it skipped the Worker. A repaired fetch failure with no new commits can likewise leave obsolete health To-dos without a freshness warning.
 
-**Fix and acceptance:** associate each decision with proposal identity/content. Forced replacements need new decisions; replay of the identical proposal must remain idempotent.
+**Acceptance:** define a complete input identity, including health, the intended covered Runs and externally changed Memory. Account for Memory written by this very answer so an ordinary replay remains idempotent. Test manual edits, repaired health and newly queued backlog entries.
 
-### C10 — [P2] Serialize Memory approvals with proposal writes — pending from issue 7
+### C22 — [P2] Remove the unsupported page-order expectation from the Docs test — new, review fix
 
-**Evidence:** [src/cli.ts:44](/Users/khannasaransh/Saransh/agents/src/cli.ts:44), [src/memory.ts:70](/Users/khannasaransh/Saransh/agents/src/memory.ts:70).
+**Evidence:** [test/docs.test.ts:821](/Users/khannasaransh/Saransh/agents/test/docs.test.ts:821).
 
-`agents memory accept/reject` bypasses the Run lock. If Save state replaces a pending proposal between the approval's read and deletion, approval settles the old proposal and deletes the new one. A controlled two-process interleaving applied the older proposal and left no pending proposal. These call paths remain unchanged.
+The PRD backlink test expects `[PRD page, existing page]` in both tool calls, but the implementation supplies `[existing page, PRD page]`. Both calls use the correct PRD pins and contain both pages. This fails `npm test` on the reviewed Mac and fails when run alone; it is not a discovered stamp/check failure. Compare the page sets while preserving required argument positions, or explicitly define and implement an ordering contract.
 
-**Fix and acceptance:** serialize the whole decision with queue writes and verify identity before removal. In a concurrent approval/new-proposal test, the new proposal must survive unless it was itself decided.
+### C23 — [P3] Make the installed status line's date formatting work on macOS — new, issue 14
 
-### C13 — [P2] Stop when regions or stamp fails — new, issues 10–11
+**Evidence:** [statusline.sh:73](/Users/khannasaransh/Saransh/agents/worker-config/claude-code/.claude/statusline.sh:73), [statusline.sh:91](/Users/khannasaransh/Saransh/agents/worker-config/claude-code/.claude/statusline.sh:91).
 
-**Evidence:** [steps/docs.ts:344](/Users/khannasaransh/Saransh/agents/steps/docs.ts:344), [steps/docs.ts:350](/Users/khannasaransh/Saransh/agents/steps/docs.ts:350), [agents/docs/tools/finish:18](/Users/khannasaransh/Saransh/agents/agents/docs/tools/finish:18).
-
-Docs awaits `regions` and `stamp` but ignores their exit codes. Only `check` determines whether the branch advances. The `finish` Tool behaves the same way. With both preparation tools exiting 1 and the checker exiting 0, Docs reported `updated` and committed the page. Failed generation or stamping need not produce a checker error.
-
-**Fix and acceptance:** require success from every required tool and stop at the first failure. Test failing regions and failing stamp independently while the checker would otherwise succeed.
-
-### C14 — [P2] Recover PRD acknowledgement after the wiki commit succeeds — new, issue 11
-
-**Evidence:** [steps/docs.ts:320](/Users/khannasaransh/Saransh/agents/steps/docs.ts:320), [steps/docs.ts:369](/Users/khannasaransh/Saransh/agents/steps/docs.ts:369), [steps/docs.ts:375](/Users/khannasaransh/Saransh/agents/steps/docs.ts:375).
-
-The branch advances before inbox files move and before `docs.json` records completion. On retry, a PRD is acknowledged only if its page appears in the current worktree's edits. A reproduction induced an inbox-move failure after commit, removed the obstruction and retried the same successful Agent output. The page and copy were already committed, so the retry returned `no-edits` and left the PRD waiting. A crash at the same boundary has the same gap.
-
-**Fix and acceptance:** persist stable input-to-commit acknowledgement and resume incomplete moves without requiring another edit. Test interruption after branch update but before the first move, including identical-content replays.
-
-### C15 — [P2] Paginate archived threads before advancing the read cursor — new, issue 8
-
-**Evidence:** [steps/discord.ts:215](/Users/khannasaransh/Saransh/agents/steps/discord.ts:215).
-
-`threadsOf` fetches one archive page with `limit=100`, ignores `has_more`, and permits the global cursor to advance. Additional eligible threads' messages and attachments are then omitted from normal later reads. A fixture with 101 eligible threads made one archive request, never queried the last thread's message, and still advanced state.
-
-Discord documents descending archive timestamps and pagination through `before` and `has_more`. [Official archived-thread API](https://docs.discord.com/developers/resources/channel#list-public-archived-threads).
-
-**Fix and acceptance:** continue until no threads remain or archive timestamps pass the lower bound. Test two archive pages with an actionable message and attachment on the second page.
-
-### C16 — [P2] Ignore malformed links instead of failing ingestion — new, issue 9
-
-**Evidence:** [steps/discord.ts:35](/Users/khannasaransh/Saransh/agents/steps/discord.ts:35).
-
-The regex extracts URL-like text from arbitrary messages and passes it to `new URL` without handling parse failures. A message containing `https://%` reproduced an `Invalid URL` failure for the entire Step. The cursor stayed unchanged, so automatic retries encounter the same message and fail again, blocking later messages across watched channels.
-
-**Fix and acceptance:** ignore an unparseable link candidate while preserving the message. Test malformed text beside valid document links and require successful ingestion and cursor advancement.
-
-### C17 — [P2] Report existing docs work when the Agent fails — new, issue 10
-
-**Evidence:** [steps/docs.ts:311](/Users/khannasaransh/Saransh/agents/steps/docs.ts:311), [steps/docs.ts:379](/Users/khannasaransh/Saransh/agents/steps/docs.ts:379), [steps/brief.ts:99](/Users/khannasaransh/Saransh/agents/steps/brief.ts:99).
-
-Quota, timeout, schema and other thrown failures escape before Docs writes its result or records existing branch work. Brief omits the docs section even when earlier Runs left pages waiting. A reproduction had two pending commits, a failed subsequent Docs call and no docs branch section in Brief. Handled conflict/check failures have structured results; general failures need equivalent treatment.
-
-**Fix and acceptance:** record a failed result with available branch/waiting state before propagating failure. A failed forced retry must supersede prior success. Verify that pending drafts remain visible when both Workers fail.
-
-### C18 — [P2] Preserve provenance when retrying a skipped PRD — new, issue 11
-
-**Evidence:** [steps/docs.ts:303](/Users/khannasaransh/Saransh/agents/steps/docs.ts:303), [src/prd-inbox.ts:58](/Users/khannasaransh/Saransh/agents/src/prd-inbox.ts:58), [steps/brief.ts:134](/Users/khannasaransh/Saransh/agents/steps/brief.ts:134).
-
-Brief tells Saransh to move a skipped file back into the inbox to retry it, but provenance stays keyed as `skipped/<name>`. Docs looks up only the top-level filename, giving the Agent `discordMessage: null`. Following that documented restore procedure produced a successful Docs call and a committed page without its Discord source link; the manifest still pointed to the obsolete skipped path.
-
-**Fix and acceptance:** provide a restore operation or reconcile restored files by stable identity/checksum, updating the manifest. Test skipped → waiting → done and require the original source link in the PRD page.
+The captured script uses GNU `date -d` for reset timestamps. Setup installs it unchanged on macOS, where the system date command rejects that option; stderr is suppressed. A fixture with both reset timestamps displayed only `tmp | 5h:12% 7d:34%`, omitting both reset times and the countdown. Use portable formatting or branch by the available date implementation, and test both supported OS environments.
 
 ## 2. Fixed implementation findings
 
-These findings are retained as closed records, with the limits of verification stated explicitly.
+“Fixed” means the original reproduced defect is addressed by current code and the relevant passing checks, subject to the limits below. It does not imply every related design problem is closed.
 
 | ID | Status | Current evidence |
 | --- | --- | --- |
-| C01 — Surviving children after runner death | **Fixed** | Recovery tracks and stops surviving Steps/Workers before admitting a replacement Run. Parent-only crash coverage passes in [test/lock.test.ts:76](/Users/khannasaransh/Saransh/agents/test/lock.test.ts:76). See [src/processes.ts](/Users/khannasaransh/Saransh/agents/src/processes.ts) and [src/lock.ts](/Users/khannasaransh/Saransh/agents/src/lock.ts). |
-| C02 — Non-atomic stale-lock takeover | **Fixed** | An OS file lock replaces stale-file unlink/recreate ownership. Simultaneous takeover coverage passes in [test/lock.test.ts:100](/Users/khannasaransh/Saransh/agents/test/lock.test.ts:100). |
-| C03 — Codex implicitly writable working directory | **Fixed in command construction** | [src/workers/codex.ts:57](/Users/khannasaransh/Saransh/agents/src/workers/codex.ts:57) extends read-only and explicitly grants declared write roots. Argument tests pass; effective live-CLI enforcement remains unverified. |
-| C04 — Brief generated before Save state | **Fixed** | [pipelines/daily.ts](/Users/khannasaransh/Saransh/agents/pipelines/daily.ts) puts Brief last. Tests verify successful health and a Save state failure reflected in Brief. |
-| C05 — Old review displayed against new fetched commits | **Fixed for review results** | [steps/brief.ts:215](/Users/khannasaransh/Saransh/agents/steps/brief.ts:215) checks repository and range before displaying reviews. Stale-review tests pass. PM freshness remains C08. |
+| C01 — Surviving children after runner death | **Fixed** | Process records and lock recovery stop surviving Steps/Workers before replacement Runs. Crash recovery tests pass. |
+| C02 — Non-atomic stale-lock takeover | **Fixed** | OS file locking replaces stale-file unlink/recreate ownership; simultaneous takeover coverage passes. |
+| C03 — Codex implicitly writable working directory | **Fixed in command construction** | Read-only is extended only by declared write roots in `src/workers/codex.ts`. Argument tests pass; live enforcement remains unverified. |
+| C04 — Brief before Save state | **Fixed** | `pipelines/daily.ts` puts Brief last, including Save state health in its output. |
+| C05 — Old review against new fetched commits | **Fixed** | Brief filters review results by matching repo and commit range. |
+| C07 — Older proposals overwrite newer Memory | **Fixed for versioned results** | Review and PM record `memoryRead`; Save state queues a proposal if its base differs. A newer queued Run cannot be replaced by an older one. Legacy proposals lacking a base still bypass this protection; see D02. |
+| C09 — Decisions ignore corrected proposal content | **Fixed for versioned decisions** | `src/memory.ts` stores and compares `proposed`; identical replay is settled, a corrected proposal is not. Legacy decisions without `proposed` retain the old compatibility behavior. |
+| C10 — Approval deletes a replacement proposal | **Fixed** | Memory accept/reject takes the Run lock; `decideProposal` removes only the exact proposal text it read. |
+| C11 — Failed Docs work lost after Review succeeds | **Fixed for recorded Docs attempts** | Independent `lastDocumented` ranges survive failure and feed later Docs work even when Fetch says unchanged. New consumer initialization/backfill remains D01. |
+| C13 — Ignored regions/stamp failures | **Fixed** | Both the Step and `finish` stop on nonzero preparation-tool exits. Failure-path checks pass. |
+| C14 — Commit-before-inbox-move retry stuck | **Fixed for the original interrupted input** | Docs persists its outcome before updating the branch, checks that the commit landed, and resumes moves without requiring another page edit. The new same-name replay regression is C19. |
+| C15 — Only first archived-thread page | **Fixed** | Discord follows `has_more` with `before` until the time boundary; pagination test passes. |
+| C16 — Malformed message URL aborts ingestion | **Fixed** | URL parsing can return null and the malformed candidate is ignored; mixed malformed/valid-link test passes. |
+| C17 — Worker failure hides existing docs branch | **Fixed for updateWiki failures** | The catch writes `status: failed` and available waiting state; Brief renders it. Early configuration errors before the catch are outside this guarantee. |
+| C18 — Ordinary skipped-file restore loses provenance | **Fixed for an unchanged restored filename** | `reclaimMovedBack` rekeys the old manifest entry before inputs are built. Next-Run restore/citation coverage passes; same-Run forced replay remains C19. |
+
+The separate issue-11 review's path-traversal cases in `prd`, mutable PRD pins, per-product index rejection, duplicate moves, missing frontmatter citation, discarded skipped-file outcomes, legacy Brief arrays and contradictory `finish` instructions also have specific fixes. PRD pins now live outside the writable worktree. Backlink stamping uses PRD pins; the new assertion about argument order still needs C22. Tool execution trust remains C12. Old `.doc` handling, unknown Codebases and unclassified inputs should remain explicit product decisions rather than being called supported automatically.
 
 ## 3. Cross-cutting design and recovery work
 
-### D01 — Independent consumer progress — pending; now demonstrated
+### D01 — Independent consumer progress — partly implemented
 
-The original warning is now represented by C06 and C11. Preserve ingestion/review cursors but add downstream acknowledgement. Specify recovery of older failed Runs, baselines for newly introduced consumers, and overlapping ranges. Review success, Discord ingestion, PM processing and Docs completion are separate milestones.
+PM has a backlog and Docs has its own cursor. C06 still blocks correct acknowledgement after upstream retry. Define initialization/backfill when Docs is first configured or when upgrading from pre-backlog Runs: an unchanged Fetch currently initializes missing Docs state at the current head, and historical failed PM Runs are not automatically scanned. Also specify interruption recovery if ingestion/review progress persists but Save state never registers the downstream work.
 
-### D02 — Replay-safe Memory and PRD transactions — partially implemented, pending
+### D02 — Replay-safe Memory and PRD transactions — partly implemented
 
-Memory decisions and PRD provenance are recorded, and the successful PRD path validates and commits before moving inputs. These improvements do not close C07, C09, C10 or C14.
-
-Also cover [src/prd-inbox.ts:56](/Users/khannasaransh/Saransh/agents/src/prd-inbox.ts:56): files move individually, but all manifest rekeys are written only after the loop. Interruption can leave moved files under old manifest keys. Reconcile incomplete moves before a new same-named attachment reuses a key. Prefer stable identities, checksums and committed outcomes to filenames or current working-tree differences alone.
-
-Acceptance should exercise failures between Memory write and decision write, wiki commit and inbox move, individual moves, and manifest persistence. Recovery must preserve intervening manual Memory edits. C18 separately covers the documented skipped-file restore path.
+C07/C09/C10/C14/C18 close their ordinary paths. Retain the remaining boundaries: Memory write before decision write; inbox rename before manifest persistence; and legacy proposals/results without versions. The manifest now saves **after each move**, rather than after the whole batch, but a crash between a rename and that write can still separate identity from provenance. C19 demonstrates why filenames alone are insufficient. Use stable identities and a recoverable outcome record, and exercise these boundaries with fault injection. Decide how old results are migrated rather than treating missing metadata as verified freshness.
 
 ### D03 — Writable Worker fallback semantics — pending decision
 
-The fallback receives the same worktree after the primary has edited it and failed, with the original prompt and no explicit account of inherited edits. A reproduction made the primary write a partial edit and fail, then the fallback return empty arrays without writing anything. Docs committed the inherited edit and reported an empty `pages` list.
-
-Choose clean restart or deliberate continuation. Continuation can be useful, but should disclose inherited changes and require reconciliation before success. This is a policy/integration gap, not an assumption that preserving partial work is inherently incorrect. See [src/worker.ts:61](/Users/khannasaransh/Saransh/agents/src/worker.ts:61) and [steps/docs.ts:311](/Users/khannasaransh/Saransh/agents/steps/docs.ts:311).
+The fallback still inherits the primary's partially edited worktree and original prompt. The earlier reproduction committed inherited edits even when the fallback reported no pages. Choose deliberate continuation with explicit inherited-change disclosure and reconciliation, or a clean restart. This is a policy/integration decision; preserving partial work is not inherently incorrect.
 
 ## 4. Original supplied-review claims and pending decisions
 
@@ -155,49 +115,59 @@ All V01–V18 identifiers are retained. Resolved means the earlier ambiguity has
 | ID | Current status | Resolution or remaining decision |
 | --- | --- | --- |
 | V01 — Skipped Steps | **Resolved** | Exit 78 records optional skips; they do not make a Run partial but remain visible in health. PRD, ADR and implementation agree, and the user story requires partial status for failed Steps. |
-| V02 — “Never merge” | **Pending wording** | Main → docs integration is implemented; docs → main and pushing remain prohibited. [Issue 10](/Users/khannasaransh/Saransh/agents/docs/issues/10-docs-agent-wiki-updates-from-commits.md) and `.env.example` still say “never merges” without direction. Clarify it. Conflict rollback tests pass. |
+| V02 — “Never merge” | **Resolved** | Issue 10 and `.env.example` now distinguish main → docs integration from the prohibited docs → main merge and pushing. |
 | V03 — To-do rules and ownership | **Partly decided; policy pending** | PM owns download-link To-dos; issue 9 explicitly says they are absent after PM failure. That choice is documented; C06 addresses recovery. Define identity, completion, dismissal and carry-forward. PRD Further Notes requires settled rules before PM ships, while issue 7 leaves them open. Decide how wiki drafts reach PM, which runs before Docs and receives no docs-state input. |
 | V04 — Baseline ownership | **Closed: proposed change unnecessary** | Fetch records baseline output and Save state persists it. Later ranges advance after successful real reviews. Keep this separation and clarify older ticket wording rather than moving persistence into Fetch. |
-| V05 — Schedule and installer | **Pending, issues 12–14** | Weekdays at 05:30 Singapore / 03:00 IST is already specified. Define timezone-change behavior and connect setup to the shared schedule installer. The stated conversion is not a defect. |
+| V05 — Schedule and installer | **Implemented; rollout pending** | Issue 12 is done. Schedule definitions use the machine’s local clock, and `agents schedule install` generates launchd entries. Timezone changes therefore change the corresponding IST time. Setup and schedule installation remain separate commands; decide whether a setup reminder is wanted. |
 | V06 — Second opinion and cost signal | **Pending clarification** | Record the usual writing model and whether fallback may sacrifice model independence. Logs identify Worker/model/effort; structured provenance would improve auditing. Repos reviewed is a rough cost signal, not an attempt/token/billing count. |
-| V07 — Step definition and I/O | **Partly resolved** | Sequential Review → Discord → PM order is explicit. The [glossary](/Users/khannasaransh/Saransh/agents/GLOSSARY.md:31) still defines a Step as one Agent call although Review contains several. The [PRD contract](/Users/khannasaransh/Saransh/agents/docs/prd.md:161) excludes required repo, Memory, inbox and wiki access. Specify resource access and side effects per Step. |
+| V07 — Step definition and I/O | **Partly resolved** | Sequential Review → Discord → PM order is explicit. The [glossary](/Users/khannasaransh/Saransh/agents/GLOSSARY.md:31) still defines a Step as one Agent call although Review contains several. The [PRD contract](/Users/khannasaransh/Saransh/agents/docs/prd/prd.md:161) excludes required repo, Memory, inbox and wiki access. Specify resource access and side effects per Step. |
 | V08 — Wiki configuration and lifecycle | **Mostly implemented; decisions pending** | `WIKI_FOLDER`, local `main`, rolling `agents/docs`, checkout identity, Agent/Run trailers, isolation and conflicts are concrete. Specify whether squash/rebase merges are supported; ancestry handles ordinary merges. Define “large changes,” since every undocumented Repo with any commit is reported. Decide retention of rejected/failed work, currently removed with temporary worktrees. Real wiki compatibility remains unverified. |
-| V09 — Discord access and provenance | **Mostly implemented; coverage/recovery pending** | Env keys, bot prerequisites, mentions by ID, rate limits, message pagination, attachment formats/IDs and manifests exist. Successful done/skipped moves retain deduplication. C15/C16/C18 and D02 remain. PRD explicitly limits archived discovery to public threads; decide whether private archives, forums or directly configured thread IDs require support before claiming broader coverage. |
+| V09 — Discord access and provenance | **Implemented for the stated scope; recovery limits remain** | Public archived threads paginate, malformed URLs are ignored, and ordinary skipped-file restores recover provenance (C15/C16/C18 fixed). Private archives/forums remain a scope decision. Input identity and interruption recovery remain D02 and C19. |
 | V10 — Repo seed metadata | **Closed as an implementation complaint** | The committed [Repo list](/Users/khannasaransh/Saransh/agents/repos.ts) already carries branch/folder metadata. Do not create a competing inventory from the abbreviated PRD. The prior review counted 29 Repos and recorded exceptions; the inventory is unchanged. Remote branch correctness was not audited. |
-| V11 — Existing clones and fresh-machine paths | **Pending, issue 13** | Reuse configured clones here, including data-team repos under `backend/`; use selected root/Team layout on new machines. Define local path resolution for a fresh Mac's pipeline. Setup is not implemented; this remains a design risk. |
-| V12 — Review/retry/dry-run choices | **Mostly implemented; boundaries need clarity** | Severities, concurrency, worktree ownership, schema fallback and range-aware Review reuse exist. Saransh-first sorting is tested policy; severity-first would be a change. Dry run replaces Workers, but Fetch/Discord still read external systems and initial baselines can persist. Fake work does not advance Discord cursor, Memory or inbox moves. C08 covers stale downstream output. |
+| V11 — Existing clones and fresh-machine paths | **Implementation defect confirmed: C20** | Setup now clones into root/Team/name, but Pipeline resolution still uses the old configured folder. Existing clones must remain supported while fresh-machine destinations become discoverable. |
+| V12 — Review/retry/dry-run choices | **Mostly implemented; boundaries need clarity** | Severities, concurrency, worktree ownership, schema fallback and range-aware Review reuse exist. Saransh-first sorting is tested policy; severity-first would be a change. Dry run replaces Workers, but Fetch/Discord still read external systems and initial baselines can persist. Fake work does not advance Discord cursor, Memory or inbox moves. C08 covers the remaining PM freshness gaps. |
 | V13 — Worker/fallback policy | **Implementation gap resolved; live verification pending** | Antigravity exists as a fallback. PM and Docs name Claude Code primary and Codex fallback configurations. Older statements that they do not exist are obsolete. Argument/stand-in tests do not establish effective live-CLI isolation; retain that gate and V06's model-independence decision. |
-| V14 — Tools/skills dependency | **Mostly implemented; ticket dependency pending** | Docs declares `code`, `finish` and `prd`, with explicit wiki-skill instructions and unattended adaptations in issue 11. Issue 10 still lists only issue 3 as a dependency; add issue 4 or document that dependency. Validate actual skill/tool contracts. C12 covers protection of those tools. |
-| V15 — Schedule readiness and refused starts | **Pending, issue 12** | Separate scheduler implementation from enabling unattended Runs. Define readiness criteria and durable logging for refused starts without Run folders. Decide whether lock refusal skips or queues an invocation; preserving review inputs alone does not ensure a morning Brief. |
-| V16 — LaunchAgent environment and compatibility | **Pending, issues 12–14** | Specify session/login, sleep/power-off behavior, credentials, explicit PATH, executable installation and supported runtime/CLI versions. Node >=25 is declared. Replace dated latest-version prose with maintained compatibility requirements. Validate operating assumptions during implementation; no launchd test was performed here. |
-| V17 — Issue status and documentation | **Partly resolved** | Issues 6–11 are marked done; issues 1–5 remain `ready-for-agent` with unchecked criteria. Reconcile against evidence, retaining live-CLI gaps and confirmed defects. Run suffixes, standalone-Step locking, timeouts and abandoned-run handling already exist; C01/C02 are fixed. |
-| V18 — Preserve issue-specific requirements | **Retained** | Keep rate limits, ingestion cursors, deduplication, conflict recovery, tool checks, config backups, path rewriting and secret exclusion. Setup/scheduling remain future work. Interactive Worker configuration must not implicitly grant pipeline Agents MCP capabilities; runtime permissions are separate. |
+| V14 — Tools/skills dependency | **Dependency resolved; trust boundary pending** | Issue 10 now depends on issue 4. Docs declares its Tools and adapts the wiki skill explicitly. Real wiki compatibility remains unverified, and C12 still applies to Tools invoked during the Agent call. |
+| V15 — Schedule readiness and refused starts | **Refusal behavior resolved; readiness pending** | Lock refusal skips the invocation and is durably recorded in scheduled-starts.log; it does not queue a replacement. Define operational readiness before enabling unattended Runs. No real schedule was installed in this review. |
+| V16 — LaunchAgent environment and compatibility | **Mostly implemented; live checks pending** | Explicit PATH, absolute Node path, data directory, log directory, local time and no RunAtLoad are specified and tested as generated config. Issue 12 documents sleep/off behavior. Real launchd loading, credentials and Windows execution were not tested here. Setup version checks warn rather than enforce a compatible runtime. The installed status line has a Mac portability defect (C23). |
+| V17 — Issue status and documentation | **Partly resolved** | Issues 6–14 are marked done; issues 1–5 still say ready-for-agent with unchecked criteria. Reconcile them with implementation evidence while retaining the live-CLI gaps and open defects. Issues 15–45 are new planned stocks work, not missing implementation of issues 1–14. |
+| V18 — Preserve issue-specific requirements | **Retained** | Rate limits, cursors, deduplication, conflict handling, tool checks, backups, path rewriting and secret exclusion remain requirements. Setup and scheduling now exist, with C20/C21/C23 remaining. Interactive Worker config must not broaden Pipeline Agent permissions. |
 
-### Additional decisions exposed by issue 11
 
-- **PRD identity/replacement:** `prd add` replaces a wiki copy with the same basename in the same Codebase. Define when this is a revision and when unrelated attachments need distinct names. Inbox history alone does not resolve wiki-source collisions. See [prd Tool:31](/Users/khannasaransh/Saransh/agents/agents/docs/tools/prd:31).
-- **Changed restored inputs:** C18 covers proven provenance loss during restore. Additionally specify how an input edited before restoration under the same name is versioned; equal names do not establish equal contents.
-- **Generated edits:** specify which indexes/backlinks may change outside selected pages, and their draft status, source pins and validation. Permitting any modified file is insufficient; see C12.
-- **Incomplete Run data:** define invalidation of cached Docs/Discord results after upstream changes and replacement of prior success after failed forced retries. PM has confirmed instance C08; new Steps also use existence/status-based caching.
+### Additional retained daily-Pipeline decisions
 
-## 5. Recommended follow-up order
+- **PRD replacement:** define when a repeated basename is a revision versus a separate source. Wiki copies currently replace by Codebase/basename; input identity and deliberate restores also need C19/D02.
+- **Generated edits:** specify allowed indexes/backlinks, draft status and validation; C12 still permits unrelated existing content pages.
+- **Incomplete Run data:** specify cache invalidation for Docs and Discord when upstream inputs change. PM's remaining freshness defects are C08.
+- **Unclassified input:** a successful Docs result may leave files absent from both `prds` and `skipped`. Decide whether that is a partial outcome and how Brief reports it; neither a successful exit nor a done checkbox guarantees every waiting file was classified.
 
-| Order | Work | Completion evidence |
+## 5. New stocks PRD and issue decisions
+
+These are unresolved contracts in planned work, not claims of bugs in unimplemented stocks code. References are to this repo's [stocks PRD](/Users/khannasaransh/Saransh/agents/docs/prd/stocks-pipeline.md) and its issues. Backtest figures, market-data correctness, tax assumptions and external repository implementations were not validated.
+
+| ID | Status | Concrete gap and proposed acceptance |
 | --- | --- | --- |
-| 1 | Wiki scope and trusted validation (C12, C13) | Altered tools/unrelated files are rejected; failed required tools block branch advancement. |
-| 2 | Consumer progress (C06, C11, D01) | Quiet Runs recover failed PM/Docs work without manually replaying old Runs. |
-| 3 | Memory versioning and serialization (C07, C09, C10, D02) | Out-of-order saves, forced replacements, manual edits and concurrent decisions are safe. |
-| 4 | PRD recovery/provenance (C14, C18, D02) | Commit/move/manifest interruption and skipped-file restores preserve logical input identity and source link. |
-| 5 | Discord coverage and malformed input (C15, C16) | Multiple archive pages and malformed links neither lose nor block messages. |
-| 6 | Output freshness and failure reporting (C08, C17) | Brief exposes stale/missing analysis and existing docs work after failure. |
-| 7 | Remaining D/V decisions before unattended rollout | PRD, glossary, issues, real wiki and Worker capabilities agree; scheduler/setup requirements are testable. |
+| S01 — Fresh events before selecting the Desk's names | **Pending ordering decision** | The PRD and issue 37 build dossiers and the event-dependent review list in Plan, then fetch Feeds. A holding whose event is first discovered by that fetch can be absent from today's Desk input. Fetch holdings events before selection, or explicitly rebuild/enrich the list and dossiers after Feeds. Test a previously uncached imminent event. |
+| S02 — Demotions before effective order generation | **Pending ordering decision** | The PRD places Plan before Review, while issue 35 automatically demotes strategies in Review. Clarify whether today's orders must use the new Stage; if so, recompute/revalidate plans after demotion. Test a Saturday demotion affecting a buy already in the plan. |
+| S03 — Replay, missing inputs and session identity | **Missing acceptance criteria** | Issues 32–34/42 need stable order identities across retries, duplicate Check protection, a policy for changed same-session plans, and suppression of output when Plan is missing/stale. Worker failure may fall back to a valid Rule plan, but that is not a rule for failed Plan itself. Define session/as-of data and how late Answers revalidate still-open order/promotion proposals. Test repeated/forced Steps, delayed Answers and overlapping broker-export files, not only identical file reimports. |
+| S04 — Yearly rebalance parity | **Contract mismatch to resolve** | Issue 27 reweights in the first session of April; issue 45 proposes changes on the first Saturday and applies them only after an Answer. Those can produce different effective sessions despite the shared-engine parity requirement. Specify effective dates and approval delay in the backtest/live contract, with a parity test spanning April. |
 
-## 6. Verification and limits
+The PRD explicitly lists further unconfirmed choices: the Answers download workflow, early broker-import sequencing, initial capital and broker samples, Windows sandbox behavior, runtime upgrade, feed access and web-search permissions. Keep these pending. The new Windows and stocks tickets intentionally extend the daily PRD's earlier scope; their mere absence from current implementation is not a finding.
 
-- **Typechecking passed; the complete test suite passed 145/145 tests** during the review through issue 11, including staged changes. The first sandboxed run could not bind loopback servers; a permitted rerun passed. Those environment failures were not application regressions.
-- Additional reproductions used temporary repos, wiki/inbox folders and Worker/API stand-ins: lost Docs retry (C11), altered checker accepted (C12), ignored preparation-tool failures (C13), commit-before-move replay (C14), omitted archive page (C15), malformed URL failure (C16), missing branch report (C17), and provenance lost on restore (C18). D03's fallback behavior was reproduced separately.
-- C06–C10 retain their prior reproductions and were rechecked against current call paths. Memory, Save state and the Memory CLI decision path have not been fixed since issue 7. PM's Discord integration does not fix its progress/cache behavior.
-- Current source and regression tests support C01–C05 closure. C03's command construction is fixed; live permission enforcement remains unverified.
-- Discord archive pagination was checked against official documentation cited at C15. Local HTTP fixtures replaced Discord; no company account/channel or external attachment was read.
-- No paid Worker call, actual org-wiki integration, remote production-branch audit, schedule installation or setup was performed. Wiki fixture tools record invocation, and the checker rejects a fixture marker; these do not prove actual stamp/regions/PRD-skill compatibility or semantic correctness of generated pages.
-- Restoring this report does not constitute another code/test run. Only this document was changed; staged implementation files were preserved, with no fixes, ticket status changes, commits, pushes or publication.
+## 6. Recommended follow-up order
+
+1. Close C12's Tool execution boundary and C21's secret capture before relying on those commands with untrusted inputs or real config.
+2. Fix PM acknowledgement/freshness (C06/C08) and PRD input identity (C19).
+3. Connect setup destinations to Pipeline paths (C20), restore the test gate (C22), and fix status-line portability (C23).
+4. Specify migration and interruption behavior (D01/D02) and resolve the retained policy decisions before unattended rollout.
+5. Resolve S01–S04 before the corresponding stocks Steps are implemented, keeping them distinct from daily-Pipeline defects.
+
+## 7. Verification and limits
+
+- **`npm run typecheck`: passed.** **`npm test`: 200 passed, 1 failed, 201 total**, on macOS at `82ba67e`. The failure is C22. It also failed in isolation with `node --test --test-name-pattern='a page the Docs Agent links to a new PRD' test/docs.test.ts`.
+- The initial sandboxed test run could not bind loopback sockets. A permitted rerun produced the results above; sandbox failures are not application defects.
+- Seven additional isolated checks reproduced: mutable `finish` script execution, unrelated wiki page acceptance, same-name PRD replay, stale PM backlog acknowledgement, Memory-insensitive PM caching, setup/Fetch path disagreement, and multiline-secret capture. Fixtures used temporary repos/homes, synthetic config and stand-in Worker CLIs. The Mac status-line check separately confirmed missing reset details.
+- Review-only reproduction script and output are in `/tmp/agents-review-oct25-repros.mts` and `/tmp/agents-review-oct25-repros.log`; the suite log is `/tmp/agents-review-oct25-tests-unrestricted.log`. These temporary files are not committed regression tests.
+- No paid Worker call, company Discord access, production remote audit, actual org-wiki integration, real setup or schedule installation was performed. Tool-wrapper behavior was reproduced directly; effective live Worker permissions remain unverified. Windows behavior was assessed from source and layout tests, not a Windows execution.
+- Wiki fixtures record tool calls and reject a marker; they do not establish actual stamp/regions/PRD-skill compatibility or generated-page accuracy. Current test evidence supports the scoped closures above, not blanket integration readiness.
+- Only this consolidated report was edited in the repository. No implementation fix, ticket status change, commit, push or publication was made.

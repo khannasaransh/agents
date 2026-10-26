@@ -9,9 +9,10 @@ import { readJson, readJsonFiles, writeJson } from '../src/files.ts'
 import { readMemory } from '../src/memory.ts'
 import { coversItsRuns, fingerprint, pmRunInputs } from '../src/pm-inputs.ts'
 import { readRun } from '../src/run.ts'
-import { readPmBacklog } from '../src/state.ts'
+import { readPmBacklog, readWeeklyPmBacklog } from '../src/state.ts'
 import { runAsStep } from '../src/step.ts'
 import { callAgent } from '../src/worker.ts'
+import { isWeekly } from '../src/weekly.ts'
 import { pmMemory } from '../agents/pm/config.ts'
 import type { FetchResult } from './fetch.ts'
 
@@ -46,7 +47,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   }
   const run = readRun(runId)
   const pm = await loadAgent('pm')
-  const runs = [...new Set([...readPmBacklog(), runId])].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+  const runs = [...new Set([...(isWeekly(run.pipeline) ? readWeeklyPmBacklog() : readPmBacklog()), runId])].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
   if (runs.length > 1) console.log(`The PM backlog adds what Runs ${runs.filter((id) => id !== runId).join(', ')} held, since their PM failed`)
   const fromRuns = pmRunInputs(runs)
   const results = readJsonFiles<FetchResult>(join(runFolder, 'fetch'))
@@ -58,7 +59,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   const memory = readMemory(pm.name, pmMemory)
   const inputs = { ...fromRuns, runHealth, memory }
   try {
-    const answer = (await callAgent(pm, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false })) as PmAnswer
+    const answer = (await callAgent(pm, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false, worker: run.worker })) as PmAnswer
     writeJson(out, { status: 'answered', ...answer, runs, inputs: fingerprint(fromRuns), memoryRead: memory } satisfies PmResult)
     console.log(`PM answered: ${answer.repoLines.length} Repo lines, ${answer.todos.length} To-dos`)
   } catch (error) {

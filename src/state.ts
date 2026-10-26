@@ -55,6 +55,28 @@ export function writeDocsState(state: Record<string, DocsRepoState>): void {
   writeJson(docsStateFile(), state)
 }
 
+/** The weekly Pipeline's last reviewed commit per Repo, kept apart from the daily Pipeline's. */
+const weeklyRepoStateFile = () => join(stateDir(), 'weekly-repos.json')
+
+export function readWeeklyRepoState(): Record<string, RepoState> {
+  return existsSync(weeklyRepoStateFile()) ? readJson(weeklyRepoStateFile()) : {}
+}
+
+export function writeWeeklyRepoState(state: Record<string, RepoState>): void {
+  writeJson(weeklyRepoStateFile(), state)
+}
+
+/** Where the weekly Pipeline's last Discord read ended, kept apart from the daily Pipeline's. */
+const weeklyDiscordStateFile = () => join(stateDir(), 'weekly-discord.json')
+
+export function readWeeklyDiscordState(): DiscordState | null {
+  return existsSync(weeklyDiscordStateFile()) ? readJson(weeklyDiscordStateFile()) : null
+}
+
+export function writeWeeklyDiscordState(state: DiscordState): void {
+  writeJson(weeklyDiscordStateFile(), state)
+}
+
 const pmBacklogFile = () => join(stateDir(), 'pm-backlog.json')
 
 /**
@@ -85,4 +107,15 @@ export function readAnswersState(): Record<string, AppliedAnswer> {
 
 export function writeAnswersState(state: Record<string, AppliedAnswer>): void {
   writeJson(answersStateFile(), state)
+}
+
+const weeklyPmBacklogFile = () => join(stateDir(), 'weekly-pm-backlog.json')
+
+/** The weekly Pipeline's own PM backlog, kept apart from the daily one. */
+export function readWeeklyPmBacklog(): string[] {
+  return existsSync(weeklyPmBacklogFile()) ? readJson(weeklyPmBacklogFile()) : []
+}
+
+export function writeWeeklyPmBacklog(runs: string[]): void {
+  writeJson(weeklyPmBacklogFile(), runs)
 }

@@ -1,41 +1,41 @@
-// Brief: renders the day's Brief as Markdown in the Run folder from what earlier Steps wrote there:
-// the PM Agent's To-dos and Discord highlights, the Discord messages that mention Saransh and the
-// DMs with the bot, then by Team each Repo's line from the PM Agent, its new commits and review,
-// then the docs branch's pages waiting for review, the PRD inbox files set aside and the undocumented
-// Repos with new commits, then the Memory changes waiting for Saransh and the Run's health with the
-// number of Repos reviewed.
+// Brief: renders the day's Brief in the Run folder, as Markdown and as an HTML page where each part
+// opens with a tap, from what earlier Steps wrote there. Both open with a summary at a glance, then
+// give the details: the PM Agent's To-dos and Discord highlights, the Discord messages that mention
+// Saransh and the DMs with the bot, the APKs and other files saved from Discord, then the code review
+// by Team, each Repo's line from the PM Agent, its new commits and review, then the docs branch's
+// pages waiting for review, the PRD inbox files set aside and the undocumented Repos with new
+// commits, then the Memory changes waiting for Saransh and the Run's health with the number of Repos
+// reviewed.
 // It runs even when earlier Steps failed, and says when the PM output is missing, or out of date
 // since an earlier Step was re-run after the PM answered.
-import { existsSync, writeFileSync } from 'node:fs'
+import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { readJson, readJsonFiles } from '../src/files.ts'
+import { attachedFiles, byPriority, firstLine, forSaransh, glance, renderHtml, repoLinks, short, webUrl, whereFrom, type BriefInputs } from '../src/brief.ts'
+import { readJson, readJsonFiles, writeText } from '../src/files.ts'
 import { pendingProposals, type MemoryProposal } from '../src/memory.ts'
+import { apkInboxDir, otherFilesDir } from '../src/paths.ts'
 import { coversItsRuns } from '../src/pm-inputs.ts'
-import { teams } from '../src/repos.ts'
-import { readRun, stepsNotSucceeded, type RunRecord } from '../src/run.ts'
+import { loadRepos, teams } from '../src/repos.ts'
+import { readRun, stepsNotSucceeded } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
 import { mainLine } from '../agents/docs/config.ts'
-import type { DiscordMessage, DiscordRead } from './discord.ts'
+import type { DiscordRead } from './discord.ts'
 import type { DocsResult } from './docs.ts'
 import type { FetchResult } from './fetch.ts'
 import type { PmResult } from './pm.ts'
-import { severities } from '../agents/reviewer/config.ts'
-import type { Finding, ReviewResult } from './review.ts'
+import type { ReviewResult } from './review.ts'
 
-const short = (sha: string) => sha.slice(0, 7)
-const firstLine = (text: string) => text.split('\n')[0]
+/** `text` linked to `href` in Markdown, or as it is with no link. */
+const linked = (text: string, href: string | null) => (href ? `[${text}](${href})` : text)
 
-/** Saransh's own findings first, then the worst first. */
-const byPriority = (a: Finding, b: Finding) => Number(b.bySaransh) - Number(a.bySaransh) || severities.indexOf(a.severity) - severities.indexOf(b.severity)
-
-function reviewLines(review: ReviewResult | undefined): string[] {
+function reviewLines(review: ReviewResult | undefined, links: ReturnType<typeof repoLinks>): string[] {
   if (!review) return ['No review of these commits in this Run.', '']
   if (review.status === 'failed') return [`Review failed: ${firstLine(review.error)}`, '']
   const lines = [`Review: ${review.summary}`, '']
   if (!review.findings.length) lines.push('No findings.')
   for (const f of review.findings.toSorted(byPriority)) {
-    const where = f.line === null ? f.file : `${f.file}:${f.line}`
-    lines.push(`- **${f.severity}** \`${where}\` in \`${short(f.commit)}\` by ${f.author}${f.bySaransh ? ' (yours)' : ''}: ${f.summary}`)
+    const where = linked(`\`${f.line === null ? f.file : `${f.file}:${f.line}`}\``, links.file(review.to, f.file, f.line))
+    lines.push(`- **${f.severity}** ${where} in ${linked(`\`${short(f.commit)}\``, links.commit(f.commit))} by ${f.author}${f.bySaransh ? ' (yours)' : ''}: ${f.summary}`)
   }
   lines.push('')
   return lines
@@ -87,16 +87,31 @@ function pmLines(pm: PmResult | null, discord: DiscordRead | null): string[] {
 /** Every message that mentions Saransh or was sent in a DM with the bot, from the Discord Step itself, so they show even without the PM output. */
 function mentionLines(discord: DiscordRead | null): string[] {
   if (!discord) return []
-  const forYou = discord.messages.filter((m) => m.mentionsSaransh || m.dm)
-  const where = (m: DiscordMessage) => (m.dm ? `DM with ${m.channel}` : `#${m.channel}${m.thread ? ` › ${m.thread}` : ''}`)
+  const forYou = forSaransh(discord)
   return [
     '## Mentions of you and DMs on Discord',
     '',
     ...(forYou.length
-      ? forYou.map((m) => `- [${where(m)}](${m.link}) ${m.author}: ${firstLine(m.content)}`)
+      ? forYou.map((m) => `- [${whereFrom(m)}](${m.link}) ${m.author}: ${firstLine(m.content)}`)
       : [`None of the ${discord.messages.length} messages read mention you, and none came in a DM.`]),
     '',
   ]
+}
+
+/** The APKs attached on Discord, waiting to be tested, and every other file attached there, each with the message it came from. */
+function fileLines(discord: DiscordRead | null, dryRun: boolean): string[] {
+  const lines: string[] = []
+  const kinds = [
+    { kind: 'apkFiles', heading: '## APKs to test', folder: apkInboxDir(), where: 'the APK inbox' },
+    { kind: 'otherFiles', heading: '## Other files from Discord', folder: otherFilesDir(), where: 'the other folder' },
+  ] as const
+  for (const { kind, heading, folder, where } of kinds) {
+    const files = attachedFiles(discord, kind)
+    if (!files.length) continue
+    lines.push(heading, '', dryRun ? 'A dry run saves nothing, so these were not downloaded.' : `Saved in ${where}, \`${folder}\`.`, '')
+    lines.push(...files.map(({ file, message }) => `- \`${file}\` from ${message.author} in [${whereFrom(message)}](${message.link})`), '')
+  }
+  return lines
 }
 
 /** The docs branch's pages waiting for Saransh's review, and how this Run's Docs Step went, with the PRD pages it wrote. */
@@ -168,19 +183,14 @@ function undocumentedLines(docs: DocsResult | null): string[] {
   ]
 }
 
-function render(
-  run: RunRecord,
-  results: FetchResult[],
-  reviews: Map<string, ReviewResult>,
-  pm: PmResult | null,
-  discord: DiscordRead | null,
-  docs: DocsResult | null,
-  proposals: MemoryProposal[],
-): string {
+function render(inputs: BriefInputs): string {
+  const { run, results, reviews, pm, discord, docs, proposals } = inputs
   const lines = [`# Brief ${run.id}`, '']
   if (run.dryRun) lines.push('Dry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done.', '')
-  lines.push(...pmLines(pm, discord), ...mentionLines(discord))
+  lines.push('## At a glance', '', ...glance(inputs).map((item) => `- **${item.label}:** ${item.value}, ${item.note}`), '', '# Details', '')
+  lines.push(...pmLines(pm, discord), ...mentionLines(discord), ...fileLines(discord, !!run.dryRun))
   const repoLines = new Map(pm?.status === 'answered' ? pm.repoLines.map((r) => [r.repo, r.line]) : [])
+  lines.push('## Code review', '')
   if (!results.length) lines.push('No Repo was fetched in this Run.', '')
 
   for (const team of teams) {
@@ -190,18 +200,20 @@ function render(
     const unchanged = ofTeam.filter((r) => r.status === 'unchanged').map((r) => r.repo)
     if (!changed.length && !baselines.length && !unchanged.length) continue
 
-    lines.push(`## ${team}`, '')
+    lines.push(`### ${team}`, '')
     for (const r of changed) {
       const count = r.commits.length === 1 ? '1 new commit' : `${r.commits.length} new commits`
-      lines.push(`### ${r.repo}`, '')
+      const links = repoLinks(inputs, r.repo)
+      lines.push(`#### ${r.repo}`, '')
       const line = repoLines.get(r.repo)
       if (line) lines.push(line, '')
-      lines.push(`${count} on ${r.branch}:`, '')
-      for (const c of r.commits) lines.push(`- \`${short(c.sha)}\` ${c.subject} (${c.author})`)
-      lines.push('', ...reviewLines(reviews.get(r.repo)))
+      const compare = links.compare(r.previous!, r.head)
+      lines.push(`${count} on ${r.branch}${compare ? ` ([compare](${compare}))` : ''}:`, '')
+      for (const c of r.commits) lines.push(`- ${linked(`\`${short(c.sha)}\``, links.commit(c.sha))} ${c.subject} (${c.author})`)
+      lines.push('', ...reviewLines(reviews.get(r.repo), links))
     }
     for (const r of baselines) {
-      lines.push(`### ${r.repo}`, '', `Baseline recorded at \`${short(r.head)}\` on ${r.branch}. New commits are listed from the next Run.`, '')
+      lines.push(`#### ${r.repo}`, '', `Baseline recorded at \`${short(r.head)}\` on ${r.branch}. New commits are listed from the next Run.`, '')
     }
     if (unchanged.length) lines.push(`Unchanged: ${unchanged.join(', ')}`, '')
   }
@@ -216,9 +228,10 @@ function render(
   return `${lines.join('\n')}\n`
 }
 
-await runAsStep(({ runId, runFolder, force }) => {
+await runAsStep(async ({ runId, runFolder, force }) => {
   const out = join(runFolder, 'brief.md')
-  if (!force && existsSync(out)) {
+  const html = join(runFolder, 'brief.html')
+  if (!force && existsSync(out) && existsSync(html)) {
     console.log('Brief already written in this Run, skipping')
     return
   }
@@ -233,6 +246,9 @@ await runAsStep(({ runId, runFolder, force }) => {
   const discord = existsSync(discordFile) ? readJson<DiscordRead>(discordFile) : null
   const docsFile = join(runFolder, 'docs.json')
   const docs = existsSync(docsFile) ? readJson<DocsResult>(docsFile) : null
-  writeFileSync(out, render(readRun(runId), results, reviews, pm, discord, docs, pendingProposals()))
-  console.log(`Wrote ${out}`)
+  const webUrls = new Map((await loadRepos()).flatMap((repo) => (webUrl(repo.remote) ? [[repo.name, webUrl(repo.remote)!] as const] : [])))
+  const inputs: BriefInputs = { run: readRun(runId), runFolder, results, reviews, pm, discord, docs, proposals: pendingProposals(), webUrls }
+  writeText(out, render(inputs))
+  writeText(html, renderHtml(inputs))
+  console.log(`Wrote ${out} and ${html}`)
 })
