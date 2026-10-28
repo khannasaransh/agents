@@ -29,21 +29,28 @@
   "data_version": "2018-12-31.4cecefb2b497",
   "book_data_version": "2018-12-31.faf5123fa00f",
   "engine_version": 17,
-  "book_engine_version": 2,
+  "book_engine_version": 3,
+  "paper": false,
   "strategies": [
     {
       "id": "in-ab",
       "name": "in-ab",
       "version": "9d149a9b53a9",
       "approved": false,
-      "run_id": "0ed4cd9966465783"
+      "run_id": "0ed4cd9966465783",
+      "stage": "real_full",
+      "stop_distance": null,
+      "disaster_stop": 0.15
     },
     {
       "id": "in-cd",
       "name": "in-cd",
       "version": "d272da153c8a",
       "approved": false,
-      "run_id": "5a7c61198878e0c4"
+      "run_id": "5a7c61198878e0c4",
+      "stage": "real_full",
+      "stop_distance": null,
+      "disaster_stop": 0.15
     }
   ],
   "gold_etf": "IN:GOLD1",
@@ -54,12 +61,12 @@
   "new_money": 0.0,
   "start": "2016-08-16",
   "end": "2018-08-15",
-  "end_value": 1350820.2784286528,
-  "total_return": 0.3508202784286527,
-  "cagr": 0.1626075674020533,
-  "max_drawdown": -0.07422714998559454,
-  "volatility": 0.10517826298246145,
-  "sharpe": 0.7923625269476174,
+  "end_value": 1324448.8860369844,
+  "total_return": 0.3244488860369845,
+  "cagr": 0.15117977741308053,
+  "max_drawdown": -0.06641022924784334,
+  "volatility": 0.0916969964805338,
+  "sharpe": 0.790373929611259,
   "benchmark_metrics": {
     "total_return": 0.12793910000613895,
     "cagr": 0.06217632634763137,
@@ -71,22 +78,22 @@
     "status": "ran",
     "start": "2013-01-01",
     "end": "2016-08-15",
-    "cagr": 0.1925681489960207,
-    "max_drawdown": -0.07037852013584112,
-    "sharpe": 1.0201736081411554,
+    "cagr": 0.19357975180566434,
+    "max_drawdown": -0.06337386078175733,
+    "sharpe": 1.1703046871383225,
     "benchmark_cagr": 0.07560483232191006,
     "benchmark_sharpe": 8.160945744497054
   },
   "rolling_12m": {
     "windows": 261,
     "book": {
-      "min": 0.03331979367036597,
-      "p5": 0.056281721968668874,
-      "p25": 0.10170217697417727,
-      "p50": 0.15403158989691645,
-      "p75": 0.1907684772910334,
-      "p95": 0.23058119380686248,
-      "max": 0.24721228234680903
+      "min": 0.056925570894217126,
+      "p5": 0.07806503712770074,
+      "p25": 0.11497289760943841,
+      "p50": 0.15486372109516666,
+      "p75": 0.17874111975736584,
+      "p95": 0.21078475286129383,
+      "max": 0.22888293711266505
     },
     "benchmark": {
       "min": 0.06024583068844125,
@@ -97,37 +104,43 @@
       "p95": 0.06388837892417865,
       "max": 0.06409233224875699
     },
-    "beating": 0.9272030651340997
+    "beating": 0.9961685823754789
   },
   "drawdowns": {
-    "max": -0.07422714998559454,
+    "max": -0.06641022924784334,
     "sessions": {
-      "min": -0.07422714998559454,
-      "p5": -0.062459398795775514,
-      "p25": -0.041727414084102105,
-      "p50": -0.01722941488688634,
-      "p75": -0.00642592225900529,
+      "min": -0.06641022924784334,
+      "p5": -0.056153230264790736,
+      "p25": -0.03679540398922726,
+      "p50": -0.01600217826688477,
+      "p75": -0.005880533267689003,
       "p95": 0.0,
       "max": 0.0
     },
     "deep": [
       {
-        "peak": "2017-05-12",
-        "trough": "2017-06-23",
-        "recovery": "2017-08-08",
-        "depth": -0.06246759897368259
+        "peak": "2017-05-15",
+        "trough": "2017-06-28",
+        "recovery": "2017-08-30",
+        "depth": -0.05034692508284
       },
       {
         "peak": "2017-10-17",
-        "trough": "2017-11-23",
-        "recovery": "2018-03-02",
-        "depth": -0.07228082523188217
+        "trough": "2017-12-19",
+        "recovery": "2018-01-18",
+        "depth": -0.06072976280362319
       },
       {
-        "peak": "2018-03-26",
-        "trough": "2018-06-15",
-        "recovery": "2018-08-07",
-        "depth": -0.07422714998559454
+        "peak": "2018-01-18",
+        "trough": "2018-02-13",
+        "recovery": "2018-03-02",
+        "depth": -0.05171280080153917
+      },
+      {
+        "peak": "2018-04-11",
+        "trough": "2018-06-26",
+        "recovery": "2018-08-08",
+        "depth": -0.06641022924784334
       }
     ]
   },
@@ -149,7 +162,7 @@
     {
       "date": "2017-04-03",
       "new_money": 0.0,
-      "value": 1142501.7618576982,
+      "value": 1120262.4521475844,
       "volatility": {
         "in-ab": 0.186542782339578,
         "in-cd": 0.2317949915160833
@@ -163,7 +176,7 @@
     {
       "date": "2018-04-02",
       "new_money": 0.0,
-      "value": 1297249.1276095526,
+      "value": 1289524.5884758583,
       "volatility": {
         "in-ab": 0.18355715692214372,
         "in-cd": 0.2383719403378632
@@ -176,33 +189,42 @@
     }
   ],
   "at_end": {
-    "value": 1350820.2784286528,
-    "cash_fund": 0.16578134085635585,
+    "value": 1324448.8860369844,
+    "cash_fund": 0.2495736686428679,
     "sleeves": {
       "in-ab": {
-        "weight": 0.49575838767986924,
+        "weight": 0.4841092267060561,
         "holdings": {
-          "IN:A": 479,
-          "IN:B": 873
+          "IN:A": 304,
+          "IN:B": 871
+        },
+        "stops": {
+          "IN:A": 631.1712,
+          "IN:B": 202.6826
         }
       },
       "in-cd": {
-        "weight": 0.40711735704859714,
+        "weight": 0.41742957245602275,
         "holdings": {
-          "IN:C": 438,
-          "IN:D": 1813
+          "IN:C": 437,
+          "IN:D": 1800
+        },
+        "stops": {
+          "IN:C": 362.11,
+          "IN:D": 129.823
         }
       },
       "gold": {
-        "weight": 0.09712425527153365,
+        "weight": 0.0984612008379211,
         "holdings": {
-          "IN:GOLD1": 3318
-        }
+          "IN:GOLD1": 3298
+        },
+        "stops": {}
       }
     }
   },
-  "costs": 3929.7832203060557,
-  "interest": 36190.0689409026,
+  "costs": 16323.667632992077,
+  "interest": 58628.486215056844,
   "rules": {
     "breakers": {
       "events": [],
@@ -215,9 +237,9 @@
         "value": 0.0
       },
       "without": {
-        "cagr": 0.1626075674020533,
-        "max_drawdown": -0.07422714998559454,
-        "end_value": 1350820.2784286528
+        "cagr": 0.15117977741308053,
+        "max_drawdown": -0.06641022924784334,
+        "end_value": 1324448.8860369844
       },
       "effect": {
         "cagr": 0.0,
@@ -225,25 +247,25 @@
       }
     },
     "position_cap": {
-      "orders": 38,
-      "value": 2510667.2567645954,
+      "orders": 39,
+      "value": 2742569.918364514,
       "without": {
-        "cagr": 0.2087687792626518,
-        "max_drawdown": -0.08720746406584001,
-        "end_value": 1459984.6957574498
+        "cagr": 0.20555669277972366,
+        "max_drawdown": -0.087701209995805,
+        "end_value": 1452251.5791350799
       },
       "effect": {
-        "cagr": -0.04616121186059852,
-        "max_drawdown": 0.01298031408024547
+        "cagr": -0.05437691536664313,
+        "max_drawdown": 0.021290980747961652
       }
     },
     "sector_cap": {
       "orders": 0,
       "value": 0.0,
       "without": {
-        "cagr": 0.1626075674020533,
-        "max_drawdown": -0.07422714998559454,
-        "end_value": 1350820.2784286528
+        "cagr": 0.15117977741308053,
+        "max_drawdown": -0.06641022924784334,
+        "end_value": 1324448.8860369844
       },
       "effect": {
         "cagr": 0.0,
@@ -255,9 +277,9 @@
       "value": 0.0,
       "cuts": [],
       "without": {
-        "cagr": 0.1626075674020533,
-        "max_drawdown": -0.07422714998559454,
-        "end_value": 1350820.2784286528
+        "cagr": 0.15117977741308053,
+        "max_drawdown": -0.06641022924784334,
+        "end_value": 1324448.8860369844
       },
       "effect": {
         "cagr": 0.0,
@@ -268,19 +290,132 @@
       "orders": 1,
       "value": 149816.07354234936,
       "without": {
-        "cagr": 0.1557065501059074,
-        "max_drawdown": -0.0741968393906074,
-        "end_value": 1334864.0853382149
+        "cagr": 0.15101431874710758,
+        "max_drawdown": -0.06642858302735433,
+        "end_value": 1324068.96985744
       },
       "effect": {
-        "cagr": 0.006901017296145895,
-        "max_drawdown": -3.0310594987148498e-05
+        "cagr": 0.00016545866597295067,
+        "max_drawdown": 1.835377951098227e-05
+      }
+    },
+    "disaster_stops": {
+      "orders": 12,
+      "value": 2030922.287,
+      "hits": [
+        {
+          "date": "2016-09-23",
+          "sleeve": "in-ab",
+          "security_id": "IN:A",
+          "shares": 536,
+          "price": 249.3693,
+          "gapped": true
+        },
+        {
+          "date": "2016-11-16",
+          "sleeve": "in-cd",
+          "security_id": "IN:D",
+          "shares": 1040,
+          "price": 122.2022,
+          "gapped": true
+        },
+        {
+          "date": "2016-11-17",
+          "sleeve": "in-ab",
+          "security_id": "IN:A",
+          "shares": 579,
+          "price": 242.8152,
+          "gapped": true
+        },
+        {
+          "date": "2017-05-04",
+          "sleeve": "in-cd",
+          "security_id": "IN:C",
+          "shares": 337,
+          "price": 490.0071,
+          "gapped": true
+        },
+        {
+          "date": "2017-05-31",
+          "sleeve": "in-cd",
+          "security_id": "IN:D",
+          "shares": 1234,
+          "price": 172.4433,
+          "gapped": true
+        },
+        {
+          "date": "2017-07-25",
+          "sleeve": "in-cd",
+          "security_id": "IN:D",
+          "shares": 972,
+          "price": 151.4958,
+          "gapped": true
+        },
+        {
+          "date": "2017-10-23",
+          "sleeve": "in-ab",
+          "security_id": "IN:B",
+          "shares": 836,
+          "price": 211.0391,
+          "gapped": true
+        },
+        {
+          "date": "2017-11-08",
+          "sleeve": "in-cd",
+          "security_id": "IN:D",
+          "shares": 1187,
+          "price": 145.2196,
+          "gapped": true
+        },
+        {
+          "date": "2018-01-29",
+          "sleeve": "in-cd",
+          "security_id": "IN:C",
+          "shares": 359,
+          "price": 450.0384,
+          "gapped": true
+        },
+        {
+          "date": "2018-02-14",
+          "sleeve": "in-cd",
+          "security_id": "IN:D",
+          "shares": 1316,
+          "price": 125.4036,
+          "gapped": true
+        },
+        {
+          "date": "2018-04-30",
+          "sleeve": "in-ab",
+          "security_id": "IN:A",
+          "shares": 450,
+          "price": 591.0613,
+          "gapped": true
+        },
+        {
+          "date": "2018-06-08",
+          "sleeve": "in-cd",
+          "security_id": "IN:C",
+          "shares": 377,
+          "price": 432.4187,
+          "gapped": true
+        }
+      ],
+      "without": {
+        "cagr": 0.1626075674020533,
+        "max_drawdown": -0.07422714998559454,
+        "end_value": 1350820.2784286528
+      },
+      "effect": {
+        "cagr": -0.011427789988972759,
+        "max_drawdown": 0.007816920737751198
       }
     }
   },
   "caveats": [
     "The benchmark, ^CRSLDX, is compared as its price index: the lake hasn't its total-return levels over the range, so its dividends are left out and the Book's lead over it is overstated",
-    "Not yet in the Book backtest: the exposure level (the breakers halve all of the Book, not the Market condition's level), Disaster stops and Stage scaling (agents issues 29 and 46)",
+    "Not yet in the Book backtest: the exposure level (the breakers halve all of the Book, not the Market condition's level; agents issue 46)",
+    "Disaster stops are tested on daily bars, each in place from its entry's own session: a low at or under one sells the whole holding at it, or at the open when the price opens under it, with the preset's slippage and no more. A stock a stop sold is bought back only when its strategy trades it again or the breakers' buying back buys it",
+    "Each strategy keeps its Stage over the whole range: no promotions or demotions",
     "The limit tolerance, 3% over the last close, is a placeholder until Saransh sets the India Book's",
     "The caps' room goes to the Sleeves in the order their strategies are named: the first named buys first, and a later one's buy is cut to what is left",
     "A buy a rule cuts isn't bought later: its money waits in the cash fund until the strategy trades the stock again, the next weighting or, after the breakers, buys resume",
