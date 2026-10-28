@@ -1,0 +1,291 @@
+{
+  "book": "IN",
+  "name": "India Book",
+  "market": "IN",
+  "currency": "INR",
+  "broker": "icici_direct",
+  "real_portfolio": "India Book (ICICI Direct)",
+  "benchmark": {
+    "id": "^CRSLDX",
+    "name": "Nifty 500",
+    "basis": "price return"
+  },
+  "mandate_version": "f99c88f13b5b",
+  "mandate": {
+    "gold": 0.1,
+    "position_cap": 0.15,
+    "sector_cap": 0.3,
+    "no_new_buys_at": -0.1,
+    "resume_buys_at": -0.05,
+    "halve_exposure_at": -0.18,
+    "full_exposure_at": -0.09,
+    "drawdown_limit": -0.25,
+    "risk_per_trade": 0.01,
+    "order_size_guard": 0.01,
+    "disaster_stop_multiple": 2.0,
+    "disaster_stop_without": 0.15,
+    "limit_tolerance": 0.03
+  },
+  "data_version": "2018-12-31.4cecefb2b497",
+  "book_data_version": "2018-12-31.faf5123fa00f",
+  "engine_version": 17,
+  "book_engine_version": 2,
+  "strategies": [
+    {
+      "id": "in-ab",
+      "name": "in-ab",
+      "version": "9d149a9b53a9",
+      "approved": false,
+      "run_id": "0ed4cd9966465783"
+    },
+    {
+      "id": "in-cd",
+      "name": "in-cd",
+      "version": "d272da153c8a",
+      "approved": false,
+      "run_id": "5a7c61198878e0c4"
+    }
+  ],
+  "gold_etf": "IN:GOLD1",
+  "cash_fund": "IN:LIQUIDBEES",
+  "risk_free": 0.07,
+  "capital": 1000000.0,
+  "capital_set": false,
+  "new_money": 0.0,
+  "start": "2016-08-16",
+  "end": "2018-08-15",
+  "end_value": 1350820.2784286528,
+  "total_return": 0.3508202784286527,
+  "cagr": 0.1626075674020533,
+  "max_drawdown": -0.07422714998559454,
+  "volatility": 0.10517826298246145,
+  "sharpe": 0.7923625269476174,
+  "benchmark_metrics": {
+    "total_return": 0.12793910000613895,
+    "cagr": 0.06217632634763137,
+    "max_drawdown": 0.0,
+    "volatility": 0.00012767038095810388,
+    "sharpe": -73.85491940446167
+  },
+  "holdout": {
+    "status": "ran",
+    "start": "2013-01-01",
+    "end": "2016-08-15",
+    "cagr": 0.1925681489960207,
+    "max_drawdown": -0.07037852013584112,
+    "sharpe": 1.0201736081411554,
+    "benchmark_cagr": 0.07560483232191006,
+    "benchmark_sharpe": 8.160945744497054
+  },
+  "rolling_12m": {
+    "windows": 261,
+    "book": {
+      "min": 0.03331979367036597,
+      "p5": 0.056281721968668874,
+      "p25": 0.10170217697417727,
+      "p50": 0.15403158989691645,
+      "p75": 0.1907684772910334,
+      "p95": 0.23058119380686248,
+      "max": 0.24721228234680903
+    },
+    "benchmark": {
+      "min": 0.06024583068844125,
+      "p5": 0.060427157492620065,
+      "p25": 0.0611635128009842,
+      "p50": 0.062109584151347486,
+      "p75": 0.06308538280258635,
+      "p95": 0.06388837892417865,
+      "max": 0.06409233224875699
+    },
+    "beating": 0.9272030651340997
+  },
+  "drawdowns": {
+    "max": -0.07422714998559454,
+    "sessions": {
+      "min": -0.07422714998559454,
+      "p5": -0.062459398795775514,
+      "p25": -0.041727414084102105,
+      "p50": -0.01722941488688634,
+      "p75": -0.00642592225900529,
+      "p95": 0.0,
+      "max": 0.0
+    },
+    "deep": [
+      {
+        "peak": "2017-05-12",
+        "trough": "2017-06-23",
+        "recovery": "2017-08-08",
+        "depth": -0.06246759897368259
+      },
+      {
+        "peak": "2017-10-17",
+        "trough": "2017-11-23",
+        "recovery": "2018-03-02",
+        "depth": -0.07228082523188217
+      },
+      {
+        "peak": "2018-03-26",
+        "trough": "2018-06-15",
+        "recovery": "2018-08-07",
+        "depth": -0.07422714998559454
+      }
+    ]
+  },
+  "weightings": [
+    {
+      "date": "2016-08-16",
+      "new_money": 0.0,
+      "value": 1000000.0,
+      "volatility": {
+        "in-ab": 0.18757305462918306,
+        "in-cd": 0.23419064077175886
+      },
+      "weights": {
+        "in-ab": 0.4997385478952067,
+        "in-cd": 0.4002614521047933,
+        "gold": 0.1
+      }
+    },
+    {
+      "date": "2017-04-03",
+      "new_money": 0.0,
+      "value": 1142501.7618576982,
+      "volatility": {
+        "in-ab": 0.186542782339578,
+        "in-cd": 0.2317949915160833
+      },
+      "weights": {
+        "in-ab": 0.49867715851175665,
+        "in-cd": 0.4013228414882435,
+        "gold": 0.1
+      }
+    },
+    {
+      "date": "2018-04-02",
+      "new_money": 0.0,
+      "value": 1297249.1276095526,
+      "volatility": {
+        "in-ab": 0.18355715692214372,
+        "in-cd": 0.2383719403378632
+      },
+      "weights": {
+        "in-ab": 0.5084616057466957,
+        "in-cd": 0.3915383942533043,
+        "gold": 0.1
+      }
+    }
+  ],
+  "at_end": {
+    "value": 1350820.2784286528,
+    "cash_fund": 0.16578134085635585,
+    "sleeves": {
+      "in-ab": {
+        "weight": 0.49575838767986924,
+        "holdings": {
+          "IN:A": 479,
+          "IN:B": 873
+        }
+      },
+      "in-cd": {
+        "weight": 0.40711735704859714,
+        "holdings": {
+          "IN:C": 438,
+          "IN:D": 1813
+        }
+      },
+      "gold": {
+        "weight": 0.09712425527153365,
+        "holdings": {
+          "IN:GOLD1": 3318
+        }
+      }
+    }
+  },
+  "costs": 3929.7832203060557,
+  "interest": 36190.0689409026,
+  "rules": {
+    "breakers": {
+      "events": [],
+      "no_new_buys": {
+        "orders": 0,
+        "value": 0.0
+      },
+      "half_exposure": {
+        "orders": 0,
+        "value": 0.0
+      },
+      "without": {
+        "cagr": 0.1626075674020533,
+        "max_drawdown": -0.07422714998559454,
+        "end_value": 1350820.2784286528
+      },
+      "effect": {
+        "cagr": 0.0,
+        "max_drawdown": 0.0
+      }
+    },
+    "position_cap": {
+      "orders": 38,
+      "value": 2510667.2567645954,
+      "without": {
+        "cagr": 0.2087687792626518,
+        "max_drawdown": -0.08720746406584001,
+        "end_value": 1459984.6957574498
+      },
+      "effect": {
+        "cagr": -0.04616121186059852,
+        "max_drawdown": 0.01298031408024547
+      }
+    },
+    "sector_cap": {
+      "orders": 0,
+      "value": 0.0,
+      "without": {
+        "cagr": 0.1626075674020533,
+        "max_drawdown": -0.07422714998559454,
+        "end_value": 1350820.2784286528
+      },
+      "effect": {
+        "cagr": 0.0,
+        "max_drawdown": 0.0
+      }
+    },
+    "order_size_guard": {
+      "orders": 0,
+      "value": 0.0,
+      "cuts": [],
+      "without": {
+        "cagr": 0.1626075674020533,
+        "max_drawdown": -0.07422714998559454,
+        "end_value": 1350820.2784286528
+      },
+      "effect": {
+        "cagr": 0.0,
+        "max_drawdown": 0.0
+      }
+    },
+    "limit_price": {
+      "orders": 1,
+      "value": 149816.07354234936,
+      "without": {
+        "cagr": 0.1557065501059074,
+        "max_drawdown": -0.0741968393906074,
+        "end_value": 1334864.0853382149
+      },
+      "effect": {
+        "cagr": 0.006901017296145895,
+        "max_drawdown": -3.0310594987148498e-05
+      }
+    }
+  },
+  "caveats": [
+    "The benchmark, ^CRSLDX, is compared as its price index: the lake hasn't its total-return levels over the range, so its dividends are left out and the Book's lead over it is overstated",
+    "Not yet in the Book backtest: the exposure level (the breakers halve all of the Book, not the Market condition's level), Disaster stops and Stage scaling (agents issues 29 and 46)",
+    "The limit tolerance, 3% over the last close, is a placeholder until Saransh sets the India Book's",
+    "The caps' room goes to the Sleeves in the order their strategies are named: the first named buys first, and a later one's buy is cut to what is left",
+    "A buy a rule cuts isn't bought later: its money waits in the cash fund until the strategy trades the stock again, the next weighting or, after the breakers, buys resume",
+    "Sectors are today's (the securities table's), as the strategies' own are",
+    "The cash fund earns one risk-free rate, 7.00% a year, throughout, and so does the cash waiting in the Sleeves, in fractions and without costs: years when bills paid less (2011–2016 and 2020–2021 in the US) earn more than they did",
+    "Each Sleeve buys what its strategy holds on the Book's first close at the next open, so it starts from the strategy's track rather than with its first rebalance"
+  ]
+}
