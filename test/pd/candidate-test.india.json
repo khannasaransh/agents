@@ -1,0 +1,261 @@
+{
+  "book": "IN",
+  "name": "India Book",
+  "market": "IN",
+  "currency": "INR",
+  "benchmark": {
+    "id": "^CRSLDX",
+    "name": "Nifty 500",
+    "basis": "price return"
+  },
+  "mandate_version": "f99c88f13b5b",
+  "data_version": "2018-12-31.973e4db07535",
+  "book_data_version": "2018-12-31.1cb2a11785e4",
+  "engine_version": 17,
+  "book_engine_version": 3,
+  "start": "2016-08-16",
+  "end": "2018-12-31",
+  "rules": {
+    "holdout": {
+      "start": "2013-01-01",
+      "end": "2016-08-15"
+    },
+    "deflated_sharpe_bar": 0.95,
+    "drawdown_limit": -0.25,
+    "objective_cagr": 0.2,
+    "same_cagr": 0.001
+  },
+  "strategies": [
+    {
+      "id": "in-late",
+      "name": "in-late",
+      "version": "f8d3a96ab397",
+      "family": "in-late",
+      "holdout": {
+        "status": "ran",
+        "start": "2013-01-01",
+        "end": "2016-08-15",
+        "benchmark": {
+          "id": "^CRSLDX",
+          "name": "Nifty 500",
+          "basis": "price return"
+        },
+        "cagr": -0.10959007290744294,
+        "benchmark_cagr": 0.07560483232191006,
+        "passes": false
+      },
+      "deflated_sharpe": {
+        "status": "ran",
+        "sharpe": 17.336464237057356,
+        "threshold": 0.0,
+        "probability": 1.0,
+        "trials": 1,
+        "sessions": 619,
+        "skew": -0.2987027456247792,
+        "kurtosis": 4.005962802480314,
+        "passes": true
+      },
+      "book": {
+        "status": "ran",
+        "with": {
+          "cagr": 0.47222158395422853,
+          "max_drawdown": -0.004519640631071575
+        },
+        "without": {
+          "cagr": 0.3781056160630907,
+          "max_drawdown": -0.0037078738937084132
+        },
+        "improves": true
+      },
+      "passes": false,
+      "why": [
+        "its holdout CAGR doesn't beat its benchmark's"
+      ]
+    },
+    {
+      "id": "in-loud",
+      "name": "in-loud",
+      "version": "aa9af0bbdff4",
+      "family": "in-loud",
+      "holdout": {
+        "status": "ran",
+        "start": "2013-01-01",
+        "end": "2016-08-15",
+        "benchmark": {
+          "id": "^CRSLDX",
+          "name": "Nifty 500",
+          "basis": "price return"
+        },
+        "cagr": 0.3940613469487504,
+        "benchmark_cagr": 0.07560483232191006,
+        "passes": true
+      },
+      "deflated_sharpe": {
+        "status": "ran",
+        "sharpe": 2.4355235240986484,
+        "threshold": 0.0,
+        "probability": 0.9999311362412147,
+        "trials": 1,
+        "sessions": 619,
+        "skew": 0.017444134372084405,
+        "kurtosis": 1.6184454348177522,
+        "passes": true
+      },
+      "book": {
+        "status": "ran",
+        "with": {
+          "cagr": 0.3594340915478138,
+          "max_drawdown": -0.01300387152918503
+        },
+        "without": {
+          "cagr": 0.3781056160630907,
+          "max_drawdown": -0.0037078738937084132
+        },
+        "improves": false
+      },
+      "passes": false,
+      "why": [
+        "adding it doesn't improve the Book"
+      ]
+    },
+    {
+      "id": "in-up",
+      "name": "in-up",
+      "version": "c7acd145cffe",
+      "family": "in-up",
+      "holdout": {
+        "status": "ran",
+        "start": "2013-01-01",
+        "end": "2016-08-15",
+        "benchmark": {
+          "id": "^CRSLDX",
+          "name": "Nifty 500",
+          "basis": "price return"
+        },
+        "cagr": 0.44608105429851364,
+        "benchmark_cagr": 0.07560483232191006,
+        "passes": true
+      },
+      "deflated_sharpe": {
+        "status": "ran",
+        "sharpe": 11.221095019925642,
+        "threshold": 0.0,
+        "probability": 1.0,
+        "trials": 1,
+        "sessions": 619,
+        "skew": -0.16989490453172107,
+        "kurtosis": 3.130245770413577,
+        "passes": true
+      },
+      "book": {
+        "status": "ran",
+        "with": {
+          "cagr": 0.3781056160630907,
+          "max_drawdown": -0.0037078738937084132
+        },
+        "without": {
+          "cagr": 0.06601115715814299,
+          "max_drawdown": -0.00042467347207841843
+        },
+        "improves": true
+      },
+      "passes": true,
+      "why": []
+    }
+  ],
+  "selection": {
+    "rounds": [
+      {
+        "book": [],
+        "cagr": 0.06601115715814299,
+        "max_drawdown": -0.00042467347207841843,
+        "tried": {
+          "in-loud": {
+            "cagr": 0.2960294162157331,
+            "max_drawdown": -0.12142698466587909,
+            "improves": true
+          },
+          "in-up": {
+            "cagr": 0.3781056160630907,
+            "max_drawdown": -0.0037078738937084132,
+            "improves": true
+          }
+        },
+        "joined": "in-up"
+      },
+      {
+        "book": [
+          "in-up"
+        ],
+        "cagr": 0.3781056160630907,
+        "max_drawdown": -0.0037078738937084132,
+        "tried": {
+          "in-loud": {
+            "cagr": 0.3594340915478138,
+            "max_drawdown": -0.01300387152918503,
+            "improves": false
+          }
+        },
+        "joined": null
+      }
+    ]
+  },
+  "chosen": [
+    "in-up"
+  ],
+  "book_result": {
+    "end_value": 2141002.5913372524,
+    "cagr": 0.3781056160630907,
+    "max_drawdown": -0.0037078738937084132,
+    "volatility": 0.021984541661165695,
+    "sharpe": 11.038890329151002,
+    "benchmark_metrics": {
+      "total_return": 0.1520044201608448,
+      "cagr": 0.06142526138567739,
+      "max_drawdown": 0.0,
+      "volatility": 0.00014843888161351435,
+      "sharpe": -67.73115116925494
+    },
+    "holdout": {
+      "status": "ran",
+      "start": "2013-01-01",
+      "end": "2016-08-15",
+      "cagr": 0.403694233575554,
+      "max_drawdown": -0.0035562811903721014,
+      "sharpe": 11.96148674229621,
+      "benchmark_cagr": 0.07560483232191006,
+      "benchmark_sharpe": 8.160945744497054
+    }
+  },
+  "objective": {
+    "max_drawdown": {
+      "limit": -0.25,
+      "value": -0.0037078738937084132,
+      "meets": true
+    },
+    "holdout_cagr": {
+      "target": 0.2,
+      "value": 0.403694233575554,
+      "meets": true
+    },
+    "meets": true
+  },
+  "caveats": [
+    "Each strategy is tested at its full share (Real-full), the Book it would make once promoted, in the order it joined: the caps' room goes to the strategies chosen first",
+    "Forward selection adds the best strategy each round and never removes one: a pair that improves the Book only together, or a strategy that a later one makes unneeded, isn't found",
+    "Improving is measured over the range alone; the holdout tests each strategy, and checks the chosen Book's objective, but chooses nothing",
+    "The deflated Sharpe counts the variants the research recorded (config/trials.yaml, its census in docs/review/candidate-test-20261028/), over 2016-08-16 to 2026-08-14, against the strategy's own run over the range (its own run a trial too, unless its version is among them); sweeps run on the dashboard aren't counted",
+    "Each strategy's holdout is against its own benchmark, on the basis its run had (`holdout.benchmark`): the Book's may differ",
+    "A strategy chosen early stays chosen: the chosen Book without it (its `book`) may then not be worse",
+    "The benchmark, ^CRSLDX, is compared as its price index: the lake hasn't its total-return levels over the range, so its dividends are left out and the Book's lead over it is overstated",
+    "Not yet in the Book backtest: the exposure level (the breakers halve all of the Book, not the Market condition's level; agents issue 46)",
+    "Disaster stops are tested on daily bars, each in place from its entry's own session: a low at or under one sells the whole holding at it, or at the open when the price opens under it, with the preset's slippage and no more. A stock a stop sold is bought back only when its strategy trades it again or the breakers' buying back buys it",
+    "Each strategy keeps its Stage over the whole range: no promotions or demotions",
+    "The limit tolerance, 3% over the last close, is a placeholder until Saransh sets the India Book's",
+    "The caps' room goes to the Sleeves in the order their strategies are named: the first named buys first, and a later one's buy is cut to what is left",
+    "A buy a rule cuts isn't bought later: its money waits in the cash fund until the strategy trades the stock again, the next weighting or, after the breakers, buys resume",
+    "Sectors are today's (the securities table's), as the strategies' own are",
+    "The cash fund earns one risk-free rate, 7.00% a year, throughout, and so does the cash waiting in the Sleeves, in fractions and without costs: years when bills paid less (2011–2016 and 2020–2021 in the US) earn more than they did",
+    "Each Sleeve buys what its strategy holds on the Book's first close at the next open, so it starts from the strategy's track rather than with its first rebalance"
+  ]
+}
