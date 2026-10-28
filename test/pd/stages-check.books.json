@@ -1,0 +1,108 @@
+{
+  "checked_at": "2026-10-28T01:42:10.512000+00:00",
+  "dry_run": false,
+  "recorded": [],
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "market": "IN",
+      "today": "2026-10-28",
+      "sleeves": [
+        {
+          "id": 1,
+          "book": "IN",
+          "strategy_id": "in-super30-ok-tuned",
+          "name": "India Super 30 OK, tuned",
+          "version": "5d1e0c7a9b21",
+          "current_version": "b0a30c3545e3",
+          "stage": "retired",
+          "since": "2026-07-28",
+          "launch_date": null,
+          "history": [
+            {
+              "from": null,
+              "stage": "candidate",
+              "date": "2026-07-25",
+              "at": "2026-07-25T03:10:00+00:00",
+              "by": "the Candidate test of 2026-07-24",
+              "why": "Chosen by the Candidate test over 2016-07-25 to 2026-07-24 on 2026-07-24.0e4a1f2b3c5d"
+            },
+            {
+              "from": "candidate",
+              "stage": "retired",
+              "date": "2026-07-28",
+              "at": "2026-07-28T01:40:00+00:00",
+              "by": "a new version",
+              "why": "Replaced by version b0a30c3545e3 in Candidate"
+            }
+          ]
+        },
+        {
+          "id": 2,
+          "book": "IN",
+          "strategy_id": "in-super30-ok-tuned",
+          "name": "India Super 30 OK, tuned",
+          "version": "b0a30c3545e3",
+          "current_version": "b0a30c3545e3",
+          "stage": "paper",
+          "since": "2026-07-29",
+          "launch_date": "2026-07-29",
+          "history": [
+            {
+              "from": null,
+              "stage": "candidate",
+              "date": "2026-07-28",
+              "at": "2026-07-28T01:40:00+00:00",
+              "by": "a new version",
+              "why": "in-super30-ok-tuned's rules, parameters or code changed: version b0a30c3545e3 follows 5d1e0c7a9b21, which keeps its Stage until this one replaces it"
+            },
+            {
+              "from": "candidate",
+              "stage": "paper",
+              "date": "2026-07-29",
+              "at": "2026-07-29T01:35:00+00:00",
+              "by": "Saransh",
+              "why": "Approved into Paper: its live track starts the day it enters Paper"
+            }
+          ]
+        },
+        {
+          "id": 3,
+          "book": "IN",
+          "strategy_id": "in-cw2-selected",
+          "name": "India CW2, selected",
+          "version": "9c41d27e8b05",
+          "current_version": "9c41d27e8b05",
+          "stage": "candidate",
+          "since": "2026-10-28",
+          "launch_date": null,
+          "history": [
+            {
+              "from": null,
+              "stage": "candidate",
+              "date": "2026-10-28",
+              "at": "2026-10-28T01:30:00+00:00",
+              "by": "the Candidate test of 2026-10-23",
+              "why": "Chosen by the Candidate test over 2016-10-24 to 2026-10-23 on 2026-10-23.70c27d24c7a7"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "market": "US",
+      "today": "2026-10-27",
+      "sleeves": []
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "market": "HK",
+      "today": "2026-10-28",
+      "sleeves": []
+    }
+  ]
+}

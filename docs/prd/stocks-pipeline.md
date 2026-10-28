@@ -299,15 +299,16 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
    - It clears a refresh left running by a dead process.
    - It runs `pd daily`, retrying once on failure, and fails if the retry fails too.
    - It records each market's latest session and the Health report.
-5. **Health** (Agent: the Health Agent). It skips itself when the Lake Step succeeded and the Health report flags nothing. It reads, read-only, the Lake Step's log, the Health report, ash_new's code and its job records. Its output:
+5. **Stages** (command, through `pd`). It runs `pd stages check`, which records as a Candidate each new version of a strategy with a Sleeve, the old version keeping its Stage, and prints each Book's Sleeves and their Stages for the Brief (issue 31).
+6. **Health** (Agent: the Health Agent). It skips itself when the Lake Step succeeded and the Health report flags nothing. It reads, read-only, the Lake Step's log, the Health report, ash_new's code and its job records. Its output:
    - a diagnosis;
    - a proposed fix, as text, never applied;
    - proposed Corrections in the Corrections file's format, recorded in ash_new to wait for approval.
-6. **Plan** (command, through `pd`). It applies the Data gate and reads each market's Market condition, then makes the Rule plan for each Book, real and paper, from the Book's state (see The Book engine and The Book state). It writes the Rule plans, each Book's exposure level and Pool, and the names the Desk must review with the analysts each needs, with a dossier for each name.
-7. **Feeds** (command, through `pd`). It fetches the Feeds for the Rule plan's names and the holdings, reusing what it has cached.
-8. **Review** (command, through `pd`, Saturdays only). It computes the weekly figures, adds the monthly ones on the first Saturday of a month, and the yearly ones at the yearly review.
-9. **Desk** (Agents: one call per analyst needed, all at once; it skips itself when none is). Each analyst gets the names `pd plan` asks it to review, with their dossiers and Feeds, and writes a view of each. A view is reused, with its date, while nothing that analyst reads for the name has changed.
-10. **Portfolio Manager** (Agent).
+7. **Plan** (command, through `pd`). It applies the Data gate and reads each market's Market condition, then makes the Rule plan for each Book, real and paper, from the Book's state (see The Book engine and The Book state). It writes the Rule plans, each Book's exposure level and Pool, and the names the Desk must review with the analysts each needs, with a dossier for each name.
+8. **Feeds** (command, through `pd`). It fetches the Feeds for the Rule plan's names and the holdings, reusing what it has cached.
+9. **Review** (command, through `pd`, Saturdays only). It computes the weekly figures, adds the monthly ones on the first Saturday of a month, and the yearly ones at the yearly review.
+10. **Desk** (Agents: one call per analyst needed, all at once; it skips itself when none is). Each analyst gets the names `pd plan` asks it to review, with their dossiers and Feeds, and writes a view of each. A view is reused, with its date, while nothing that analyst reads for the name has changed.
+11. **Portfolio Manager** (Agent).
     - **Its inputs:**
       - the Rule plans and the Desk's views;
       - each Book's Playbook, Judgement mode, Market condition, exposure level and Pool;
@@ -320,15 +321,15 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
       - the early exits, promotions and Lessons it proposes;
       - the Journal's new entries;
       - the Brief's commentary.
-11. **Check** (command, through `pd`). It makes the final Order lists.
+12. **Check** (command, through `pd`). It makes the final Order lists.
     - It records nothing unless this Run's Plan Step succeeded. It treats a Portfolio Manager output made from a Book state, Mandate version or Playbook version that is no longer current as failed.
     - It accepts each change from the Rule plan only if the Book's Judgement mode allows it, it is inside its Lever's range, it drops or delays none of the Rule plan's exits or Disaster stops, and its Decision record is complete, with every cited figure matching the Run's inputs.
     - It drops each change that fails, and the Brief says why. Then it checks the whole Book as the Order list would leave it: each position and sector against its cap, the stocks against the exposure level, and the buys against the cash left after what open orders reserve.
     - If that fails, or the Portfolio Manager failed, the Rule plan goes out instead, once it passes the same check, and a buy whose required Desk review is missing waits a session. If the Rule plan fails too, only its exits and Disaster stops go out, with a To-do.
     - It records the Order lists in ash_new: a paper Book's and a rules-only paper Book's orders to fill at the next open, a real Book's orders as proposed. Recording a list for a session that already has one supersedes the old one, and no order is recorded twice.
     - It records each accepted change as an Override, with the Rule plan's order and the Decision record beside it.
-12. **Save state** (command). It applies the Journal's entries and queues each proposed Lesson for Saransh's Answer, as the daily Pipeline's Save state does for Memory.
-13. **Brief** (command). It writes the Stocks Brief as a single self-contained HTML file in the Run folder.
+13. **Save state** (command). It applies the Journal's entries and queues each proposed Lesson for Saransh's Answer, as the daily Pipeline's Save state does for Memory.
+14. **Brief** (command). It writes the Stocks Brief as a single self-contained HTML file in the Run folder.
 
 A dry run changes nothing in ash_new:
 - the fake Worker stands in for every Agent;

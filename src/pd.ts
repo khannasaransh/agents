@@ -191,6 +191,41 @@ export interface PdClearRefresh {
   refused: string | null
 }
 
+/** Where a strategy stands in a Book (the glossary's Stage), as ash_new names it. */
+export type PdStage = 'candidate' | 'paper' | 'real_small' | 'real_full' | 'retired'
+
+/** A strategy's version in a Book, from the day it became a Candidate, as `pd stages` prints it. */
+export interface PdSleeve {
+  /** Its id: a Candidate's item in the Brief is candidate:<id>. Null for one a dry run would record. */
+  id: number | null
+  book: 'IN' | 'US' | 'HK'
+  strategy_id: string
+  /** Null when it is no built-in strategy now. */
+  name: string | null
+  version: string
+  /** The strategy's version now: another means it changed, and its new version is a Sleeve of its own. */
+  current_version: string | null
+  stage: PdStage
+  /** The day it entered its Stage, in its Book's market. */
+  since: string
+  /** The day its strategy was launched, while its live track follows this version. */
+  launch_date: string | null
+  /** Its Stage changes, oldest first, each with who approved it and why. */
+  history: { from: PdStage | null; stage: PdStage; date: string; at: string; by: string; why: string }[]
+}
+
+/**
+ * What `pd stages check` prints (contract/stages-check.schema.json): each new version of a strategy
+ * with a Sleeve, recorded as a Candidate (in a dry run, those that would be), then each Book's Sleeves.
+ */
+export interface PdStagesCheck {
+  checked_at: string
+  dry_run: boolean
+  recorded: PdSleeve[]
+  /** India, the US and Hong Kong, each with its day now: how long a Sleeve has been in its Stage is counted to it. */
+  books: { book: 'IN' | 'US' | 'HK'; name: string; market: string; today: string; sleeves: PdSleeve[] }[]
+}
+
 /**
  * Runs `pd` in `cwd` and resolves with how it ended, its output kept whole. It is the first `pd`
  * on PATH, else the one in ash_new's own environment, so a `pd` put first on PATH (the tests'

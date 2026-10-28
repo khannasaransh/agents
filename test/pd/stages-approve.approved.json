@@ -1,0 +1,38 @@
+{
+  "changed": true,
+  "why": null,
+  "sleeve": {
+    "id": 1,
+    "book": "IN",
+    "strategy_id": "in-super30-ok-tuned",
+    "name": "India Super 30 OK, tuned",
+    "version": "b0a30c3545e3",
+    "current_version": "b0a30c3545e3",
+    "stage": "paper",
+    "since": "2026-10-28",
+    "launch_date": "2026-10-28",
+    "history": [
+      {
+        "from": null,
+        "stage": "candidate",
+        "date": "2026-10-28",
+        "at": "2026-10-28T14:56:10.615739+00:00",
+        "by": "the Candidate test of 2026-10-23",
+        "why": "Chosen by the Candidate test over 2016-10-24 to 2026-10-23 on 2026-10-23.70c27d24c7a7"
+      },
+      {
+        "from": "candidate",
+        "stage": "paper",
+        "date": "2026-10-28",
+        "at": "2026-10-28T14:56:16.404092+00:00",
+        "by": "Saransh",
+        "why": "Approved into Paper: its live track starts the day it enters Paper"
+      }
+    ]
+  },
+  "replaced": [],
+  "launched": {
+    "launch_date": "2026-10-28",
+    "now": true
+  }
+}

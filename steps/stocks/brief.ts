@@ -2,10 +2,11 @@
 // from the internet, from what earlier Steps wrote there: the Data gate's verdict and its reasons;
 // under them, the Health Agent's diagnosis and proposed fix, or that it failed, with what became of
 // the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
-// for approval with what it would change; each Quarantine with its flag; each market's latest session
-// in the Lake against its last finished one; the To-dos the Steps raised; each Book's real holdings
-// and value, its latest Reconciliation's differences and this Run's Broker inbox files; on Saturdays,
-// what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
+// for approval with what it would change; each Quarantine with its flag; each Candidate waiting for
+// approval into Paper; each market's latest session in the Lake against its last finished one; the
+// To-dos the Steps raised; each Book's Sleeves with their Stages and how long each has been in its
+// Stage; each Book's real holdings and value, its latest Reconciliation's differences and this Run's
+// Broker inbox files; on Saturdays, what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
 // the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 // Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
@@ -13,13 +14,14 @@
 // Run's Answers Step: the page works opened from disk, with nothing running.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingItems, type AnswerItem } from '../../src/answers.ts'
+import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingCandidates, waitingItems, type AnswerItem } from '../../src/answers.ts'
 import { brokerFiles, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
-import type { PdBook, PdMarketSmith, PdStatus } from '../../src/pd.ts'
+import type { PdBook, PdMarketSmith, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
+import { stageName } from '../../src/stages.ts'
 import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
 import type { AnswersResult } from './answers.ts'
@@ -216,6 +218,81 @@ function quarantineSection(status: PdStatus | null): string {
   ].join('\n')
 }
 
+/** How long from one day to a later one, in calendar months and days: "2 months and 29 days", "today". */
+function lasted(since: string, today: string): string {
+  const [y1, m1, d1] = since.split('-').map(Number)
+  const [y2, m2, d2] = today.split('-').map(Number)
+  const months = (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0)
+  // The day as many months on, or the last of its month when it has fewer days.
+  const lastDay = new Date(Date.UTC(y1, m1 - 1 + months + 1, 0)).getUTCDate()
+  const anchor = Date.UTC(y1, m1 - 1 + months, Math.min(d1, lastDay))
+  const days = Math.round((Date.UTC(y2, m2 - 1, d2) - anchor) / 86_400_000)
+  const parts = [...(months > 0 ? [plural(months, 'month')] : []), ...(days > 0 ? [plural(days, 'day')] : [])]
+  return parts.length ? parts.join(' and ') : 'today'
+}
+
+/** A Sleeve's strategy: its name over its id. */
+const strategyCell = (s: PdSleeve) => `${esc(s.name ?? s.strategy_id)}<br><span class="muted">${esc(s.strategy_id)}</span>`
+
+/** A Sleeve's version, and what became of its strategy when it changed since. */
+function versionCell(s: PdSleeve): string {
+  if (s.current_version === s.version) return esc(s.version)
+  const why = s.current_version === null ? 'its strategy is no built-in now' : `its strategy changed since: version ${s.current_version} is a Sleeve of its own`
+  return `${esc(s.version)}<br><span class="muted">${esc(why)}</span>`
+}
+
+/** Each Candidate waiting for approval into Paper, with its Approve button; nothing when the Stages weren't read. */
+function candidatesSection(stages: PdStagesCheck | null): string {
+  if (!stages) return ''
+  const candidates = waitingCandidates(stages)
+  if (!candidates.length) return '<section><h2>Candidates</h2><p>No Candidate is waiting for your approval.</p></section>'
+  const books = new Map(stages.books.map((b) => [b.book, b.name]))
+  const rows = candidates.map((s) => [
+    String(s.id),
+    esc(books.get(s.book) ?? s.book),
+    strategyCell(s),
+    esc(s.version),
+    esc(`${s.since}, ${s.history[0]?.by ?? ''}`),
+    esc(s.history[0]?.why ?? ''),
+    answerButtons(answerItem('candidate', s.id)),
+  ])
+  return [
+    `<section><h2>Candidates waiting for your approval: ${candidates.length}</h2>`,
+    "<p>Approving one moves it into Paper: ash_new launches it, so its live track starts that day, and the paper Book holds it at its full share, while the real Book holds none of it until it is promoted. Approve each you want, then Save answers: the next Run records your Answers in ash_new. One you don't approve waits here.</p>",
+    table(['Id', 'Book', 'Strategy', 'Version', 'Recorded', 'Why', 'Your Answer'], rows),
+    '</section>',
+  ].join('\n')
+}
+
+/**
+ * Each Book's Sleeves with their Stages, since when and for how long, and the Retired ones winding
+ * down; that they couldn't be read when the Stages Step failed, and nothing when it didn't run.
+ */
+function stagesSection(run: RunRecord, stages: PdStagesCheck | null): string {
+  const step = run.steps.find((s) => s.name === 'stages')
+  if (!stages)
+    return step?.status === 'failed' ? `<section><h2>Sleeves and Stages</h2><p>The Books' Sleeves couldn't be read in this Run. See the Stages Step's log: ${logLink(step.log ?? 'logs/stages.log')}</p></section>` : ''
+  const books = stages.books.map((book) => {
+    if (!book.sleeves.length) return `<h3>${esc(book.name)}</h3>\n<p>No strategy has a Sleeve yet.</p>`
+    const held = book.sleeves.filter((s) => s.stage !== 'retired')
+    const retired = book.sleeves.filter((s) => s.stage === 'retired')
+    const since = (s: PdSleeve) => esc(`${s.since}, ${lasted(s.since, book.today)}`)
+    const rows = held.map((s) => [strategyCell(s), versionCell(s), esc(stageName(s.stage)), since(s), esc(s.launch_date ?? '—')])
+    const retiredRows = retired.map((s) => [strategyCell(s), esc(s.version), since(s), esc(s.history.at(-1)?.why ?? '')])
+    return [
+      `<h3>${esc(book.name)}</h3>`,
+      held.length ? table(['Strategy', 'Version', 'Stage', 'Since', 'Live since'], rows) : '<p>Only Retired strategies, winding down.</p>',
+      ...(retired.length ? [`<details><summary>Retired, winding down through their strategies' own exits: ${retired.length}</summary>\n${table(['Strategy', 'Version', 'Retired', 'Why'], retiredRows)}</details>`] : []),
+    ].join('\n')
+  })
+  return [
+    '<section><h2>Sleeves and Stages</h2>',
+    ...books,
+    '<p class="muted">In a real Book a Paper strategy holds nothing, a Real-small one a quarter of its share and a Real-full one all of it; the paper Book holds each from Paper up at its full share. A strategy whose version changes starts again as a Candidate, the old version keeping its Stage until the new one replaces it.</p>',
+    '</section>',
+  ].join('\n')
+}
+
 function marketsSection(status: PdStatus | null): string {
   if (!status) return ''
   const state = (m: PdStatus['markets'][number]) => {
@@ -374,7 +451,7 @@ a { color: inherit; }
  * `status` is the Lake's as the Lake Step read it; `latest`, as the Health Step read it again once it
  * recorded the Health Agent's Corrections, so they are among those waiting.
  */
-function render(run: RunRecord, answers: AnswersResult | null, inbox: BrokerInboxResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
+function render(run: RunRecord, answers: AnswersResult | null, inbox: BrokerInboxResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, stages: PdStagesCheck | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   return `<!doctype html>
@@ -392,14 +469,16 @@ ${diagnosisSection(run, health)}
 ${answersSection(answers)}
 ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
+${candidatesSection(stages)}
 ${marketsSection(status)}
 ${todosSection(todos)}
+${stagesSection(run, stages)}
 ${booksSection(run, inbox)}
 ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
-${saveAnswers(run.id, waiting ? waitingItems(waiting) : [])}
+${saveAnswers(run.id, waitingItems(waiting, stages))}
 </body>
 </html>
 `
@@ -412,6 +491,6 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<BrokerInboxResult>('broker-inbox.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<HealthResult>('health.json'), readTodos(runFolder)))
+  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<BrokerInboxResult>('broker-inbox.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<PdStagesCheck>('stages.json'), read<HealthResult>('health.json'), readTodos(runFolder)))
   console.log(`Wrote ${out}`)
 })

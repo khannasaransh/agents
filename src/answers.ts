@@ -3,12 +3,14 @@
 // naming the Run and each Answer, and the next Run's Answers Step applies it through `pd`. A kind of
 // item is added here, with its Answers and the `pd` command that applies one, and the Brief and the
 // Step follow (the stocks Pipeline PRD's "Answers").
-import type { PdStatus } from './pd.ts'
+import type { PdSleeve, PdStagesCheck, PdStatus } from './pd.ts'
 
 /** Each kind of item waiting on Saransh: the Answers it takes, and the `pd` command that applies one to the item with this id. */
 const kinds = {
   correction: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['corrections', answer, id] },
   quarantine: { answers: ['dismiss'], pd: (id: string) => ['quarantines', 'dismiss', id] },
+  // Approving a Candidate moves it into Paper, which launches its strategy in ash_new.
+  candidate: { answers: ['approve'], pd: (id: string) => ['stages', 'approve', id] },
 } satisfies Record<string, { answers: string[]; pd(id: string, answer: string): string[] }>
 
 /** An item waiting on Saransh, as the Brief embeds it: its id and the Answers it takes. */
@@ -38,9 +40,18 @@ export function answerItem(kind: keyof typeof kinds, id: number): AnswerItem {
   return { item: `${kind}:${id}`, answers: kinds[kind].answers }
 }
 
-/** The items waiting on Saransh in the Lake's status: each waiting Correction, then each Quarantine. */
-export function waitingItems(status: PdStatus): AnswerItem[] {
-  return [...status.corrections.map((c) => answerItem('correction', c.id)), ...status.quarantines.map((q) => answerItem('quarantine', q.id))]
+/** The Candidates Saransh may approve into Paper: each still at its strategy's version, Book by Book. */
+export function waitingCandidates(stages: PdStagesCheck | null): (PdSleeve & { id: number })[] {
+  return (stages?.books ?? []).flatMap((b) => b.sleeves.filter((s): s is PdSleeve & { id: number } => s.stage === 'candidate' && s.id !== null && s.version === s.current_version))
+}
+
+/** The items waiting on Saransh: each waiting Correction and each Quarantine in the Lake's status, then each Candidate. */
+export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null): AnswerItem[] {
+  return [
+    ...(status?.corrections ?? []).map((c) => answerItem('correction', c.id)),
+    ...(status?.quarantines ?? []).map((q) => answerItem('quarantine', q.id)),
+    ...waitingCandidates(stages).map((s) => answerItem('candidate', s.id)),
+  ]
 }
 
 /** An item's kind and its id in ash_new, from the item's id: correction:7. */

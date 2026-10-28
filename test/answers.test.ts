@@ -258,3 +258,29 @@ test("two different Answers saved at the same moment are both put to pd, Downloa
     ['correction:7', 'reject', 'ignored'],
   ])
 })
+
+test('an Answer approving a Candidate moves it into Paper through pd stages approve, and a second is ignored with why', async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(briefRun, { pipeline: 'stocks', steps: [{ name: 'lake', status: 'succeeded' }, { name: 'stages', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(briefRun, 'lake/status.json', JSON.parse(readFileSync(join(pdExamples, 'status.clean.json'), 'utf8')))
+  ws.writeRunFile(briefRun, 'stages.json', JSON.parse(readFileSync(join(pdExamples, 'stages-check.books.json'), 'utf8')))
+  assert.equal((await ws.agents('step', 'brief', '--run', briefRun)).status, 0)
+  const items: AnswerItem[] = JSON.parse(ws.readRunFile(briefRun, 'brief.html').match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
+  assert.deepEqual(items, [{ item: 'candidate:3', answers: ['approve'] }])
+  save(answersFile(briefRun, items, { 'candidate:3': { answer: 'approve' } }, '2026-10-27T03:10:00.000Z'))
+  save(file('2026-10-27T03:20:00.000Z', [{ item: 'candidate:3', answer: 'approve' }]), inbox())
+  prepareRun(nextRun)
+  ws.setPd({ stages: [{ example: 'stages-approve.approved.json' }, { example: 'stages-approve.decided.json' }] })
+
+  assert.equal((await step(nextRun)).status, 0)
+
+  assert.deepEqual(pdCallArgs(), [
+    ['stages', 'approve', '3'],
+    ['stages', 'approve', '3'],
+  ])
+  assert.deepEqual(outcomes(nextRun), [
+    ['candidate:3', 'approve', 'applied'],
+    ['candidate:3', 'approve', 'ignored'],
+  ])
+  assert.equal(result(nextRun).files[1].answers[0].why, 'It is in Paper already, since 2026-10-28')
+})

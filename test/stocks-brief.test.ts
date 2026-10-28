@@ -416,3 +416,43 @@ test("before ICICI Direct's first file is recorded, the Brief says where to drop
   assert.match(page, /India Book No ICICI Direct file is recorded yet: drop its tradebook and holdings export in the Broker inbox, .*broker-inbox, and the next Run records them\./)
   assert.match(page, /US Book No moomoo file is recorded yet: drop its trade history and positions export in the Broker inbox, .*broker-inbox, and the next Run records them\./)
 })
+
+test("the Stocks Brief shows each Book's Sleeves with their Stages and how long each has been in its Stage", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  ws.writeRunFile(runId, 'stages.json', example('stages-check.books.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /Sleeves and Stages India Book Strategy Version Stage Since Live since India Super 30 OK, tuned in-super30-ok-tuned b0a30c3545e3 Paper 2026-07-29, 2 months and 29 days 2026-07-29 India CW2, selected in-cw2-selected 9c41d27e8b05 Candidate 2026-10-28, today —/)
+  assert.match(page, /Retired, winding down through their strategies' own exits: 1 Strategy Version Retired Why India Super 30 OK, tuned in-super30-ok-tuned 5d1e0c7a9b21 2026-07-28, 3 months Replaced by version b0a30c3545e3 in Candidate/)
+  assert.match(page, /US Book No strategy has a Sleeve yet\./)
+  assert.match(page, /Hong Kong Book No strategy has a Sleeve yet\./)
+})
+
+test('each Candidate waits for approval into Paper, with its id and an Approve button', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+  ws.writeRunFile(runId, 'stages.json', example('stages-check.books.json'))
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(page, /Candidates waiting for your approval: 1/)
+  assert.match(page, /Approving one moves it into Paper: ash_new launches it, so its live track starts that day/)
+  assert.match(page, /3 India Book India CW2, selected in-cw2-selected 9c41d27e8b05 2026-10-28, the Candidate test of 2026-10-23 Chosen by the Candidate test over 2016-10-24 to 2026-10-23 on 2026-10-23\.70c27d24c7a7 Approve/)
+  const items = [...html.matchAll(/<div class="answer" data-item="([^"]+)">(.*?)<\/div>/g)].map(([, item, cell]) => [item, [...cell.matchAll(/data-answer="([^"]+)"/g)].map(([, answer]) => answer)])
+  assert.deepEqual(items, [['candidate:3', ['approve']]])
+  assert.match(html, /id="save-answers"/)
+  assert.ok(page.indexOf('Candidates waiting') < page.indexOf('Sleeves and Stages'), 'what waits on Saransh comes before the Books')
+})
+
+test("a Stages Step that failed leaves a Sleeves and Stages section saying so", async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'lake', status: 'succeeded' }, { name: 'stages', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'lake/status.json', example('status.clean.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /Sleeves and Stages The Books' Sleeves couldn't be read in this Run\. See the Stages Step's log: logs\/stages\.log/)
+})

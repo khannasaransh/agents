@@ -1,0 +1,28 @@
+{
+  "checked_at": "2026-10-28T14:56:25.231711+00:00",
+  "dry_run": false,
+  "recorded": [],
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "market": "IN",
+      "today": "2026-10-28",
+      "sleeves": []
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "market": "US",
+      "today": "2026-10-28",
+      "sleeves": []
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "market": "HK",
+      "today": "2026-10-28",
+      "sleeves": []
+    }
+  ]
+}
