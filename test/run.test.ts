@@ -9,7 +9,7 @@ afterEach(() => ws.cleanup())
 
 /** `claude --print` answering as a PM Agent with nothing to report. */
 const claudeCodeAnsweringPm = {
-  stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null } }),
+  stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null, taskStatus: [] } }),
 }
 
 test('agents run daily creates a Run named by local start date and time that runs its Steps in order', async () => {
@@ -28,13 +28,14 @@ test('agents run daily creates a Run named by local start date and time that run
 
   const run = ws.readRun(id)
   assert.equal(run.pipeline, 'daily')
-  assert.equal(run.status, 'succeeded', 'Discord and Docs, not set up yet, are skipped without counting against the Run')
+  assert.equal(run.status, 'succeeded', 'Discord and Docs, not set up yet, and Branches, with no sprint post, are skipped without counting against the Run')
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
       ['fetch', 'succeeded'],
       ['review', 'succeeded'],
       ['discord', 'skipped'],
+      ['branches', 'skipped'],
       ['pm', 'succeeded'],
       ['docs', 'skipped'],
       ['save-state', 'succeeded'],
@@ -84,6 +85,7 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
       ['fetch', 'failed'],
       ['review', 'succeeded'],
       ['discord', 'skipped'],
+      ['branches', 'skipped'],
       ['pm', 'succeeded'],
       ['docs', 'skipped'],
       ['save-state', 'succeeded'],
@@ -150,6 +152,7 @@ test('agents run daily --dry-run runs the Docs Step after the PM Agent, without 
       ['fetch', 'succeeded'],
       ['review', 'succeeded'],
       ['discord', 'skipped'],
+      ['branches', 'skipped'],
       ['pm', 'succeeded'],
       ['docs', 'succeeded'],
       ['save-state', 'succeeded'],
@@ -192,7 +195,7 @@ test('agents run daily --worker codex runs the PM Agent on Codex, with the model
   ws = makeWorkspace()
   ws.addRepo('crux_flutter')
   ws.writeRepoList()
-  ws.setWorkerCli('codex', codexAnswering({ repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null }))
+  ws.setWorkerCli('codex', codexAnswering({ repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null, taskStatus: [] }))
 
   const result = await ws.agents('run', 'daily', '--worker', 'codex')
 

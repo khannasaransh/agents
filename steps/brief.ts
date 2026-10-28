@@ -10,7 +10,7 @@
 // since an earlier Step was re-run after the PM answered.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { attachedFiles, byPriority, firstLine, forSaransh, glance, renderHtml, repoLinks, short, webUrl, whereFrom, type BriefInputs } from '../src/brief.ts'
+import { assigneesOf, attachedFiles, byPriority, byStatus, statusLabel, taskReportOf, firstLine, forSaransh, glance, renderHtml, repoLinks, short, webUrl, whereFrom, type BriefInputs } from '../src/brief.ts'
 import { readJson, readJsonFiles, writeText } from '../src/files.ts'
 import { pendingProposals, type MemoryProposal } from '../src/memory.ts'
 import { apkInboxDir, otherFilesDir } from '../src/paths.ts'
@@ -183,12 +183,31 @@ function undocumentedLines(docs: DocsResult | null): string[] {
   ]
 }
 
+/** The PM Agent's task status report on the latest sprint post, by status, what needs Saransh first. */
+function sprintLines(pm: PmResult | null): string[] {
+  const report = taskReportOf(pm)
+  if (!report) return []
+  const { post } = report
+  const lines = ['## Sprint task status', '', `From ${post.author}'s [sprint post](${post.link}) in #${post.channel}, ${post.postedAt.slice(0, 10)}${post.title ? `: ${post.title}` : ''}`, '']
+  if (!report.tasks.length) lines.push('The post lists no tasks.', '')
+  for (const { status, tasks } of byStatus(report)) {
+    lines.push(`### ${statusLabel[status]} (${tasks.length})`, '')
+    for (const t of tasks) {
+      const was = t.was ? ` (was ${statusLabel[t.was].toLowerCase()})` : ''
+      lines.push(`- **${t.title}**${was}: ${t.note} PM ${t.pm ?? 'not named'}; ${assigneesOf(t)}.`)
+      lines.push(...t.evidence.map((e) => `  - ${e}`))
+    }
+    lines.push('')
+  }
+  return lines
+}
+
 function render(inputs: BriefInputs): string {
   const { run, results, reviews, pm, discord, docs, proposals } = inputs
   const lines = [`# Brief ${run.id}`, '']
   if (run.dryRun) lines.push('Dry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done.', '')
   lines.push('## At a glance', '', ...glance(inputs).map((item) => `- **${item.label}:** ${item.value}, ${item.note}`), '', '# Details', '')
-  lines.push(...pmLines(pm, discord), ...mentionLines(discord), ...fileLines(discord, !!run.dryRun))
+  lines.push(...pmLines(pm, discord), ...mentionLines(discord), ...fileLines(discord, !!run.dryRun), ...sprintLines(pm))
   const repoLines = new Map(pm?.status === 'answered' ? pm.repoLines.map((r) => [r.repo, r.line]) : [])
   lines.push('## Code review', '')
   if (!results.length) lines.push('No Repo was fetched in this Run.', '')

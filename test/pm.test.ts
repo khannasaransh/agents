@@ -62,7 +62,11 @@ const answer = {
   highlights: [],
   todos: ['Fix the fetch of gone: the repository is not found.'],
   memory: null,
+  taskStatus: [],
 }
+/** The answer as pm.json records it: with the task status report, null without a sprint post, in place of the statuses. */
+const { taskStatus: _, ...recorded } = answer
+const written = { status: 'answered', ...recorded, taskReport: null }
 
 test("the PM Agent runs on Claude Code with the Run's reviews, commits and health so far, no Discord messages and its Memory, and its answer is written to the Run", async () => {
   ws = makeWorkspace()
@@ -87,7 +91,7 @@ test("the PM Agent runs on Claude Code with the Run's reviews, commits and healt
   })
   assert.equal(promptInput(call.stdin, 'memory'), '- Still open: the inpix-panel login bug.\n')
   const { runs, inputs, memoryRead, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
-  assert.deepEqual(answered, { status: 'answered', ...answer })
+  assert.deepEqual(answered, written)
   assert.deepEqual(runs, [runId])
   assert.match(inputs, /^[0-9a-f]{64}$/)
   assert.equal(memoryRead, '- Still open: the inpix-panel login bug.\n')
@@ -122,7 +126,7 @@ test('re-running PM after it answered calls no Worker, unless forced', async () 
   assert.equal(forced.status, 0, forced.stderr)
   assert.equal(ws.workerCliCalls('claude').length, 1)
   const { runs, inputs, memoryRead, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
-  assert.deepEqual(answered, { status: 'answered', ...answer })
+  assert.deepEqual(answered, written)
 })
 
 test('a PM Agent that fails on Claude Code is retried on Codex outside any git repo, and when that fails too the Step fails and the Run records why', async () => {
@@ -186,4 +190,108 @@ test("the PM Agent is given what earlier Runs in the PM backlog held, since thei
   )
   assert.deepEqual(promptInput(call.stdin, 'discord'), [])
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'pm.json')).runs, [earlierRun, runId])
+})
+
+const sprintPost = {
+  channel: 'sprint-assignments',
+  author: 'Subhash Yadav',
+  postedAt: '2026-10-21T12:05:26.362+00:00',
+  link: 'https://discord.com/channels/1/1306524433187602432/9',
+  title: 'here is the list of tasks for this sprint-(oct 21 - oct 27)',
+  messages: [{ id: '9', author: 'Subhash Yadav', timestamp: '2026-10-21T12:05:26.362+00:00', link: 'https://discord.com/channels/1/1306524433187602432/9', content: '…' }],
+  tasks: [
+    { id: 'paywall', title: 'Crux | Paywall', product: 'Crux', pm: 'Aditya Manchanda', assignees: [{ name: 'Asha', team: 'Flutter' }] },
+    { id: 'football-center', title: 'Football Center', product: null, pm: 'Prakhar Shukla', assignees: [{ name: 'Neha', team: 'Backend' }] },
+    { id: 'tender-tracker', title: 'Tender Tracker', product: null, pm: null, assignees: [{ name: 'Neha', team: 'Backend' }] },
+  ],
+  updates: [
+    {
+      id: '12',
+      channel: 'payments',
+      thread: null,
+      dm: false,
+      author: 'Asha',
+      timestamp: '2026-10-22T10:00:00.000+00:00',
+      content: 'Paywall build is up for QA',
+      link: 'https://discord.com/channels/1/2/12',
+      mentionsSaransh: false,
+      fromSaransh: false,
+      prdFiles: [],
+      apkFiles: [],
+      otherFiles: [],
+      loginLinks: [],
+    },
+  ],
+}
+const { messages: _messages, tasks: _tasks, updates: _updates, ...postAbout } = sprintPost
+
+test('with a sprint post, the PM Agent is given it and the last report on the same post, and its task status report covers every task', async () => {
+  ws = makeWorkspace()
+  prepareRun()
+  ws.writeRunFile(runId, 'sprint.json', sprintPost)
+  const lastReport = {
+    post: postAbout,
+    tasks: [
+      { ...sprintPost.tasks[0], status: 'in-progress', note: 'Asha started it.', evidence: ['crux_flutter `1111111` Start paywall'], was: null },
+      { ...sprintPost.tasks[1], status: 'blocked', note: 'Waits on the scores API.', evidence: [], was: null },
+    ],
+  }
+  ws.prepareRun('2026-10-21-0530')
+  ws.writeRunFile('2026-10-21-0530', 'pm.json', { status: 'answered', ...recorded, taskReport: lastReport })
+  ws.prepareRun('2026-10-20-0530')
+  ws.writeRunFile('2026-10-20-0530', 'pm.json', { status: 'answered', ...recorded, taskReport: { ...lastReport, post: { ...postAbout, link: 'https://discord.com/channels/1/1306524433187602432/1' } } })
+  const taskStatus = [
+    { id: 'paywall', status: 'in-testing', note: 'The paywall is merged and waits for QA.', evidence: ['crux_flutter `2222222` Add paywall'] },
+    { id: 'football-center', status: 'blocked', note: 'Still waits on the scores API.', evidence: [] },
+  ]
+  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, taskStatus }))
+
+  const result = await pm()
+
+  assert.equal(result.status, 0, result.stderr)
+  const prompt = ws.workerCliCalls('claude')[0].stdin
+  const { loginLinks, ...update } = sprintPost.updates[0]
+  assert.deepEqual(promptInput(prompt, 'sprint'), { ...sprintPost, updates: [update] }, 'the PRD links of messages since the post are not To-dos again')
+  assert.deepEqual(promptInput(prompt, 'previousTaskStatus'), {
+    run: '2026-10-21-0530',
+    tasks: lastReport.tasks.map(({ id, status, note, evidence }) => ({ id, status, note, evidence })),
+  })
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'pm.json')).taskReport, {
+    post: postAbout,
+    tasks: [
+      { ...sprintPost.tasks[0], ...taskStatus[0], id: 'paywall', was: 'in-progress' },
+      { ...sprintPost.tasks[1], ...taskStatus[1], id: 'football-center', was: null },
+      { ...sprintPost.tasks[2], status: 'no-signal', note: 'The PM Agent said nothing about this task.', evidence: [], was: null },
+    ],
+  })
+})
+
+test('without a sprint post, the PM Agent is given none and records no task status report', async () => {
+  ws = makeWorkspace()
+  prepareRun()
+  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+
+  const result = await pm()
+
+  assert.equal(result.status, 0, result.stderr)
+  const prompt = ws.workerCliCalls('claude')[0].stdin
+  assert.equal(promptInput(prompt, 'sprint'), null)
+  assert.equal(promptInput(prompt, 'previousTaskStatus'), null)
+  assert.equal(JSON.parse(ws.readRunFile(runId, 'pm.json')).taskReport, null)
+})
+
+test("with a sprint post, the PM Agent is given the work on other branches since it, but not a read from before the post changed", async () => {
+  ws = makeWorkspace()
+  prepareRun()
+  ws.writeRunFile(runId, 'sprint.json', sprintPost)
+  const repos = [{ repo: 'inpix_flutter', team: 'flutter', production: 'development', branches: [{ branch: 'feature/jaapCounterChanges', count: 1, commits: [{ sha: sha(4), author: 'Shreyansh', date: '2026-10-22T10:00:00+05:30', subject: 'Bug fixes' }] }] }]
+  ws.writeRunFile(runId, 'branches.json', { since: '2026-10-21T12:05:26.362Z', repos, failed: [] })
+  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+
+  assert.equal((await pm()).status, 0)
+  assert.deepEqual(promptInput(ws.workerCliCalls('claude')[0].stdin, 'branches'), repos)
+
+  ws.writeRunFile(runId, 'branches.json', { since: '2026-10-14T12:00:00.000Z', repos, failed: [] })
+  assert.equal((await ws.agents('step', 'pm', '--run', runId, '--force')).status, 0)
+  assert.equal(promptInput(ws.workerCliCalls('claude')[1].stdin, 'branches'), null)
 })

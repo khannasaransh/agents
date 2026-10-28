@@ -77,8 +77,8 @@ export interface RepoEntry {
 export interface TestRepo {
   entry: RepoEntry
   folder: string
-  /** Pushes a commit, adding any given files, to the remote's production branch without touching the local clone. `date` is its author and committer time. */
-  pushCommit(subject: string, options?: { files?: Record<string, string>; author?: string; date?: string }): string
+  /** Pushes a commit, adding any given files, to the remote's production branch, or to `branch` (made from production the first time), without touching the local clone. `date` is its author and committer time. */
+  pushCommit(subject: string, options?: { files?: Record<string, string>; author?: string; date?: string; branch?: string }): string
 }
 
 export interface CliResult {
@@ -288,7 +288,9 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       return {
         entry,
         folder,
-        pushCommit(subject, { files = {}, author, date } = {}) {
+        pushCommit(subject, { files = {}, author, date, branch: onto = branch } = {}) {
+          const exists = git(upstream, 'branch', '--list', onto) !== ''
+          if (onto !== branch) git(upstream, 'checkout', '-q', ...(exists ? [onto] : ['-b', onto, branch]))
           for (const [path, content] of Object.entries(files)) {
             mkdirSync(join(upstream, path, '..'), { recursive: true })
             writeFileSync(join(upstream, path), content)
@@ -301,8 +303,10 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
             encoding: 'utf8',
             windowsHide: true,
           })
-          git(upstream, 'push', '-q', 'origin', branch)
-          return git(upstream, 'rev-parse', 'HEAD')
+          git(upstream, 'push', '-q', 'origin', onto)
+          const sha = git(upstream, 'rev-parse', 'HEAD')
+          if (onto !== branch) git(upstream, 'checkout', '-q', branch)
+          return sha
         },
       }
     },
@@ -369,7 +373,7 @@ export function makeWorkspace(env: Record<string, string> = {}): Workspace {
       writeFileSync(repoListFile, `export default ${JSON.stringify(list, null, 2)}\n`)
     },
 
-    prepareRun(id, { pipeline = 'daily', steps = ['fetch', 'review', 'discord', 'pm', 'docs', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
+    prepareRun(id, { pipeline = 'daily', steps = ['fetch', 'review', 'discord', 'branches', 'pm', 'docs', 'save-state', 'brief'].map((name) => ({ name, status: 'pending' })), dryRun = false } = {}) {
       ws.writeRunFile(id, 'run.json', {
         id,
         pipeline,
@@ -690,6 +694,8 @@ export interface DiscordRequest {
   path: string
   query: Record<string, string>
   authorization?: string
+  /** The JSON it sent, for a POST. */
+  body?: unknown
   /** When it arrived, in milliseconds since the epoch. */
   at: number
 }
@@ -701,9 +707,12 @@ export interface DiscordRequest {
 export async function replayDiscord(recording: Record<string, RecordedResponse | RecordedResponse[]>): Promise<{ url: string; requests: DiscordRequest[]; close(): void }> {
   const queues = new Map(Object.entries(recording).map(([path, responses]) => [path, [responses].flat()]))
   const requests: DiscordRequest[] = []
-  const server = await serve((req, res) => {
+  const server = await serve(async (req, res) => {
     const url = new URL(req.url!, 'http://discord.test')
-    requests.push({ method: req.method!, path: url.pathname, query: Object.fromEntries(url.searchParams), authorization: req.headers.authorization, at: Date.now() })
+    const at = Date.now()
+    let sent = ''
+    for await (const chunk of req) sent += chunk
+    requests.push({ method: req.method!, path: url.pathname, query: Object.fromEntries(url.searchParams), authorization: req.headers.authorization, ...(sent ? { body: JSON.parse(sent) } : {}), at })
     const queue = queues.get(url.pathname)
     const response = queue ? (queue.length > 1 ? queue.shift()! : queue[0]) : { status: 404, body: { message: 'Unknown Channel', code: 10003 } }
     const file = Buffer.isBuffer(response.body)
