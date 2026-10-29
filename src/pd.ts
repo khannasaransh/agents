@@ -289,6 +289,41 @@ export interface PdPlanOrder {
   /** What of its strategy's track signalled it; null for the Book's own orders and gold's. */
   signal: { kind: 'trade' | 'holding' | 'waiting'; action?: string; weight?: number; signal_date?: string; score?: number; rank?: number } | null
   cuts: PdCut[]
+  /** A paper Book's plan's (issue 34): the security's sector. */
+  sector?: string | null
+  /**
+   * A paper Book's plan's (issue 34): its role in its Sleeve. entry or add: a buy of a name it doesn't
+   * hold, or does; exit: a sale of a name its strategy no longer holds; trim: any other sale; stop: its
+   * Disaster stop. The final check never drops or delays an exit or a stop.
+   */
+  role?: 'entry' | 'add' | 'exit' | 'trim' | 'stop'
+}
+
+/** How much of the Portfolio Manager's judgement a Book's final check accepts (issue 34). */
+export type PdJudgementMode = 'plan_only' | 'subtract_only' | 'playbook'
+
+/** A Book's Playbook in force (issue 34): each Lever's range, under its version. */
+export interface PdPlaybook {
+  /** exposure: the floor the exposure level may be cut to, by Market condition. */
+  exposure_floor: Record<PdCondition, number>
+  /** size: the least and most multiple of a strategy's size. */
+  size_min: number
+  size_max: number
+  /** timing: how many sessions a buy may wait. */
+  timing_sessions: number
+  /** rebalance: the share of the Book under which a rebalance may be skipped. */
+  rebalance_under: number
+  version: string
+}
+
+/** A name the Portfolio Manager may buy: a Pool name, or a buy made to wait, at its last close and limit. */
+interface PdBuyable {
+  security_id: string
+  name: string | null
+  close: number
+  sector: string | null
+  rs_rating: number | null
+  limit: number
 }
 
 /** The kinds of Rule plan: a real Book's shadow plan, a paper Book's and a rules-only paper Book's. */
@@ -341,6 +376,18 @@ export interface PdRulePlan {
   stops?: { sleeve: string; security_id: string; name: string | null; price: number; was: number | null }[]
   buys?: number
   sales?: number
+  /** A paper Book's plan's (issue 34): its Judgement mode, and since when (null: its first). */
+  judgement?: { mode: PdJudgementMode; since: string | null }
+  /** A paper Book's plan's: the Book's Playbook in force. */
+  playbook?: PdPlaybook
+  /** A paper Book's plan's: the names a strategy with a Sleeve in the Book bought or signalled to buy in the last 2 months. */
+  pool?: (PdBuyable & { strategies: string[]; signalled: string })[]
+  /** A paper Book's plan's: each holding on the last close, Sleeve by Sleeve (Legacy ones under legacy). */
+  holdings?: { sleeve: string; security_id: string; name: string | null; shares: number; close: number; sector: string | null; rs_rating: number | null; value: number; stop: number | null; sellable: boolean }[]
+  /** A paper Book's plan's: the cash its open orders reserve. */
+  reserved?: number
+  /** A paper Book's plan's: the buys made to wait that may still be bought on its session, each by its Override's id. */
+  waits?: (PdBuyable & { id: number; sleeve: string; shares: number; until: string })[]
 }
 
 /** A market's Market condition, as ash_new reads it from the Lake (issue 46). */
@@ -384,12 +431,114 @@ export interface PdPlan {
   plans: PdRulePlan[]
 }
 
+/** The Levers of a Playbook (the glossary). */
+export const levers = ['exposure', 'selection', 'size', 'timing', 'trim', 'rebalance'] as const
+export type PdLever = (typeof levers)[number]
+
+/** A Decision record (the glossary): the evidence behind a change from the Rule plan, or the day's exposure level. */
+export interface PdDecisionRecord {
+  /** What the Rule plan said: its order, or its exposure level. */
+  rule_plan: string
+  /** What goes out instead. */
+  instead: string
+  lever: PdLever
+  /** The Playbook's line the change is within. */
+  playbook: string
+  /** Each figure it rests on: the input file (its path in the Run folder), what it is about, the field and its value. */
+  figures: { input: string; security: string | null; field: string; value: number | string | boolean | null }[]
+  expected: string
+  /** The session it is judged on, after the plan's. */
+  judged_on: string
+}
+
+/** The kinds of change from the Rule plan the Portfolio Manager may make (issue 34). */
+export const changeKinds = ['drop', 'resize', 'swap', 'wait', 'release', 'trim', 'skip'] as const
+export type PdChangeKind = (typeof changeKinds)[number]
+
+/** A change from a paper Book's Rule plan, as the Portfolio Manager makes it. */
+export interface PdChange {
+  kind: PdChangeKind
+  /** The Rule plan's order it changes (drop, resize, swap, wait, skip). */
+  order: string | null
+  /** A swap's name bought; a trim's holding. */
+  security_id: string | null
+  /** A trim's Sleeve. */
+  sleeve: string | null
+  /** A swap's, trim's or release's shares (a release's: all those waiting when null). */
+  shares: number | null
+  /** A resize's multiple of the order's shares. */
+  multiple: number | null
+  /** How many sessions a wait holds the buy back. */
+  sessions: number | null
+  /** A release's wait, by its id in the plan's waits. */
+  wait: number | null
+  decision: PdDecisionRecord
+}
+
+/** The Portfolio Manager's judgement of one paper Book's Rule plan. */
+export interface PdJudgedBook {
+  book: 'IN' | 'US' | 'HK'
+  plan_id: string
+  state_id: string
+  mandate_version: string
+  playbook_version: string
+  /** The exposure level for the day: the plan's, or a cut, with its Decision record. */
+  exposure: { level: number; decision: PdDecisionRecord }
+  changes: PdChange[]
+  /** The Brief's commentary on the Book. */
+  commentary: string
+}
+
+/**
+ * The Portfolio Manager's judgement as the Check Step hands it to `pd check --judgement`
+ * (contract/judgement.schema.json): whether it answered, the Run's inputs its Decision records may
+ * cite (files beside it in the Run folder), and its judgement of each Book.
+ */
+export interface PdJudgement {
+  status: 'answered' | 'failed'
+  why: string | null
+  inputs: string[]
+  books: PdJudgedBook[]
+}
+
+/** A change as the final check judged it: whether it was accepted and why not, the Rule plan's order it changed and the orders it made. */
+export type PdJudgedChange = Omit<Partial<PdChange>, 'kind' | 'decision'> & { kind: PdChangeKind | 'exposure'; decision: PdDecisionRecord } & {
+  /** An exposure level's change: the level. */
+  level?: number
+  lever: PdDecisionRecord['lever'] | null
+  accepted: boolean
+  why: string | null
+  rule_order: PdPlanOrder | null
+  orders: PdPlanOrder[]
+  /** An exposure cut's: the Rule plan's buys it took out. */
+  dropped?: string[]
+}
+
+/** What the final check made of the Portfolio Manager's judgement of a paper Book's plan. */
+export interface PdListJudgement {
+  /** judgement: its changes that passed went out; rule_plan: the Rule plan did; exits_only: only its exits and Disaster stops. */
+  applied: 'judgement' | 'rule_plan' | 'exits_only'
+  /** Why not the Portfolio Manager's changes. */
+  why: string | null
+  /** The exposure level the list goes out at. */
+  level: number
+  /** Each change judged, the exposure level's first. */
+  changes: PdJudgedChange[]
+  /** When only the exits and stops went out: what Saransh should look into. */
+  todo: string | null
+  commentary: string | null
+}
+
 /** What became of a paper Book's Order list in `pd check`. */
 export interface PdOrderList {
   book: 'IN' | 'US' | 'HK'
   kind: 'paper' | 'rules_only'
   name: string
   plan_id: string
+  /** The list's id: its plan's, or for a list the judgement changed, the hash of its plan's and its orders. */
+  list_id: string | null
+  /** A paper Book's: what the final check made of the Portfolio Manager's judgement; null for a rules-only one's. */
+  judgement: PdListJudgement | null
   /** The session its orders are for; null without a plan. */
   session: string | null
   orders: number
@@ -401,14 +550,44 @@ export interface PdOrderList {
 }
 
 /**
- * What `pd check --plan <file>` prints (contract/check.schema.json): the final Order lists recorded
- * for the paper Books to fill at the next open, each paper Book's Rule plan unchanged until issue 34.
+ * What `pd check --plan <file> --judgement <file>` prints (contract/check.schema.json): the final
+ * Order lists recorded for the paper Books to fill at the next open: each paper Book's Rule plan with
+ * the Portfolio Manager's changes the final check accepted, each rules-only one's own Rule plan.
  */
 export interface PdCheck {
   on: string
   run: string | null
   dry_run: boolean
   lists: PdOrderList[]
+}
+
+/** A proposal waiting on Saransh's Answer: to move a Book's Judgement mode, or to change its Playbook's ranges. */
+export interface PdJudgementProposal {
+  id: number
+  book: string
+  /** A mode's side: the paper Book's (true) or the real Book's; null for Playbook ranges. */
+  paper: boolean | null
+  mode: PdJudgementMode | null
+  /** Each range's new value, by its name (an exposure floor as exposure_floor.<condition>). */
+  playbook: Record<string, number> | null
+  why: string
+  by: string
+  at: string
+  decision: 'approved' | 'rejected' | null
+}
+
+/** A Book's Judgement mode on one side: as the Brief writes it, and the change that set it (null: its first). */
+interface PdJudgementSide {
+  mode: PdJudgementMode
+  name: string
+  change: { date: string; by: string; why: string } | null
+}
+
+/** What `pd judgement show` prints (contract/judgement-show.schema.json). */
+export interface PdJudgementShow {
+  books: { book: string; name: string; real: PdJudgementSide; paper: PdJudgementSide; playbook: PdPlaybook; playbook_changes: Record<string, number>[]; history: unknown[] }[]
+  /** The proposals waiting on Saransh, oldest first. */
+  proposals: PdJudgementProposal[]
 }
 
 /** A paper Book on its last close filled, or its capital before its first Order list fills. */

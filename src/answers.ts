@@ -3,7 +3,7 @@
 // naming the Run and each Answer, and the next Run's Answers Step applies it through `pd`. A kind of
 // item is added here, with its Answers and the `pd` command that applies one, and the Brief and the
 // Step follow (the stocks Pipeline PRD's "Answers").
-import type { PdSleeve, PdStagesCheck, PdStatus } from './pd.ts'
+import type { PdJudgementShow, PdSleeve, PdStagesCheck, PdStatus } from './pd.ts'
 
 /** Each kind of item waiting on Saransh: the Answers it takes, and the `pd` command that applies one to the item with this id. */
 const kinds = {
@@ -11,6 +11,8 @@ const kinds = {
   quarantine: { answers: ['dismiss'], pd: (id: string) => ['quarantines', 'dismiss', id] },
   // Approving a Candidate moves it into Paper, which launches its strategy in ash_new.
   candidate: { answers: ['approve'], pd: (id: string) => ['stages', 'approve', id] },
+  // A proposal to move a Book's Judgement mode or change its Playbook's ranges.
+  judgement: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['judgement', answer, id] },
 } satisfies Record<string, { answers: string[]; pd(id: string, answer: string): string[] }>
 
 /** An item waiting on Saransh, as the Brief embeds it: its id and the Answers it takes. */
@@ -45,12 +47,16 @@ export function waitingCandidates(stages: PdStagesCheck | null): (PdSleeve & { i
   return (stages?.books ?? []).flatMap((b) => b.sleeves.filter((s): s is PdSleeve & { id: number } => s.stage === 'candidate' && s.id !== null && s.version === s.current_version))
 }
 
-/** The items waiting on Saransh: each waiting Correction and each Quarantine in the Lake's status, then each Candidate. */
-export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null): AnswerItem[] {
+/**
+ * The items waiting on Saransh: each waiting Correction and each Quarantine in the Lake's status, then
+ * each Candidate, then each proposal to move a Judgement mode or change a Playbook's ranges.
+ */
+export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null, judgement: PdJudgementShow | null = null): AnswerItem[] {
   return [
     ...(status?.corrections ?? []).map((c) => answerItem('correction', c.id)),
     ...(status?.quarantines ?? []).map((q) => answerItem('quarantine', q.id)),
     ...waitingCandidates(stages).map((s) => answerItem('candidate', s.id)),
+    ...(judgement?.proposals ?? []).map((p) => answerItem('judgement', p.id)),
   ]
 }
 

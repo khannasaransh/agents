@@ -525,12 +525,41 @@ test('the Order lists the Check Step recorded are listed, or why none was', asyn
 
   const page = text(await brief())
 
-  assert.match(page, /Order lists Each paper Book's Order list is its Rule plan unchanged until the Portfolio Manager changes it \(issue 34\)/)
-  assert.match(page, /India Book's paper Book 2026-10-26 3 Recorded India Book's rules-only paper Book 2026-10-26 3 Recorded/)
+  assert.match(page, /Order lists Each paper Book's Order list is its Rule plan with the Portfolio Manager's changes that passed the final check/)
+  assert.match(page, /India Book's paper Book 2026-10-26 2 Recorded India Book's rules-only paper Book 2026-10-26 3 Recorded/)
   assert.match(page, /US Book's paper Book — 0 Not recorded: It has no Rule plan: US has no panels yet/)
 
   ws.writeRunFile(runId, 'check.json', { check: null, why: 'the Plan Step failed, so there is no Rule plan to record' })
   assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /Order lists No Order list was recorded in this Run: the Plan Step failed, so there is no Rule plan to record\./)
+})
+
+test("the Portfolio Manager's judgement of each paper Book is shown: its mode, commentary, each change with its Decision record and each change the final check dropped", async () => {
+  prepare()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'portfolio-manager', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'portfolio-manager.json', { status: 'answered', answer: { books: [], journal: { entries: [], open: [] } }, journalRead: '', inputs: [] })
+  ws.writeRunFile(runId, 'check.json', { check: JSON.parse(example('check.recorded.json')), why: null })
+  ws.writeRunFile(runId, 'judgement-show.json', JSON.parse(example('judgement-show.books.json')))
+
+  const page = text(await brief())
+
+  assert.match(page, /The Portfolio Manager India Book's paper Book, in Playbook mode India is in a Correction, so the paper Book starts at its 40% exposure level\./)
+  assert.match(page, /Its Order list went out with the Portfolio Manager's changes that passed the final check\. Its exposure level for the day: 40%\./)
+  assert.match(
+    page,
+    /Dropped the buy of 865 Rategain Travel Technologies Ltd \(IN:RATEGAIN\)\. The Rule plan: Buy 865 Rategain Travel Technologies at ₹173\.38 for India Super 30 OK, tuned\. Instead: Nothing: its money waits in the cash fund\. Its Lever is selection, within the Playbook's "selection: a buy may be dropped"\. It read rs_rating of IN:RATEGAIN 71 \(plan\.json\); breadth of \^CRSLDX 0\.27 \(plan\.json\)\. Expected: .*Judged on 2026-12-24\./,
+  )
+  assert.match(page, /Dropped by the final check: Swapped the buy of IN-paper-2026-10-26-002 for IN:ZOMATO: IN:ZOMATO isn't in the Book's Pool/)
+  assert.match(page, /Judgement modes and Playbooks Book Real Book Paper Book Playbook India Book subtract only Playbook size 0\.5× to 1×, waits up to 5 sessions/)
+})
+
+test('a proposal to move a Judgement mode or change a Playbook range waits for an Approve or Reject', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'judgement-show.json', JSON.parse(example('judgement-show.books.json')))
+
+  const html = await brief()
+
+  assert.match(text(html), /Judgement proposals waiting for your Answer: 1 .* 3 Set the India Book's Playbook's size_max to 1\.25 2026-10-26, Saransh Over 3 months/)
+  assert.match(html, /<div class="answer" data-item="judgement:3"><button type="button" data-answer="approve" aria-pressed="false">Approve<\/button><button type="button" data-answer="reject" aria-pressed="false">Reject<\/button>/)
 })
 
 test('a dry run says no Order list was recorded', async () => {
@@ -540,7 +569,7 @@ test('a dry run says no Order list was recorded', async () => {
   const page = text(await brief())
 
   assert.match(page, /Order lists Dry run: nothing was recorded\./)
-  assert.match(page, /India Book's paper Book 2026-10-26 3 Would be recorded/)
+  assert.match(page, /India Book's paper Book 2026-10-26 2 Would be recorded/)
 })
 
 test('each paper Book is shown against its rules-only paper Book, with its drawdown, Sleeves, riskiest stops and the Books together in rupees', async () => {

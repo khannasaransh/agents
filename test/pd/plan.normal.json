@@ -269,7 +269,9 @@
               "wanted": 2684.0,
               "allowed": 865.1292358890212
             }
-          ]
+          ],
+          "sector": "Information Technology",
+          "role": "entry"
         },
         {
           "id": "IN-paper-2026-10-26-002",
@@ -293,7 +295,9 @@
               "wanted": 6886.0,
               "allowed": 2398.129185864967
             }
-          ]
+          ],
+          "sector": "Consumer Durables",
+          "role": "entry"
         },
         {
           "id": "IN-paper-2026-10-26-003",
@@ -308,7 +312,9 @@
           "limit": 41.2,
           "reason": "first_allocation",
           "signal": null,
-          "cuts": []
+          "cuts": [],
+          "sector": null,
+          "role": "entry"
         }
       ],
       "dropped": [],
@@ -330,7 +336,64 @@
       ],
       "buys": 399258.8739,
       "sales": 0,
-      "left_out": []
+      "left_out": [],
+      "judgement": {
+        "mode": "playbook",
+        "since": null
+      },
+      "playbook": {
+        "exposure_floor": {
+          "uptrend": 0.8,
+          "under_pressure": 0.5,
+          "correction": 0.0
+        },
+        "size_min": 0.5,
+        "size_max": 1.0,
+        "timing_sessions": 5,
+        "rebalance_under": 0.02,
+        "version": "e247b5b89ff0"
+      },
+      "pool": [
+        {
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "strategies": [
+            "in-super30-ok-tuned"
+          ],
+          "signalled": "2026-10-23",
+          "close": 173.3845,
+          "sector": "Information Technology",
+          "rs_rating": 71.0,
+          "limit": 178.586
+        },
+        {
+          "security_id": "IN:STOVEKRAFT",
+          "name": "Stove Kraft Ltd",
+          "strategies": [
+            "in-super30-ok-tuned"
+          ],
+          "signalled": "2026-10-23",
+          "close": 62.5193,
+          "sector": "Consumer Durables",
+          "rs_rating": 88.0,
+          "limit": 64.3949
+        },
+        {
+          "security_id": "IN:KPITTECH",
+          "name": "KPIT Technologies Ltd",
+          "strategies": [
+            "in-super30-ok-tuned"
+          ],
+          "signalled": "2026-09-12",
+          "close": 1312.4,
+          "sector": "Information Technology",
+          "rs_rating": 64.0,
+          "limit": 1351.772
+        }
+      ],
+      "holdings": [],
+      "reserved": 0.0,
+      "waits": []
     },
     {
       "id": "9d04c6e1a7b2",

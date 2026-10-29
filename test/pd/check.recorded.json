@@ -9,10 +9,113 @@
       "name": "India Book's paper Book",
       "plan_id": "4115e6534e70",
       "session": "2026-10-26",
-      "orders": 3,
+      "orders": 2,
       "status": "recorded",
       "why": null,
-      "superseded": 0
+      "superseded": 0,
+      "list_id": "b7d02c51e9a4",
+      "judgement": {
+        "applied": "judgement",
+        "why": null,
+        "level": 0.4,
+        "changes": [
+          {
+            "kind": "drop",
+            "order": "IN-paper-2026-10-26-001",
+            "security_id": null,
+            "sleeve": null,
+            "shares": null,
+            "multiple": null,
+            "sessions": null,
+            "wait": null,
+            "decision": {
+              "rule_plan": "Buy 865 Rategain Travel Technologies at ₹173.38 for India Super 30 OK, tuned",
+              "instead": "Nothing: its money waits in the cash fund",
+              "lever": "selection",
+              "playbook": "selection: a buy may be dropped",
+              "figures": [
+                {
+                  "input": "plan.json",
+                  "security": "IN:RATEGAIN",
+                  "field": "rs_rating",
+                  "value": 71
+                },
+                {
+                  "input": "plan.json",
+                  "security": "^CRSLDX",
+                  "field": "breadth",
+                  "value": 0.27
+                }
+              ],
+              "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
+              "judged_on": "2026-12-24"
+            },
+            "lever": "selection",
+            "accepted": true,
+            "why": null,
+            "rule_order": {
+              "id": "IN-paper-2026-10-26-001",
+              "book": "IN",
+              "sleeve": "in-super30-ok-tuned",
+              "security_id": "IN:RATEGAIN",
+              "name": "Rategain Travel Technologies Ltd",
+              "side": "BUY",
+              "shares": 865,
+              "price": 173.3845,
+              "value": 149977.5925,
+              "limit": 178.5861,
+              "reason": "first_allocation",
+              "signal": {
+                "kind": "holding",
+                "weight": 0.125
+              },
+              "cuts": [
+                {
+                  "rule": "position_cap",
+                  "wanted": 2684.0,
+                  "allowed": 865.1292358890212
+                }
+              ],
+              "sector": "Information Technology",
+              "role": "entry"
+            },
+            "orders": []
+          },
+          {
+            "kind": "swap",
+            "order": "IN-paper-2026-10-26-002",
+            "security_id": "IN:ZOMATO",
+            "sleeve": null,
+            "shares": 100,
+            "multiple": null,
+            "sessions": null,
+            "wait": null,
+            "decision": {
+              "rule_plan": "Buy 2,398 Stove Kraft at ₹62.52",
+              "instead": "100 Zomato",
+              "lever": "selection",
+              "playbook": "selection: a buy may be dropped",
+              "figures": [
+                {
+                  "input": "plan.json",
+                  "security": "IN:STOVEKRAFT",
+                  "field": "rs_rating",
+                  "value": 88
+                }
+              ],
+              "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
+              "judged_on": "2026-12-24"
+            },
+            "lever": "selection",
+            "accepted": false,
+            "rule_order": null,
+            "orders": [],
+            "why": "IN:ZOMATO isn't in the Book's Pool: no strategy with a Sleeve in it bought or signalled it in the last 2 months"
+          }
+        ],
+        "todo": null,
+        "commentary": "India is in a Correction, so the paper Book starts at its 40% exposure level. Of the Rule plan's two buys, Rategain is the weaker, and I left it out; Stove Kraft goes out as planned."
+      }
     },
     {
       "book": "IN",
@@ -23,7 +126,9 @@
       "orders": 3,
       "status": "recorded",
       "why": null,
-      "superseded": 0
+      "superseded": 0,
+      "list_id": "9d04c6e1a7b2",
+      "judgement": null
     },
     {
       "book": "US",
@@ -34,7 +139,9 @@
       "orders": 0,
       "status": "not_recorded",
       "why": "It has no Rule plan: US has no panels yet: run `pd build-panels` (or refresh the data)",
-      "superseded": 0
+      "superseded": 0,
+      "list_id": null,
+      "judgement": null
     },
     {
       "book": "US",
@@ -45,7 +152,9 @@
       "orders": 0,
       "status": "not_recorded",
       "why": "It has no Rule plan: US has no panels yet: run `pd build-panels` (or refresh the data)",
-      "superseded": 0
+      "superseded": 0,
+      "list_id": null,
+      "judgement": null
     },
     {
       "book": "HK",
@@ -56,7 +165,9 @@
       "orders": 0,
       "status": "not_recorded",
       "why": "It has no Rule plan: HK has no panels yet: run `pd build-panels` (or refresh the data)",
-      "superseded": 0
+      "superseded": 0,
+      "list_id": null,
+      "judgement": null
     },
     {
       "book": "HK",
@@ -67,7 +178,9 @@
       "orders": 0,
       "status": "not_recorded",
       "why": "It has no Rule plan: HK has no panels yet: run `pd build-panels` (or refresh the data)",
-      "superseded": 0
+      "superseded": 0,
+      "list_id": null,
+      "judgement": null
     }
   ]
 }

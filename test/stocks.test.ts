@@ -18,7 +18,7 @@ function workspace(): Workspace {
   return made
 }
 
-test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agent on a healthy Lake, then writes the Stocks Brief', async () => {
+test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agent on a healthy Lake, judges on the fake Worker, then writes the Stocks Brief', async () => {
   ws = workspace()
   ws.setPd({
     status: { example: 'status.clean.json' },
@@ -28,6 +28,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
     check: { example: 'check.recorded.json' },
     'paper-books': { example: 'paper-books.json' },
+    judgement: { example: 'judgement-show.books.json' },
   })
 
   const result = await ws.agents('run', 'stocks', '--dry-run')
@@ -48,13 +49,17 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['stages', 'succeeded'],
       ['health', 'skipped'],
       ['plan', 'succeeded'],
+      // The fake Worker stands in for the Portfolio Manager, so its Journal is never saved.
+      ['portfolio-manager', 'succeeded'],
       ['check', 'succeeded'],
+      ['save-state', 'skipped'],
       ['brief', 'succeeded'],
     ],
   )
+  assert.deepEqual(ws.workerCliCalls('claude'), [])
   const states = ['IN', 'US', 'HK'].flatMap((book) => [['book-state', book, '--paper'], ['book-state', book, '--rules-only']])
   assert.deepEqual(
-    ws.pdCalls().map((call) => call.args.map((arg) => (arg.endsWith('plan.json') ? 'plan.json' : arg))),
+    ws.pdCalls().map((call) => call.args.map((arg) => (arg.endsWith('.json') ? arg.split(/[\\/]/).at(-1)! : arg))),
     [
       ['book-holdings'],
       ['status'],
@@ -62,8 +67,9 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['plan', '--on', id.slice(0, 10)],
       ['book-state', 'IN'],
       ...states,
-      ['check', '--plan', 'plan.json', '--run', id, '--dry-run'],
+      ['check', '--plan', 'plan.json', '--judgement', 'judgement.json', '--run', id, '--dry-run'],
       ['paper-books'],
+      ['judgement', 'show'],
     ],
     'nothing in ash_new is recorded, refreshed or cleared',
   )
@@ -72,7 +78,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
   assert.deepEqual(readdirSync(join(ws.dataDir, 'processes')), [], 'every process the Run started is recorded as ended')
 })
 
-test('a stocks Run whose refresh fails twice calls the Health Agent and ends partial, with a Brief that says why the Data gate failed and that the Health Agent failed too', async () => {
+test('a stocks Run whose refresh fails twice calls the Health Agent and ends partial, with a Brief that says why the Data gate failed, that the Health Agent failed too, and that the Rule plans went out without the Portfolio Manager', async () => {
   ws = workspace()
   ws.setPd({
     'book-holdings': { example: 'book-holdings.empty.json' },
@@ -85,6 +91,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
     check: { example: 'check.recorded.json' },
     'paper-books': { example: 'paper-books.json' },
+    judgement: { example: 'judgement-show.books.json' },
   })
 
   const result = await ws.agents('run', 'stocks')
@@ -106,16 +113,20 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['stages', 'succeeded'],
       ['health', 'failed'],
       ['plan', 'succeeded'],
+      ['portfolio-manager', 'failed'],
       ['check', 'succeeded'],
+      ['save-state', 'skipped'],
       ['brief', 'succeeded'],
     ],
   )
-  // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent fails on both.
-  assert.equal(ws.workerCliCalls('codex').length, 1)
-  assert.equal(ws.workerCliCalls('claude').length, 1)
+  // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent and the Portfolio Manager fail on both.
+  assert.equal(ws.workerCliCalls('codex').length, 2)
+  assert.equal(ws.workerCliCalls('claude').length, 2)
+  assert.equal(JSON.parse(ws.readRunFile(id, 'judgement.json')).status, 'failed')
   const brief = ws.readRunFile(id, 'brief.html')
   assert.match(brief, /Data gate: fail/)
   assert.match(brief, /The Health Agent failed, so there is no diagnosis: claude-code failed/)
+  assert.match(brief, /The Portfolio Manager failed, so each paper Book's Rule plan went out instead/)
   assert.match(brief, /lake: failed\. Log: <a href="logs\/lake\.log">/)
 })
 

@@ -4,17 +4,20 @@
 // the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
 // for approval with what it would change; each Quarantine with its flag; each Candidate waiting for
 // approval into Paper; each market's latest session in the Lake against its last finished one; the
-// To-dos the Steps raised; each Book's Sleeves with their Stages and how long each has been in its
-// Stage; each Book's real holdings and value, its latest Reconciliation's differences and this Run's
-// Broker inbox files; each market's Market condition with MarketSmith's outlook beside it and each
-// Book's exposure level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's
-// state beside its shadow Rule plan and each paper Book's beside its Rule plan, every order marked not for
-// placing, with its rules-only paper Book's plan after it; the Order lists the Check Step recorded, or
-// why none was; how each paper Book stands (its value and its gap to its rules-only paper Book, its
-// drawdown against its breakers, its Sleeves and Stages, the Disaster stops that would lose more than 1%
-// of it, and the Books together in rupees); on Saturdays, what MarketSmith's fetch brought; how this
-// Run's Lake Step went and how ash_new's last refresh ended; the Health report's verdict and flags; and
-// the Run's health.
+// To-dos the Steps raised; each proposal to move a Judgement mode or change a Playbook's ranges; each
+// Book's Sleeves with their Stages and how long each has been in its Stage; each Book's real holdings
+// and value, its latest Reconciliation's differences and this Run's Broker inbox files; each market's
+// Market condition with MarketSmith's outlook beside it and each Book's exposure level; on a day the
+// Data gate fails, that every plan is in Hold mode; the India Book's state beside its shadow Rule plan
+// and each paper Book's beside its Rule plan, every order marked not for placing, with its rules-only
+// paper Book's plan after it; the Portfolio Manager's judgement of each paper Book (its Judgement
+// mode, its commentary, what went out and why, each change with its Decision record in plain
+// sentences, and each change the final check dropped with why) and each Book's Judgement modes; the
+// Order lists the Check Step recorded, or why none was; how each paper Book stands (its value and its
+// gap to its rules-only paper Book, its drawdown against its breakers, its Sleeves and Stages, the
+// Disaster stops that would lose more than 1% of it, and the Books together in rupees); on Saturdays,
+// what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh
+// ended; the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 // Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
 // downloads them as one Answers file, built in the page by answersFile's own source, for the next
@@ -26,7 +29,8 @@ import { brokerFiles, differenceText, fileLine, securityName, shares } from '../
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
-import type { PdBook, PdBookState, PdMarketSmith, PdPaperBook, PdPaperBooks, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import { changeText, decisionText, modeName, proposalText } from '../../src/judgement.ts'
+import type { PdBook, PdBookState, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
 import { breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -38,6 +42,7 @@ import type { CheckResult } from './check.ts'
 import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 import type { BookStates } from './plan.ts'
+import type { PortfolioManagerResult } from './portfolio-manager.ts'
 
 /** Escapes text for HTML, so nothing from the Lake or a log is read as markup. */
 const esc = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
@@ -274,6 +279,22 @@ function candidatesSection(stages: PdStagesCheck | null): string {
   ].join('\n')
 }
 
+/** Each proposal to move a Book's Judgement mode or change its Playbook's ranges, with its Answer buttons; nothing when none waits. */
+function proposalsSection(modes: PdJudgementShow | null): string {
+  if (!modes?.proposals.length) return ''
+  const books = new Map(modes.books.map((b) => [b.book, b.name]))
+  const rows = modes.proposals.map((p) => {
+    const book = books.get(p.book) ?? p.book
+    return [String(p.id), esc(proposalText(p, book)), esc(`${p.at.slice(0, 10)}, ${p.by}`), esc(p.why), answerButtons(answerItem('judgement', p.id))]
+  })
+  return [
+    `<section><h2>Judgement proposals waiting for your Answer: ${modes.proposals.length}</h2>`,
+    "<p>A Book's Judgement mode and its Playbook's ranges change only by your Answer. Approve or reject each, then Save answers: the next Run records your Answers in ash_new, and an approved range is in force from then on, under a new Playbook version.</p>",
+    table(['Id', 'Proposal', 'Proposed', 'Why', 'Your Answer'], rows),
+    '</section>',
+  ].join('\n')
+}
+
 /**
  * Each Book's Sleeves with their Stages, since when and for how long, and the Retired ones winding
  * down; that they couldn't be read when the Stages Step failed, and nothing when it didn't run.
@@ -426,7 +447,7 @@ function ordersPart(plan: PdRulePlan): string {
 /** What a kind of Rule plan is, under its heading. */
 const planAbout = {
   shadow: '<p>One Book end to end before any judgement: its state, and the Rule plan the Book engine makes from it with one Sleeve at its full share beside gold and the cash fund. Nothing here is recorded as an order, and none of it is for placing.</p>',
-  paper: '<p>The paper Book holds each strategy from Paper up at its full share, beside gold and the cash fund. The Check Step records its Order list (its Rule plan unchanged, until the Portfolio Manager changes it) and ash_new\'s daily chain fills it at the next open: none of it is for you to place.</p>',
+  paper: '<p>The paper Book holds each strategy from Paper up at its full share, beside gold and the cash fund. The Portfolio Manager judges its Rule plan within its Playbook, the Check Step records its final Order list and ash_new\'s daily chain fills it at the next open: none of it is for you to place.</p>',
   rules_only: "<p>The rules-only paper Book starts with the paper Book and holds the same Sleeves, but always trades its Rule plan unchanged: the paper Book's gap to it is what the Portfolio Manager's judgement added.</p>",
 }
 
@@ -537,6 +558,70 @@ function plansSection(run: RunRecord, plan: PdPlan | null, states: BookStates | 
   return [hold, conditionsSection(plan), ...parts].filter(Boolean).join('\n')
 }
 
+/** What went out for a paper Book, and why not the Portfolio Manager's changes. */
+const wentOut = {
+  judgement: "Its Order list went out with the Portfolio Manager's changes that passed the final check.",
+  rule_plan: 'Its Rule plan went out instead',
+  exits_only: 'Only its exits and Disaster stops went out',
+}
+
+/** The Portfolio Manager's judgement of a paper Book's plan, as the final check left it. */
+function bookJudgement(listed: PdOrderList, modes: PdJudgementShow | null): string {
+  const judged = listed.judgement!
+  const mode = modes?.books.find((b) => b.book === listed.book)?.paper
+  const went = judged.applied === 'judgement' ? wentOut.judgement : `${wentOut[judged.applied]}: ${esc(judged.why ?? '')}.`
+  const accepted = judged.changes.filter((c) => c.accepted)
+  const dropped = judged.changes.filter((c) => !c.accepted)
+  const sent = judged.applied === 'judgement' ? '' : ', each passing on its own but not sent'
+  return [
+    `<h3>${esc(listed.name)}${mode ? `, in ${esc(modeName(mode.mode))} mode` : ''}</h3>`,
+    judged.commentary ? `<p class="text">${esc(judged.commentary)}</p>` : '',
+    `<p>${went} Its exposure level for the day: ${percent(judged.level)}.</p>`,
+    ...(accepted.length
+      ? [`<p>Its changes from the Rule plan${sent}:</p>`, list(accepted.map((c) => `<strong>${esc(changeText(c))}.</strong> ${esc(decisionText(c.decision))}`))]
+      : ['<p>No change from the Rule plan.</p>']),
+    ...(dropped.length ? ['<p>Dropped by the final check:</p>', list(dropped.map((c) => `${esc(changeText(c))}: ${esc(c.why ?? '')}`))] : []),
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * The Portfolio Manager's judgement of each paper Book, or that it failed or didn't run, then each
+ * Book's Judgement modes; nothing when it isn't in this Run.
+ */
+function judgementSection(run: RunRecord, pm: PortfolioManagerResult | null, result: CheckResult | null, modes: PdJudgementShow | null): string {
+  const step = run.steps.find((s) => s.name === 'portfolio-manager')
+  if (!step && !pm) return ''
+  const log = logLink(step?.log ?? 'logs/portfolio-manager.log')
+  let intro = ''
+  if (pm?.status === 'failed') intro = `<p>The Portfolio Manager failed, so each paper Book's Rule plan went out instead, once it passed the final check: ${esc(pm.error)}. See its log: ${log}</p>`
+  else if (!pm) intro = `<p>The Portfolio Manager didn't judge the plans in this Run, so each paper Book's Rule plan went out, once it passed the final check. See its log: ${log}</p>`
+  const books = (result?.check?.lists ?? []).filter((l) => l.judgement && l.kind === 'paper').map((l) => bookJudgement(l, modes))
+  const rows = (modes?.books ?? []).map((b) => [
+    esc(b.name),
+    esc(`${modeName(b.real.mode)}${b.real.change ? `, since ${b.real.change.date}` : ''}`),
+    esc(`${modeName(b.paper.mode)}${b.paper.change ? `, since ${b.paper.change.date}` : ''}`),
+    esc(`size ${b.playbook.size_min}× to ${b.playbook.size_max}×, waits up to ${b.playbook.timing_sessions} sessions, rebalances under ${percent(b.playbook.rebalance_under)} skipped, exposure floors ${percent(b.playbook.exposure_floor.uptrend)}, ${percent(b.playbook.exposure_floor.under_pressure)} and ${percent(b.playbook.exposure_floor.correction)}`) +
+      `<br><span class="muted">version ${esc(b.playbook.version)}</span>`,
+  ])
+  return [
+    '<section><h2>The Portfolio Manager</h2>',
+    intro,
+    ...books,
+    ...(rows.length
+      ? [
+          '<h3>Judgement modes and Playbooks</h3>',
+          table(['Book', 'Real Book', 'Paper Book', 'Playbook'], rows),
+          "<p class=\"muted\">In plan only mode no change goes out; in subtract only mode, exposure cuts, dropped buys, sizes down, trims, waits and rebalance skips; in Playbook mode also swaps to Pool names and sizes up to the range's top. The ranges are placeholders until you set them.</p>",
+        ]
+      : []),
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 /** What became of each paper Book's Order list in this Run, or why none was recorded. */
 function checkSection(run: RunRecord, result: CheckResult | null): string {
   const step = run.steps.find((s) => s.name === 'check')
@@ -553,7 +638,7 @@ function checkSection(run: RunRecord, result: CheckResult | null): string {
   return [
     head,
     result.check.dry_run ? '<p>Dry run: nothing was recorded.</p>' : '',
-    '<p>Each paper Book\'s Order list is its Rule plan unchanged until the Portfolio Manager changes it (issue 34); each rules-only paper Book\'s is always its Rule plan. Their orders fill at the next open, once ash_new\'s daily chain\'s Health report passes.</p>',
+    '<p>Each paper Book\'s Order list is its Rule plan with the Portfolio Manager\'s changes that passed the final check; each rules-only paper Book\'s is always its Rule plan. Their orders fill at the next open, once ash_new\'s daily chain\'s Health report passes.</p>',
     table(['Paper Book', 'Session', 'Orders', ''], rows),
     '</section>',
   ]
@@ -718,12 +803,15 @@ interface Inputs {
   health: HealthResult | null
   plan: PdPlan | null
   states: BookStates | null
+  pm: PortfolioManagerResult | null
   check: CheckResult | null
   paperBooks: PdPaperBooks | null
+  /** Each Book's Judgement modes and Playbook, and the proposals waiting, as the Check Step read them. */
+  modes: PdJudgementShow | null
   todos: { step: string; todo: string }[]
 }
 
-function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, check, paperBooks, todos }: Inputs): string {
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, pm, check, paperBooks, modes, todos }: Inputs): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   return `<!doctype html>
@@ -742,18 +830,20 @@ ${answersSection(answers)}
 ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${candidatesSection(stages)}
+${proposalsSection(modes)}
 ${marketsSection(status)}
 ${todosSection(todos)}
 ${stagesSection(run, stages)}
 ${booksSection(run, inbox)}
 ${plansSection(run, plan, states)}
+${judgementSection(run, pm, check, modes)}
 ${checkSection(run, check)}
 ${paperBooksSection(run, paperBooks)}
 ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
-${saveAnswers(run.id, waitingItems(waiting, stages))}
+${saveAnswers(run.id, waitingItems(waiting, stages, modes))}
 </body>
 </html>
 `
@@ -780,8 +870,10 @@ await runAsStep(({ runId, runFolder, force }) => {
       health: read<HealthResult>('health.json'),
       plan: read<PdPlan>('plan.json'),
       states: read<BookStates>('book-states.json'),
+      pm: read<PortfolioManagerResult>('portfolio-manager.json'),
       check: read<CheckResult>('check.json'),
       paperBooks: read<PdPaperBooks>('paper-books.json'),
+      modes: read<PdJudgementShow>('judgement-show.json'),
       todos: readTodos(runFolder),
     }),
   )

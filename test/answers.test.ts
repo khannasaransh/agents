@@ -284,3 +284,20 @@ test('an Answer approving a Candidate moves it into Paper through pd stages appr
   ])
   assert.equal(result(nextRun).files[1].answers[0].why, 'It is in Paper already, since 2026-10-28')
 })
+
+test("an Answer on a Judgement proposal approves or rejects it through pd judgement", async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(briefRun, { pipeline: 'stocks', steps: [{ name: 'check', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(briefRun, 'judgement-show.json', JSON.parse(readFileSync(join(pdExamples, 'judgement-show.books.json'), 'utf8')))
+  assert.equal((await ws.agents('step', 'brief', '--run', briefRun)).status, 0)
+  const items: AnswerItem[] = JSON.parse(ws.readRunFile(briefRun, 'brief.html').match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
+  assert.deepEqual(items, [{ item: 'judgement:3', answers: ['approve', 'reject'] }])
+  save(answersFile(briefRun, items, { 'judgement:3': { answer: 'reject', note: 'Not yet' } }, '2026-10-27T03:10:00.000Z'))
+  prepareRun(nextRun)
+  ws.setPd({ judgement: { example: 'judgement-decide.approved.json' } })
+
+  assert.equal((await step(nextRun)).status, 0)
+
+  assert.deepEqual(pdCallArgs(), [['judgement', 'reject', '3']])
+  assert.deepEqual(outcomes(nextRun), [['judgement:3', 'reject', 'applied']])
+})

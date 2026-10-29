@@ -1,0 +1,103 @@
+{
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "real": {
+        "mode": "subtract_only",
+        "name": "subtract only",
+        "change": null
+      },
+      "paper": {
+        "mode": "playbook",
+        "name": "Playbook",
+        "change": null
+      },
+      "playbook": {
+        "exposure_floor": {
+          "uptrend": 0.8,
+          "under_pressure": 0.5,
+          "correction": 0.0
+        },
+        "size_min": 0.5,
+        "size_max": 1.0,
+        "timing_sessions": 5,
+        "rebalance_under": 0.02,
+        "version": "e247b5b89ff0"
+      },
+      "playbook_changes": [],
+      "history": []
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "real": {
+        "mode": "subtract_only",
+        "name": "subtract only",
+        "change": null
+      },
+      "paper": {
+        "mode": "playbook",
+        "name": "Playbook",
+        "change": null
+      },
+      "playbook": {
+        "exposure_floor": {
+          "uptrend": 0.8,
+          "under_pressure": 0.5,
+          "correction": 0.0
+        },
+        "size_min": 0.5,
+        "size_max": 1.0,
+        "timing_sessions": 5,
+        "rebalance_under": 0.02,
+        "version": "e247b5b89ff0"
+      },
+      "playbook_changes": [],
+      "history": []
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "real": {
+        "mode": "subtract_only",
+        "name": "subtract only",
+        "change": null
+      },
+      "paper": {
+        "mode": "playbook",
+        "name": "Playbook",
+        "change": null
+      },
+      "playbook": {
+        "exposure_floor": {
+          "uptrend": 0.8,
+          "under_pressure": 0.5,
+          "correction": 0.0
+        },
+        "size_min": 0.5,
+        "size_max": 1.0,
+        "timing_sessions": 5,
+        "rebalance_under": 0.02,
+        "version": "e247b5b89ff0"
+      },
+      "playbook_changes": [],
+      "history": []
+    }
+  ],
+  "proposals": [
+    {
+      "id": 3,
+      "book": "IN",
+      "paper": null,
+      "mode": null,
+      "playbook": {
+        "size_max": 1.25
+      },
+      "why": "Over 3 months the override scorecard shows the India paper Book's upsized buys beat their Rule plan sizes",
+      "by": "Saransh",
+      "at": "2026-10-26T14:02:11+00:00",
+      "decision": null
+    }
+  ]
+}

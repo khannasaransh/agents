@@ -1,0 +1,98 @@
+{
+  "status": "answered",
+  "why": null,
+  "inputs": [
+    "plan.json",
+    "book-states.json",
+    "stages.json"
+  ],
+  "books": [
+    {
+      "book": "IN",
+      "plan_id": "4115e6534e70",
+      "state_id": "53f848d353e2",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "exposure": {
+        "level": 0.4,
+        "decision": {
+          "rule_plan": "An exposure level of 40%, which the Correction sets",
+          "instead": "The same 40%",
+          "lever": "exposure",
+          "playbook": "exposure: cut to no lower than 0% in a Correction",
+          "figures": [
+            {
+              "input": "plan.json",
+              "security": "IN",
+              "field": "exposure_level",
+              "value": 0.4
+            }
+          ],
+          "expected": "The Book holds no more than 40% in stocks while the Correction lasts",
+          "judged_on": "2026-11-23"
+        }
+      },
+      "changes": [
+        {
+          "kind": "drop",
+          "order": "IN-paper-2026-10-26-001",
+          "security_id": null,
+          "sleeve": null,
+          "shares": null,
+          "multiple": null,
+          "sessions": null,
+          "wait": null,
+          "decision": {
+            "rule_plan": "Buy 865 Rategain Travel Technologies at ₹173.38 for India Super 30 OK, tuned",
+            "instead": "Nothing: its money waits in the cash fund",
+            "lever": "selection",
+            "playbook": "selection: a buy may be dropped",
+            "figures": [
+              {
+                "input": "plan.json",
+                "security": "IN:RATEGAIN",
+                "field": "rs_rating",
+                "value": 71
+              },
+              {
+                "input": "plan.json",
+                "security": "^CRSLDX",
+                "field": "breadth",
+                "value": 0.27
+              }
+            ],
+            "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
+            "judged_on": "2026-12-24"
+          }
+        },
+        {
+          "kind": "swap",
+          "order": "IN-paper-2026-10-26-002",
+          "security_id": "IN:ZOMATO",
+          "sleeve": null,
+          "shares": 100,
+          "multiple": null,
+          "sessions": null,
+          "wait": null,
+          "decision": {
+            "rule_plan": "Buy 2,398 Stove Kraft at ₹62.52",
+            "instead": "100 Zomato",
+            "lever": "selection",
+            "playbook": "selection: a buy may be dropped",
+            "figures": [
+              {
+                "input": "plan.json",
+                "security": "IN:STOVEKRAFT",
+                "field": "rs_rating",
+                "value": 88
+              }
+            ],
+            "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
+            "judged_on": "2026-12-24"
+          }
+        }
+      ],
+      "commentary": "India is in a Correction, so the paper Book starts at its 40% exposure level. Of the Rule plan's two buys, Rategain is the weaker, and I left it out; Stove Kraft goes out as planned."
+    }
+  ]
+}
