@@ -1,0 +1,25 @@
+{
+  "id": "7c1e0b5a93d2",
+  "book": "IN",
+  "name": "India Book's rules-only paper Book",
+  "paper": true,
+  "rules_only": true,
+  "market": "IN",
+  "currency": "INR",
+  "portfolio_id": null,
+  "ledger": {
+    "transactions": 0,
+    "last": null
+  },
+  "capital": 1000000.0,
+  "capital_set": false,
+  "as_of": null,
+  "cash": 1000000.0,
+  "holdings": [],
+  "reconciliation": null,
+  "unsettled": [],
+  "open_orders": [],
+  "reserved": 0.0,
+  "stops": [],
+  "engine": null
+}

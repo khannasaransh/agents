@@ -9,8 +9,12 @@
 // Broker inbox files; each market's Market condition with MarketSmith's outlook beside it and each
 // Book's exposure level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's
 // state beside its shadow Rule plan and each paper Book's beside its Rule plan, every order marked not for
-// placing; on Saturdays, what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
-// the Health report's verdict and flags; and the Run's health.
+// placing, with its rules-only paper Book's plan after it; the Order lists the Check Step recorded, or
+// why none was; how each paper Book stands (its value and its gap to its rules-only paper Book, its
+// drawdown against its breakers, its Sleeves and Stages, the Disaster stops that would lose more than 1%
+// of it, and the Books together in rupees); on Saturdays, what MarketSmith's fetch brought; how this
+// Run's Lake Step went and how ash_new's last refresh ended; the Health report's verdict and flags; and
+// the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 // Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
 // downloads them as one Answers file, built in the page by answersFile's own source, for the next
@@ -22,7 +26,7 @@ import { brokerFiles, differenceText, fileLine, securityName, shares } from '../
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
-import type { PdBook, PdBookState, PdMarketSmith, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import type { PdBook, PdBookState, PdMarketSmith, PdPaperBook, PdPaperBooks, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
 import { breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -30,6 +34,7 @@ import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
 import type { AnswersResult } from './answers.ts'
 import type { BrokerInboxResult } from './broker-inbox.ts'
+import type { CheckResult } from './check.ts'
 import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 import type { BookStates } from './plan.ts'
@@ -377,13 +382,26 @@ function statePart(state: PdBookState | undefined): string {
   const unsettled = state.unsettled.map(
     (u) => `${esc(u.name ?? u.security_id ?? '')}${u.security_id ? ` (${esc(u.security_id)})` : ''}: ${esc(u.kind.replaceAll('_', ' '))}, ledger ${u.ledger_qty === null ? '—' : esc(shares(u.ledger_qty))}, broker ${esc(shares(u.broker_qty))}`,
   )
-  const cash = state.paper ? `${at(state.cash)} in cash: ${capital}, all of it in cash until issue 33 records its fills.` : `${at(state.cash)} in cash: ${capital}, with ${ledger}. No open order or Disaster stop is recorded yet.`
+  const cash = !state.paper
+    ? `${at(state.cash)} in cash: ${capital}, with ${ledger}. No open order or Disaster stop is recorded yet.`
+    : state.as_of
+      ? `${at(state.cash)} in cash on its last close filled, ${esc(state.as_of)}.`
+      : `${at(state.cash)} in cash: ${capital}, all of it in cash until its first Order list fills.`
+  const sessions = [...new Set(state.open_orders.map((o) => o.session))]
+  const waiting = state.open_orders.length
+    ? `<p>${plural(state.open_orders.length, 'order')} of its Order list for ${esc(sessions.join(', '))} wait to be filled at the open, its buys reserving ${at(state.reserved)}.</p>`
+    : ''
+  const stops = state.stops.map((stop) => `${esc(stop.security_id)}: ${esc(money(stop.price, state.currency, 2))}`)
   return [
     `<h3>The Book state ${esc(state.id)}</h3>`,
     `<p>${cash}</p>`,
     rows.length ? table(['Holding', 'Shares', 'Average cost', ''], rows) : '<p>It holds nothing.</p>',
+    waiting,
+    ...(stops.length ? ['<p>Its Disaster stops:</p>', list(stops)] : []),
     ...(unsettled.length ? ['<p>Unsettled, so neither bought nor sold on a signal until a holdings export settles it:</p>', list(unsettled)] : []),
-  ].join('\n')
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 /** A Rule plan's orders, each marked not for placing, with the signal behind it and any cut. */
@@ -408,7 +426,30 @@ function ordersPart(plan: PdRulePlan): string {
 /** What a kind of Rule plan is, under its heading. */
 const planAbout = {
   shadow: '<p>One Book end to end before any judgement: its state, and the Rule plan the Book engine makes from it with one Sleeve at its full share beside gold and the cash fund. Nothing here is recorded as an order, and none of it is for placing.</p>',
-  paper: "<p>The paper Book holds each strategy from Paper up at its full share, beside gold and the cash fund. Its orders are filled at the next open once issue 33 trades them: none is for you to place.</p>",
+  paper: '<p>The paper Book holds each strategy from Paper up at its full share, beside gold and the cash fund. The Check Step records its Order list (its Rule plan unchanged, until the Portfolio Manager changes it) and ash_new\'s daily chain fills it at the next open: none of it is for you to place.</p>',
+  rules_only: "<p>The rules-only paper Book starts with the paper Book and holds the same Sleeves, but always trades its Rule plan unchanged: the paper Book's gap to it is what the Portfolio Manager's judgement added.</p>",
+}
+
+/** Whether two plans make the same orders: the same Sleeves, securities, sides and shares. */
+const sameOrders = (one: PdRulePlan, other: PdRulePlan) =>
+  JSON.stringify((one.orders ?? []).map((o) => [o.sleeve, o.security_id, o.side, o.shares])) === JSON.stringify((other.orders ?? []).map((o) => [o.sleeve, o.security_id, o.side, o.shares]))
+
+/** A rules-only paper Book's Rule plan, short when it makes its paper Book's orders. */
+function rulesOnlyPart(plan: PdRulePlan, paper: PdRulePlan | undefined): string {
+  const head = `<h2>${esc(plan.name)}${plan.session ? `: its Rule plan for ${esc(plan.session)}` : ''}</h2>`
+  if (plan.status !== 'planned') return [`<section>${head}`, `<p>No Rule plan: ${esc(plan.why ?? '')}</p>`, '</section>'].join('\n')
+  const currency = plan.currency ?? 'INR'
+  const same = paper?.status === 'planned' && sameOrders(plan, paper)
+  const orders = `${plural(plan.orders?.length ?? 0, 'order')}, buys of ${esc(money(plan.buys ?? 0, currency))} and sales of ${esc(money(plan.sales ?? 0, currency))}`
+  return [
+    `<section>${head}`,
+    planAbout.rules_only,
+    `<p>The Rule plan ${esc(plan.id)}, made from its Book state ${esc(plan.state_id)}: ${orders}${same ? ", the same as its paper Book's" : ''}.</p>`,
+    same ? '' : ordersPart(plan),
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 /** A Book's state beside its Rule plan: what the plan was made from, its orders, what it stopped and its Disaster stops. */
@@ -491,7 +532,87 @@ function plansSection(run: RunRecord, plan: PdPlan | null, states: BookStates | 
     plan.mode === 'hold'
       ? `<section class="gate fail"><h2>Hold mode: no Rule plan makes an order today.</h2><p>The Data gate fails, so nothing new is bought and exits happen only through Disaster stops:</p>\n${list(plan.gate.reasons.map(esc))}</section>`
       : ''
-  return [hold, conditionsSection(plan), ...plan.plans.map((p) => planPart(p, stateOf(states?.states ?? [], p)))].filter(Boolean).join('\n')
+  const paperOf = (p: PdRulePlan) => plan.plans.find((other) => other.book === p.book && other.kind === 'paper')
+  const parts = plan.plans.map((p) => (p.kind === 'rules_only' ? rulesOnlyPart(p, paperOf(p)) : planPart(p, stateOf(states?.states ?? [], p))))
+  return [hold, conditionsSection(plan), ...parts].filter(Boolean).join('\n')
+}
+
+/** What became of each paper Book's Order list in this Run, or why none was recorded. */
+function checkSection(run: RunRecord, result: CheckResult | null): string {
+  const step = run.steps.find((s) => s.name === 'check')
+  const head = '<section><h2>Order lists</h2>'
+  if (!result) return step?.status === 'failed' ? `${head}<p>No Order list was recorded: the Check Step failed. See its log: ${logLink(step.log ?? 'logs/check.log')}</p></section>` : ''
+  if (!result.check) return `${head}<p>No Order list was recorded in this Run: ${esc(result.why ?? '')}.</p></section>`
+  const shown = { recorded: 'Recorded', unchanged: 'Recorded already', not_recorded: 'Not recorded', would_record: 'Would be recorded' }
+  const rows = result.check.lists.map((l) => [
+    esc(l.name),
+    esc(l.session ?? '—'),
+    String(l.orders),
+    `${shown[l.status]}${l.superseded ? `, superseding ${plural(l.superseded, 'order')} recorded earlier` : ''}${l.why ? `: ${esc(l.why)}` : ''}`,
+  ])
+  return [
+    head,
+    result.check.dry_run ? '<p>Dry run: nothing was recorded.</p>' : '',
+    '<p>Each paper Book\'s Order list is its Rule plan unchanged until the Portfolio Manager changes it (issue 34); each rules-only paper Book\'s is always its Rule plan. Their orders fill at the next open, once ash_new\'s daily chain\'s Health report passes.</p>',
+    table(['Paper Book', 'Session', 'Orders', ''], rows),
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/** A paper Book's value in a cell: on its last close filled, or its capital before its first list fills. */
+function standingCell(book: PdPaperBook, kind: 'paper' | 'rules_only'): string {
+  const standing = book[kind]
+  const value = esc(money(standing.value, book.currency))
+  return standing.as_of ? `${value}<br><span class="muted">on ${esc(standing.as_of)}</span>` : `${value}<br><span class="muted">not started: all cash</span>`
+}
+
+/** A paper Book's drawdown against its breakers, and which have tripped. */
+function drawdownCell(book: PdPaperBook): string {
+  const { drawdown, buying, halved } = book.paper
+  const tripped = [!buying ? 'no new buys' : '', halved ? 'half exposure' : ''].filter(Boolean)
+  const breakers = `breakers at ${percent(book.breakers.no_new_buys_at)} and ${percent(book.breakers.halve_exposure_at)}`
+  return `${percent(drawdown)}<br><span class="muted">${tripped.length ? `tripped: ${tripped.join(', ')}` : breakers}</span>`
+}
+
+/** How each paper Book stands against its rules-only paper Book, its Sleeves, its riskiest stops, and the Books together in rupees. */
+function paperBooksSection(run: RunRecord, standing: PdPaperBooks | null): string {
+  const step = run.steps.find((s) => s.name === 'check')
+  const head = '<section><h2>Paper Books</h2>'
+  if (!standing) return step?.status === 'failed' ? `${head}<p>How the paper Books stand couldn't be read in this Run. See the Check Step's log: ${logLink(step.log ?? 'logs/check.log')}</p></section>` : ''
+  const rows = standing.books.map((b) => [
+    esc(b.name),
+    standingCell(b, 'paper'),
+    standingCell(b, 'rules_only'),
+    b.gap === null ? '—' : `${esc(money(b.gap.value, b.currency))}<br><span class="muted">${percent(b.gap.share)}</span>`,
+    drawdownCell(b),
+  ])
+  const details = standing.books.flatMap((b) => {
+    const sleeves = b.sleeves.map((s) => `${esc(s.strategy_id)} in ${esc(s.stage_name)} since ${esc(s.since)}${s.value === null ? '' : `: ${esc(money(s.value, b.currency))}`}`)
+    if (b.gold !== null) sleeves.push(`gold: ${esc(money(b.gold, b.currency))}`)
+    const risky = b.stops_at_risk.map((r) => `${esc(r.name ?? r.security_id)} (${esc(r.security_id)}): ${esc(shares(r.qty))} shares at ${esc(money(r.close, b.currency, 2))}, its stop at ${esc(money(r.stop, b.currency, 2))}, would lose ${esc(money(r.loss, b.currency))}, ${percent(r.share)} of the Book`)
+    return [
+      `<h3>${esc(b.name)}'s paper Book</h3>`,
+      sleeves.length ? `<p>Its Sleeves: ${sleeves.join('; ')}.</p>` : '<p>No Sleeve yet.</p>',
+      b.paper.lists_waiting.length ? `<p>${plural(b.paper.orders_waiting, 'order')} of its Order list for ${esc(b.paper.lists_waiting.join(', '))} wait to be filled.</p>` : '',
+      ...(risky.length ? [`<p>Disaster stops that would lose more than ${percent(b.risk_per_trade)} of the Book:</p>`, list(risky)] : []),
+    ]
+  })
+  const combined = standing.combined
+  const rates = Object.entries(combined.rates)
+    .filter(([currency]) => currency !== combined.currency)
+    .map(([currency, rate]) => `${esc(currency)} at ${esc(money(rate, combined.currency, 2))}`)
+  const missing = combined.missing.length ? ` The ${esc(combined.missing.join(' and '))} ${combined.missing.length === 1 ? "Book's currency has" : "Books' currencies have"} no exchange rate in the Lake, so ${combined.missing.length === 1 ? 'it is' : 'they are'} left out.` : ''
+  return [
+    head,
+    table(['Book', 'Paper Book', 'Rules-only paper Book', 'Gap', 'Drawdown'], rows),
+    `<p>The paper Books together: ${esc(money(combined.value, combined.currency))}${rates.length ? `, at ${rates.join(' and ')}` : ''}.${missing}</p>`,
+    ...details,
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 /** What MarketSmith's fetch brought, on a Saturday: nothing on other days, when the Step skips itself. */
@@ -582,11 +703,27 @@ a { color: inherit; }
 .save-bar button:disabled { opacity: 0.4; cursor: default; }
 `
 
-/**
- * `status` is the Lake's as the Lake Step read it; `latest`, as the Health Step read it again once it
- * recorded the Health Agent's Corrections, so they are among those waiting.
- */
-function render(run: RunRecord, answers: AnswersResult | null, inbox: BrokerInboxResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, stages: PdStagesCheck | null, health: HealthResult | null, plan: PdPlan | null, states: BookStates | null, todos: { step: string; todo: string }[]): string {
+/** What the Brief is written from: the Run, and what each earlier Step wrote (null: nothing). */
+interface Inputs {
+  run: RunRecord
+  answers: AnswersResult | null
+  inbox: BrokerInboxResult | null
+  marketSmith: PdMarketSmith | null
+  lake: LakeResult | null
+  /** The Lake's status as the Lake Step read it. */
+  status: PdStatus | null
+  /** The Lake's status as the Health Step read it again once it recorded the Health Agent's Corrections, so they are among those waiting. */
+  latest: PdStatus | null
+  stages: PdStagesCheck | null
+  health: HealthResult | null
+  plan: PdPlan | null
+  states: BookStates | null
+  check: CheckResult | null
+  paperBooks: PdPaperBooks | null
+  todos: { step: string; todo: string }[]
+}
+
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, check, paperBooks, todos }: Inputs): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   return `<!doctype html>
@@ -610,6 +747,8 @@ ${todosSection(todos)}
 ${stagesSection(run, stages)}
 ${booksSection(run, inbox)}
 ${plansSection(run, plan, states)}
+${checkSection(run, check)}
+${paperBooksSection(run, paperBooks)}
 ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
@@ -627,6 +766,24 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<BrokerInboxResult>('broker-inbox.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<PdStagesCheck>('stages.json'), read<HealthResult>('health.json'), read<PdPlan>('plan.json'), read<BookStates>('book-states.json'), readTodos(runFolder)))
+  writeText(
+    out,
+    render({
+      run: readRun(runId),
+      answers: read<AnswersResult>('answers.json'),
+      inbox: read<BrokerInboxResult>('broker-inbox.json'),
+      marketSmith: read<PdMarketSmith>('marketsmith.json'),
+      lake: read<LakeResult>('lake.json'),
+      status: read<PdStatus>(join('lake', 'status.json')),
+      latest: read<PdStatus>(join('health', 'status.json')),
+      stages: read<PdStagesCheck>('stages.json'),
+      health: read<HealthResult>('health.json'),
+      plan: read<PdPlan>('plan.json'),
+      states: read<BookStates>('book-states.json'),
+      check: read<CheckResult>('check.json'),
+      paperBooks: read<PdPaperBooks>('paper-books.json'),
+      todos: readTodos(runFolder),
+    }),
+  )
   console.log(`Wrote ${out}`)
 })

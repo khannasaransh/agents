@@ -25,7 +25,9 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     'book-holdings': { example: 'book-holdings.empty.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
-    'book-state': { example: 'book-state.india.json' },
+    'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
+    check: { example: 'check.recorded.json' },
+    'paper-books': { example: 'paper-books.json' },
   })
 
   const result = await ws.agents('run', 'stocks', '--dry-run')
@@ -46,12 +48,23 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['stages', 'succeeded'],
       ['health', 'skipped'],
       ['plan', 'succeeded'],
+      ['check', 'succeeded'],
       ['brief', 'succeeded'],
     ],
   )
+  const states = ['IN', 'US', 'HK'].flatMap((book) => [['book-state', book, '--paper'], ['book-state', book, '--rules-only']])
   assert.deepEqual(
-    ws.pdCalls().map((call) => call.args),
-    [['book-holdings'], ['status'], ['stages', 'check', '--dry-run'], ['plan', '--on', id.slice(0, 10)], ['book-state', 'IN'], ['book-state', 'IN', '--paper'], ['book-state', 'US', '--paper'], ['book-state', 'HK', '--paper']],
+    ws.pdCalls().map((call) => call.args.map((arg) => (arg.endsWith('plan.json') ? 'plan.json' : arg))),
+    [
+      ['book-holdings'],
+      ['status'],
+      ['stages', 'check', '--dry-run'],
+      ['plan', '--on', id.slice(0, 10)],
+      ['book-state', 'IN'],
+      ...states,
+      ['check', '--plan', 'plan.json', '--run', id, '--dry-run'],
+      ['paper-books'],
+    ],
     'nothing in ash_new is recorded, refreshed or cleared',
   )
   assert.match(result.stdout, new RegExp(`Brief: .*${id}[\\\\/]brief\\.html`))
@@ -69,7 +82,9 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     status: { example: 'status.hold.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
-    'book-state': { example: 'book-state.india.json' },
+    'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
+    check: { example: 'check.recorded.json' },
+    'paper-books': { example: 'paper-books.json' },
   })
 
   const result = await ws.agents('run', 'stocks')
@@ -91,6 +106,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['stages', 'succeeded'],
       ['health', 'failed'],
       ['plan', 'succeeded'],
+      ['check', 'succeeded'],
       ['brief', 'succeeded'],
     ],
   )

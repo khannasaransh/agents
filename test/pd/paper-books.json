@@ -1,0 +1,172 @@
+{
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "market": "IN",
+      "currency": "INR",
+      "paper": {
+        "started_on": "2026-10-26",
+        "as_of": "2026-10-27",
+        "value": 1003412.5,
+        "cash": 721090.4,
+        "invested": 1000000.0,
+        "nav": 100.34125,
+        "peak": 100.6,
+        "drawdown": -0.0025720675944332916,
+        "buying": true,
+        "halved": false,
+        "lists_waiting": [],
+        "orders_waiting": 0
+      },
+      "rules_only": {
+        "started_on": "2026-10-26",
+        "as_of": "2026-10-27",
+        "value": 1001980.0,
+        "cash": 720100.0,
+        "invested": 1000000.0,
+        "nav": 100.198,
+        "peak": 100.6,
+        "drawdown": -0.003996023856858821,
+        "buying": true,
+        "halved": false,
+        "lists_waiting": [],
+        "orders_waiting": 0
+      },
+      "gap": {
+        "value": 1432.5,
+        "share": 0.0014296692548754208
+      },
+      "breakers": {
+        "no_new_buys_at": -0.1,
+        "halve_exposure_at": -0.18
+      },
+      "sleeves": [
+        {
+          "strategy_id": "in-super30-ok-tuned",
+          "version": "3f9a1c2b7d40",
+          "stage": "paper",
+          "stage_name": "Paper",
+          "since": "2026-10-26",
+          "value": 182322.1
+        }
+      ],
+      "gold": 100000.2,
+      "risk_per_trade": 0.01,
+      "stops_at_risk": [
+        {
+          "sleeve": "in-super30-ok-tuned",
+          "security_id": "IN:RELIANCE",
+          "name": "Reliance Industries Ltd.",
+          "qty": 65,
+          "close": 1452.3,
+          "stop": 1234.46,
+          "loss": 14159.6,
+          "share": 0.01411
+        }
+      ]
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "market": "US",
+      "currency": "USD",
+      "paper": {
+        "started_on": null,
+        "as_of": null,
+        "value": 100000.0,
+        "cash": 100000.0,
+        "invested": 100000.0,
+        "nav": 100.0,
+        "peak": 100.0,
+        "drawdown": 0.0,
+        "buying": true,
+        "halved": false,
+        "lists_waiting": [],
+        "orders_waiting": 0
+      },
+      "rules_only": {
+        "started_on": null,
+        "as_of": null,
+        "value": 100000.0,
+        "cash": 100000.0,
+        "invested": 100000.0,
+        "nav": 100.0,
+        "peak": 100.0,
+        "drawdown": 0.0,
+        "buying": true,
+        "halved": false,
+        "lists_waiting": [],
+        "orders_waiting": 0
+      },
+      "gap": {
+        "value": 0.0,
+        "share": 0.0
+      },
+      "breakers": {
+        "no_new_buys_at": -0.1,
+        "halve_exposure_at": -0.18
+      },
+      "sleeves": [],
+      "gold": null,
+      "risk_per_trade": 0.01,
+      "stops_at_risk": []
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "market": "HK",
+      "currency": "HKD",
+      "paper": {
+        "started_on": null,
+        "as_of": null,
+        "value": 1000000.0,
+        "cash": 1000000.0,
+        "invested": 1000000.0,
+        "nav": 100.0,
+        "peak": 100.0,
+        "drawdown": 0.0,
+        "buying": true,
+        "halved": false,
+        "lists_waiting": [],
+        "orders_waiting": 0
+      },
+      "rules_only": {
+        "started_on": null,
+        "as_of": null,
+        "value": 1000000.0,
+        "cash": 1000000.0,
+        "invested": 1000000.0,
+        "nav": 100.0,
+        "peak": 100.0,
+        "drawdown": 0.0,
+        "buying": true,
+        "halved": false,
+        "lists_waiting": [],
+        "orders_waiting": 0
+      },
+      "gap": {
+        "value": 0.0,
+        "share": 0.0
+      },
+      "breakers": {
+        "no_new_buys_at": -0.1,
+        "halve_exposure_at": -0.18
+      },
+      "sleeves": [],
+      "gold": null,
+      "risk_per_trade": 0.01,
+      "stops_at_risk": []
+    }
+  ],
+  "combined": {
+    "currency": "INR",
+    "value": 21173412.5,
+    "rates": {
+      "INR": 1.0,
+      "USD": 88.2,
+      "HKD": 11.35
+    },
+    "missing": []
+  }
+}

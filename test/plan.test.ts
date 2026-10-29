@@ -18,9 +18,9 @@ function prepare({ dryRun = false } = {}) {
 const example = (name: string) => JSON.parse(readFileSync(join(pdExamples, name), 'utf8'))
 const status = () => JSON.parse(ws.readRunFile(runId, 'run.json')).steps.find((s: { name: string }) => s.name === 'plan').status
 
-test("the Plan Step records the Rule plans for the Run's day, then reads the state of each plan's Book, a paper Book's apart", async () => {
+test("the Plan Step records the Rule plans for the Run's day, then reads the state of each plan's Book, its paper Books' apart", async () => {
   prepare()
-  ws.setPd({ plan: { example: 'plan.normal.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }] })
+  ws.setPd({ plan: { example: 'plan.normal.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }] })
 
   const result = await ws.agents('step', 'plan', '--run', runId)
 
@@ -32,16 +32,20 @@ test("the Plan Step records the Rule plans for the Run's day, then reads the sta
       ['plan', '--on', '2026-10-27'],
       ['book-state', 'IN'],
       ['book-state', 'IN', '--paper'],
+      ['book-state', 'IN', '--rules-only'],
       ['book-state', 'US', '--paper'],
+      ['book-state', 'US', '--rules-only'],
       ['book-state', 'HK', '--paper'],
+      ['book-state', 'HK', '--rules-only'],
     ],
   )
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'plan.json')), example('plan.normal.json'))
   const states = JSON.parse(ws.readRunFile(runId, 'book-states.json')).states
-  assert.deepEqual(states.slice(0, 2), [example('book-state.india.json'), example('book-state.paper.json')])
+  assert.deepEqual(states.slice(0, 3), [example('book-state.india.json'), example('book-state.paper.json'), example('book-state.rules-only.json')])
   const log = ws.readRunFile(runId, 'logs', 'plan.log')
   assert.match(log, /India Book: shadow Rule plan for 2026-10-26, 2 orders, made from state fa1dba342bad/)
   assert.match(log, /India Book's paper Book: Rule plan for 2026-10-26, 3 orders, made from state 53f848d353e2/)
+  assert.match(log, /India Book's rules-only paper Book: Rule plan for 2026-10-26, 3 orders, made from state 7c1e0b5a93d2/)
   assert.match(log, /US Book's paper Book: no Rule plan: US has no panels yet/)
   assert.doesNotMatch(log, /the ledger changed/)
   assert.doesNotMatch(log, /Hold mode/)
@@ -49,7 +53,7 @@ test("the Plan Step records the Rule plans for the Run's day, then reads the sta
 
 test('on a day the Data gate fails, the log says every plan is in Hold mode', async () => {
   prepare()
-  ws.setPd({ plan: { example: 'plan.hold.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }] })
+  ws.setPd({ plan: { example: 'plan.hold.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }] })
 
   const result = await ws.agents('step', 'plan', '--run', runId)
 
@@ -61,7 +65,7 @@ test('on a day the Data gate fails, the log says every plan is in Hold mode', as
 
 test("a plan ash_new couldn't make is recorded with why, and a state changed since its plan is said", async () => {
   prepare()
-  ws.setPd({ plan: { example: 'plan.cant-plan.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }] })
+  ws.setPd({ plan: { example: 'plan.cant-plan.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }] })
 
   const result = await ws.agents('step', 'plan', '--run', runId)
 
@@ -73,7 +77,7 @@ test("a plan ash_new couldn't make is recorded with why, and a state changed sin
 
 test('a dry run makes the plans as any Run does: neither command records anything', async () => {
   prepare({ dryRun: true })
-  ws.setPd({ plan: { example: 'plan.normal.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }] })
+  ws.setPd({ plan: { example: 'plan.normal.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }] })
 
   const result = await ws.agents('step', 'plan', '--run', runId)
 

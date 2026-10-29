@@ -112,6 +112,19 @@
       "mode": "normal",
       "status": "market_shut",
       "why": "Its market was shut on 2026-11-24, the session before the Run's day: no order for it"
+    },
+    {
+      "id": "61b8e2f0a9c3",
+      "book": "IN",
+      "name": "India Book's rules-only paper Book",
+      "kind": "rules_only",
+      "for_placing": false,
+      "state_id": "7c1e0b5a93d2",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "market_shut",
+      "why": "Its market was shut on 2026-11-24, the session before the Run's day: no order for it"
     }
   ]
 }

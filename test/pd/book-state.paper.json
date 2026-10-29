@@ -3,6 +3,7 @@
   "book": "IN",
   "name": "India Book's paper Book",
   "paper": true,
+  "rules_only": false,
   "market": "IN",
   "currency": "INR",
   "portfolio_id": null,
@@ -12,11 +13,13 @@
   },
   "capital": 1000000.0,
   "capital_set": false,
+  "as_of": null,
   "cash": 1000000.0,
   "holdings": [],
   "reconciliation": null,
   "unsettled": [],
   "open_orders": [],
   "reserved": 0.0,
-  "stops": []
+  "stops": [],
+  "engine": null
 }

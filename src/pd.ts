@@ -229,14 +229,20 @@ export interface PdStagesCheck {
 /**
  * What `pd book-state <book>` prints (contract/book-state.schema.json): what a real Book's Rule plan
  * starts from, with an id. Its cash is its capital with its ledger's money, since the brokers' files
- * hold none; every holding is Legacy until the Rule plan's orders are recorded.
+ * hold none; every holding is Legacy until the Rule plan's orders are recorded. With --paper (or
+ * --rules-only), its paper Book's (or rules-only paper Book's): the Book engine's state on its last
+ * close filled, and the orders of its Order lists not yet filled.
  */
 export interface PdBookState {
   id: string
   book: 'IN' | 'US' | 'HK'
   name: string
-  /** A paper Book's state (`pd book-state <book> --paper`): all cash, its capital, until issue 33 records its fills. */
+  /** A paper Book's state (`pd book-state <book> --paper`, or `--rules-only`): its capital in cash before its first Order list fills. */
   paper: boolean
+  /** A rules-only paper Book's, which trades the Rule plan unchanged (a paper Book's state only). */
+  rules_only?: boolean
+  /** A paper Book's last close filled; null before its first Order list fills. */
+  as_of?: string | null
   market: string
   currency: string
   portfolio_id: number | null
@@ -248,9 +254,11 @@ export interface PdBookState {
   reconciliation: { as_of: string; file: string; matched: number } | null
   /** Reconciliation's open differences: neither bought nor sold on a signal until settled. */
   unsettled: { security_id: string | null; name: string | null; kind: PdReconciliation['differences'][number]['kind']; ledger_qty: number | null; broker_qty: number }[]
-  open_orders: unknown[]
+  /** A paper Book's: the orders of its Order lists not yet filled; a real Book's none until issue 42. */
+  open_orders: { id: string; session: string; sleeve: string; security_id: string; side: 'BUY' | 'SELL'; shares: number; limit: number | null }[]
+  /** The cash its open orders reserve: its buys' shares at their limits. */
   reserved: number
-  stops: unknown[]
+  stops: { sleeve: string; security_id: string; price: number }[]
 }
 
 /** A cut a rule made to an order: the rule (or why the Book mustn't trade it), the shares wanted and allowed. */
@@ -262,7 +270,7 @@ export interface PdCut {
 
 /** An order of a Rule plan, for the next session. */
 export interface PdPlanOrder {
-  /** <book>-<session>-<n>, or <book>-paper-<session>-<n> in a paper Book. */
+  /** <book>-<session>-<n>; <book>-paper-<session>-<n> in a paper Book, <book>-rules-<session>-<n> in a rules-only one. */
   id: string
   book: 'IN' | 'US' | 'HK'
   /** Its strategy's id, or gold. */
@@ -283,6 +291,9 @@ export interface PdPlanOrder {
   cuts: PdCut[]
 }
 
+/** The kinds of Rule plan: a real Book's shadow plan, a paper Book's and a rules-only paper Book's. */
+export type PdPlanKind = 'shadow' | 'paper' | 'rules_only'
+
 /** A Book's Rule plan, as `pd plan` prints it: planned, or why it couldn't be. */
 export interface PdRulePlan {
   id: string
@@ -290,9 +301,11 @@ export interface PdRulePlan {
   name: string
   /**
    * shadow: the real Book's, with one Sleeve, not for placing (issue 47); paper: the paper Book's, each
-   * strategy from Paper up at its full share, filled at the next open once issue 33 trades it (issue 32).
+   * strategy from Paper up at its full share (issue 32); rules_only: its rules-only paper Book's, the
+   * baseline the Portfolio Manager is judged against (issue 33). The Check Step records a paper and a
+   * rules-only plan as Order lists, filled at the next open.
    */
-  kind: 'shadow' | 'paper'
+  kind: PdPlanKind
   for_placing: boolean
   state_id: string
   mandate_version: string
@@ -369,6 +382,77 @@ export interface PdPlan {
   mode: 'normal' | 'hold'
   markets: PdMarketCondition[]
   plans: PdRulePlan[]
+}
+
+/** What became of a paper Book's Order list in `pd check`. */
+export interface PdOrderList {
+  book: 'IN' | 'US' | 'HK'
+  kind: 'paper' | 'rules_only'
+  name: string
+  plan_id: string
+  /** The session its orders are for; null without a plan. */
+  session: string | null
+  orders: number
+  /** unchanged: the same plan is recorded already; would_record: in a dry run. */
+  status: 'recorded' | 'unchanged' | 'not_recorded' | 'would_record'
+  why: string | null
+  /** The orders of the session's earlier list it superseded. */
+  superseded: number
+}
+
+/**
+ * What `pd check --plan <file>` prints (contract/check.schema.json): the final Order lists recorded
+ * for the paper Books to fill at the next open, each paper Book's Rule plan unchanged until issue 34.
+ */
+export interface PdCheck {
+  on: string
+  run: string | null
+  dry_run: boolean
+  lists: PdOrderList[]
+}
+
+/** A paper Book on its last close filled, or its capital before its first Order list fills. */
+export interface PdPaperStanding {
+  started_on: string | null
+  as_of: string | null
+  value: number
+  cash: number
+  invested: number
+  nav: number
+  peak: number
+  /** Its value per unit against its highest close: 0 or less. */
+  drawdown: number
+  /** False while the first breaker stops new buys. */
+  buying: boolean
+  /** True while the second breaker halves its exposure. */
+  halved: boolean
+  lists_waiting: string[]
+  orders_waiting: number
+}
+
+/** A Book's paper Books, as `pd paper-books` gives them. */
+export interface PdPaperBook {
+  book: 'IN' | 'US' | 'HK'
+  name: string
+  market: string
+  currency: string
+  paper: PdPaperStanding
+  rules_only: PdPaperStanding
+  /** The paper Book's value less its rules-only paper Book's: what judgement added (ADR 0004). */
+  gap: { value: number; share: number } | null
+  breakers: { no_new_buys_at: number; halve_exposure_at: number }
+  sleeves: { strategy_id: string; version: string; stage: PdStage; stage_name: string; since: string; value: number | null }[]
+  gold: number | null
+  risk_per_trade: number
+  /** The positions whose Disaster stop would lose more than risk_per_trade of the paper Book. */
+  stops_at_risk: { sleeve: string; security_id: string; name: string | null; qty: number; close: number; stop: number; loss: number; share: number }[]
+}
+
+/** What `pd paper-books` prints (contract/paper-books.schema.json): how each Book's paper Books stand. */
+export interface PdPaperBooks {
+  books: PdPaperBook[]
+  /** The paper Books' values together in rupees; a Book whose currency has no rate is missing. */
+  combined: { currency: string; value: number; rates: Record<string, number>; missing: ('IN' | 'US' | 'HK')[] }
 }
 
 /**

@@ -1,0 +1,73 @@
+{
+  "on": "2026-10-27",
+  "run": "2026-10-27-0930",
+  "dry_run": true,
+  "lists": [
+    {
+      "book": "IN",
+      "kind": "paper",
+      "name": "India Book's paper Book",
+      "plan_id": "4115e6534e70",
+      "session": "2026-10-26",
+      "orders": 3,
+      "status": "would_record",
+      "why": null,
+      "superseded": 0
+    },
+    {
+      "book": "IN",
+      "kind": "rules_only",
+      "name": "India Book's rules-only paper Book",
+      "plan_id": "9d04c6e1a7b2",
+      "session": "2026-10-26",
+      "orders": 3,
+      "status": "would_record",
+      "why": null,
+      "superseded": 0
+    },
+    {
+      "book": "US",
+      "kind": "paper",
+      "name": "US Book's paper Book",
+      "plan_id": "17c7cf722c9f",
+      "session": null,
+      "orders": 0,
+      "status": "not_recorded",
+      "why": "It has no Rule plan: US has no panels yet: run `pd build-panels` (or refresh the data)",
+      "superseded": 0
+    },
+    {
+      "book": "US",
+      "kind": "rules_only",
+      "name": "US Book's rules-only paper Book",
+      "plan_id": "c3e1f07a5d68",
+      "session": null,
+      "orders": 0,
+      "status": "not_recorded",
+      "why": "It has no Rule plan: US has no panels yet: run `pd build-panels` (or refresh the data)",
+      "superseded": 0
+    },
+    {
+      "book": "HK",
+      "kind": "paper",
+      "name": "Hong Kong Book's paper Book",
+      "plan_id": "e194bc2dc93f",
+      "session": null,
+      "orders": 0,
+      "status": "not_recorded",
+      "why": "It has no Rule plan: HK has no panels yet: run `pd build-panels` (or refresh the data)",
+      "superseded": 0
+    },
+    {
+      "book": "HK",
+      "kind": "rules_only",
+      "name": "Hong Kong Book's rules-only paper Book",
+      "plan_id": "5ab2e9d0c471",
+      "session": null,
+      "orders": 0,
+      "status": "not_recorded",
+      "why": "It has no Rule plan: HK has no panels yet: run `pd build-panels` (or refresh the data)",
+      "superseded": 0
+    }
+  ]
+}

@@ -333,6 +333,131 @@
       "left_out": []
     },
     {
+      "id": "9d04c6e1a7b2",
+      "book": "IN",
+      "name": "India Book's rules-only paper Book",
+      "kind": "rules_only",
+      "for_placing": false,
+      "state_id": "7c1e0b5a93d2",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "planned",
+      "why": null,
+      "exposure": {
+        "condition": "correction",
+        "level": 0.4
+      },
+      "market": "IN",
+      "currency": "INR",
+      "as_of": "2026-10-23",
+      "session": "2026-10-26",
+      "data_version": "2026-10-23.70c27d24c7a7",
+      "book_data_version": "2026-10-23.4be1f0c9d2e8",
+      "strategies": [
+        {
+          "id": "in-super30-ok-tuned",
+          "name": "India Super 30 OK, tuned",
+          "version": "9d149a9b53a9",
+          "stage": "paper",
+          "disaster_stop": 0.15
+        }
+      ],
+      "value": 1000000.0,
+      "cash": 1000000.0,
+      "legacy": [],
+      "weights": {
+        "in-super30-ok-tuned": 0.9,
+        "gold": 0.1
+      },
+      "not_traded": [],
+      "orders": [
+        {
+          "id": "IN-rules-2026-10-26-001",
+          "book": "IN",
+          "sleeve": "in-super30-ok-tuned",
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "side": "BUY",
+          "shares": 865,
+          "price": 173.3845,
+          "value": 149977.5925,
+          "limit": 178.5861,
+          "reason": "first_allocation",
+          "signal": {
+            "kind": "holding",
+            "weight": 0.125
+          },
+          "cuts": [
+            {
+              "rule": "position_cap",
+              "wanted": 2684.0,
+              "allowed": 865.1292358890212
+            }
+          ]
+        },
+        {
+          "id": "IN-rules-2026-10-26-002",
+          "book": "IN",
+          "sleeve": "in-super30-ok-tuned",
+          "security_id": "IN:STOVEKRAFT",
+          "name": "Stove Kraft Ltd",
+          "side": "BUY",
+          "shares": 2398,
+          "price": 62.5193,
+          "value": 149921.2814,
+          "limit": 64.3949,
+          "reason": "first_allocation",
+          "signal": {
+            "kind": "holding",
+            "weight": 0.125
+          },
+          "cuts": [
+            {
+              "rule": "position_cap",
+              "wanted": 6886.0,
+              "allowed": 2398.129185864967
+            }
+          ]
+        },
+        {
+          "id": "IN-rules-2026-10-26-003",
+          "book": "IN",
+          "sleeve": "gold",
+          "security_id": "IN:GOLD1",
+          "name": null,
+          "side": "BUY",
+          "shares": 2484,
+          "price": 40.0,
+          "value": 99360.0,
+          "limit": 41.2,
+          "reason": "first_allocation",
+          "signal": null,
+          "cuts": []
+        }
+      ],
+      "dropped": [],
+      "stops": [
+        {
+          "sleeve": "in-super30-ok-tuned",
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "price": 147.3768,
+          "was": null
+        },
+        {
+          "sleeve": "in-super30-ok-tuned",
+          "security_id": "IN:STOVEKRAFT",
+          "name": "Stove Kraft Ltd",
+          "price": 53.1414,
+          "was": null
+        }
+      ],
+      "buys": 399258.8739,
+      "sales": 0,
+      "left_out": []
+    },
+    {
       "id": "17c7cf722c9f",
       "book": "US",
       "name": "US Book's paper Book",
@@ -346,10 +471,36 @@
       "why": "US has no panels yet: run `pd build-panels` (or refresh the data)"
     },
     {
+      "id": "c3e1f07a5d68",
+      "book": "US",
+      "name": "US Book's rules-only paper Book",
+      "kind": "rules_only",
+      "for_placing": false,
+      "state_id": "4d3b34f8ef2e",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "cant_plan",
+      "why": "US has no panels yet: run `pd build-panels` (or refresh the data)"
+    },
+    {
       "id": "e194bc2dc93f",
       "book": "HK",
       "name": "Hong Kong Book's paper Book",
       "kind": "paper",
+      "for_placing": false,
+      "state_id": "09b2b5b8ae32",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "cant_plan",
+      "why": "HK has no panels yet: run `pd build-panels` (or refresh the data)"
+    },
+    {
+      "id": "5ab2e9d0c471",
+      "book": "HK",
+      "name": "Hong Kong Book's rules-only paper Book",
+      "kind": "rules_only",
       "for_placing": false,
       "state_id": "09b2b5b8ae32",
       "mandate_version": "f99c88f13b5b",

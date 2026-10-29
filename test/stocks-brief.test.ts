@@ -457,10 +457,11 @@ test("a Stages Step that failed leaves a Sleeves and Stages section saying so", 
   assert.match(page, /Sleeves and Stages The Books' Sleeves couldn't be read in this Run\. See the Stages Step's log: logs\/stages\.log/)
 })
 
-/** The Plan Step's files: a plan example, and the real and paper Book states it was made from. */
+/** The Plan Step's files: a plan example, and the real, paper and rules-only paper Book states it was made from. */
 function planned(example_: string) {
   ws.writeRunFile(runId, 'plan.json', example(example_))
-  ws.writeRunFile(runId, 'book-states.json', JSON.stringify({ states: [JSON.parse(example('book-state.india.json')), JSON.parse(example('book-state.paper.json'))] }))
+  const states = ['book-state.india.json', 'book-state.paper.json', 'book-state.rules-only.json'].map((name) => JSON.parse(example(name)))
+  ws.writeRunFile(runId, 'book-states.json', JSON.stringify({ states }))
 }
 
 test("the India Book's state is shown beside its shadow Rule plan, with each order's signal and cut, none of it for placing", async () => {
@@ -491,13 +492,69 @@ test("each paper Book's Rule plan is shown beside its state, its strategies from
   const page = text(await brief())
 
   assert.match(page, /India Book's paper Book: its Rule plan for 2026-10-26 The paper Book holds each strategy from Paper up at its full share/)
-  assert.match(page, /The Book state 53f848d353e2 ₹10,00,000 in cash: its capital, ₹10,00,000 until you set it \(its market's cost preset's\), all of it in cash until issue 33 records its fills\./)
+  assert.match(page, /The Book state 53f848d353e2 ₹10,00,000 in cash: its capital, ₹10,00,000 until you set it \(its market's cost preset's\), all of it in cash until its first Order list fills\./)
   assert.match(page, /India Super 30 OK, tuned \(in-super30-ok-tuned, version 9d149a9b53a9, Paper\), its Disaster stops 15% under/)
   assert.match(page, /India Super 30 OK, tuned 90%, gold 10%/)
   assert.match(page, /IN-paper-2026-10-26-001 Rategain Travel Technologies Ltd IN:RATEGAIN Buy 865 ₹173\.38 ₹178\.59 India Super 30 OK, tuned holds it at 12\.5% on the close of 2026-10-23 cut from \d+ to 865 shares by the position cap Not for placing/)
   // The US and Hong Kong paper Books say why they have no plan.
   assert.match(page, /US Book's paper Book No Rule plan could be made: US has no panels yet/)
   assert.ok(page.indexOf('India Book in shadow') < page.indexOf("India Book's paper Book: its Rule plan"), 'the shadow plan comes first')
+  // Its rules-only paper Book's plan follows it, short while it makes the same orders.
+  assert.match(page, /India Book's rules-only paper Book: its Rule plan for 2026-10-26 The rules-only paper Book starts with the paper Book .* The Rule plan 9d04c6e1a7b2, made from its Book state 7c1e0b5a93d2: 3 orders, buys of ₹\S+ and sales of ₹0, the same as its paper Book's\./)
+  assert.doesNotMatch(page, /IN-rules-2026-10-26-001/)
+  assert.ok(page.indexOf("India Book's paper Book: its Rule plan") < page.indexOf("India Book's rules-only paper Book"), 'the paper Book comes first')
+})
+
+test("a rules-only paper Book whose orders differ from its paper Book's shows them", async () => {
+  prepare()
+  planned('plan.normal.json')
+  const plan = JSON.parse(example('plan.normal.json'))
+  const rules = plan.plans.find((p: { kind: string; book: string }) => p.kind === 'rules_only' && p.book === 'IN')
+  rules.orders = rules.orders.slice(1)
+  ws.writeRunFile(runId, 'plan.json', plan)
+
+  const page = text(await brief())
+
+  assert.match(page, /made from its Book state 7c1e0b5a93d2: 2 orders, buys of ₹\S+ and sales of ₹0\. Id Security/)
+  assert.match(page, /IN-rules-2026-10-26-002/)
+})
+
+test('the Order lists the Check Step recorded are listed, or why none was', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'check.json', { check: JSON.parse(example('check.recorded.json')), why: null })
+
+  const page = text(await brief())
+
+  assert.match(page, /Order lists Each paper Book's Order list is its Rule plan unchanged until the Portfolio Manager changes it \(issue 34\)/)
+  assert.match(page, /India Book's paper Book 2026-10-26 3 Recorded India Book's rules-only paper Book 2026-10-26 3 Recorded/)
+  assert.match(page, /US Book's paper Book — 0 Not recorded: It has no Rule plan: US has no panels yet/)
+
+  ws.writeRunFile(runId, 'check.json', { check: null, why: 'the Plan Step failed, so there is no Rule plan to record' })
+  assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /Order lists No Order list was recorded in this Run: the Plan Step failed, so there is no Rule plan to record\./)
+})
+
+test('a dry run says no Order list was recorded', async () => {
+  prepare({ dryRun: true })
+  ws.writeRunFile(runId, 'check.json', { check: JSON.parse(example('check.dry-run.json')), why: null })
+
+  const page = text(await brief())
+
+  assert.match(page, /Order lists Dry run: nothing was recorded\./)
+  assert.match(page, /India Book's paper Book 2026-10-26 3 Would be recorded/)
+})
+
+test('each paper Book is shown against its rules-only paper Book, with its drawdown, Sleeves, riskiest stops and the Books together in rupees', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'paper-books.json', JSON.parse(example('paper-books.json')))
+
+  const page = text(await brief())
+
+  assert.match(page, /Paper Books Book Paper Book Rules-only paper Book Gap Drawdown/)
+  assert.match(page, /India Book ₹10,03,413 on 2026-10-27 ₹10,01,980 on 2026-10-27 ₹1,433 0\.1% -0\.3% breakers at -10% and -18%/)
+  assert.match(page, /US Book \$100,000 not started: all cash \$100,000 not started: all cash \$0 0% 0%/)
+  assert.match(page, /The paper Books together: ₹2,11,73,413, at USD at ₹88\.20 and HKD at ₹11\.35\./)
+  assert.match(page, /India Book's paper Book Its Sleeves: in-super30-ok-tuned in Paper since 2026-10-26: ₹1,82,322; gold: ₹1,00,000\./)
+  assert.match(page, /Disaster stops that would lose more than 1% of the Book: Reliance Industries Ltd\. \(IN:RELIANCE\): 65 shares at ₹1,452\.30, its stop at ₹1,234\.46, would lose ₹14,160, 1\.4% of the Book/)
 })
 
 test('on a day the Data gate fails, every Rule plan is in Hold mode and makes no order', async () => {
