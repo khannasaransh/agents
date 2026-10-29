@@ -1,6 +1,6 @@
 // Rule plans, as the Stocks Brief words them: why each order was placed, the signal behind it, and
 // each cut a rule made to it.
-import type { PdCut, PdPlanOrder, PdRulePlan } from './pd.ts'
+import type { PdCondition, PdCut, PdPlanOrder, PdRulePlan } from './pd.ts'
 
 const rules: Record<string, string> = {
   position_cap: 'the position cap',
@@ -9,9 +9,20 @@ const rules: Record<string, string> = {
   limit_price: 'its limit price',
   no_new_buys: 'the breakers (no new buys)',
   half_exposure: 'the breakers (half exposure)',
+  exposure_level: 'the exposure level',
   unsettled: 'an open Reconciliation difference',
   quarantined: 'its Quarantine',
 }
+
+const conditions: Record<PdCondition, string> = { uptrend: 'Uptrend', under_pressure: 'Under pressure', correction: 'Correction' }
+
+const indices: Record<string, string> = { NIFTY500: 'the Nifty 500', SP500: 'the S&P 500' }
+
+/** Whose breadth it is: "of the Nifty 500", or "of the market" where the Lake keeps no index membership. */
+export const breadthOf = (index: string | null) => `of ${index === null ? 'the market' : (indices[index] ?? index)}`
+
+/** A Market condition as the glossary writes it: Uptrend, Under pressure, Correction. */
+export const conditionName = (condition: PdCondition) => conditions[condition]
 
 /** A rule as a sentence names it: "the position cap", "an open Reconciliation difference". */
 export const ruleName = (rule: string) => rules[rule] ?? rule.replaceAll('_', ' ')
@@ -30,6 +41,7 @@ const ownReasons: Record<string, string> = {
   reweighting: "The April weighting, resizing the Sleeve to its share",
   breaker: 'The breakers, trading the Sleeve back to its strategy or selling it down',
   disaster_stop: 'Its Disaster stop, which the last close is under',
+  exposure: 'The exposure level, trimming the weakest holdings first',
 }
 
 /**

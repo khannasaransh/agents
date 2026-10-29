@@ -29,7 +29,7 @@
   "data_version": "2018-12-31.4cecefb2b497",
   "book_data_version": "2018-12-31.faf5123fa00f",
   "engine_version": 17,
-  "book_engine_version": 3,
+  "book_engine_version": 4,
   "paper": false,
   "strategies": [
     {
@@ -250,13 +250,13 @@
       "orders": 39,
       "value": 2742569.918364514,
       "without": {
-        "cagr": 0.20555669277972366,
-        "max_drawdown": -0.087701209995805,
-        "end_value": 1452251.5791350799
+        "cagr": 0.20085609176103425,
+        "max_drawdown": -0.08766364466487586,
+        "end_value": 1440971.7925053558
       },
       "effect": {
-        "cagr": -0.05437691536664313,
-        "max_drawdown": 0.021290980747961652
+        "cagr": -0.04967631434795372,
+        "max_drawdown": 0.021253415417032517
       }
     },
     "sector_cap": {
@@ -409,18 +409,46 @@
         "cagr": -0.011427789988972759,
         "max_drawdown": 0.007816920737751198
       }
+    },
+    "exposure_level": {
+      "orders": 0,
+      "value": 0.0,
+      "trims": {
+        "orders": 0,
+        "value": 0.0
+      },
+      "levels": {
+        "uptrend": 1.0,
+        "under_pressure": 0.8,
+        "correction": 0.4
+      },
+      "sessions": {
+        "uptrend": 358,
+        "under_pressure": 164,
+        "correction": 0
+      },
+      "without": {
+        "cagr": 0.15117977741308053,
+        "max_drawdown": -0.06641022924784334,
+        "end_value": 1324448.8860369844
+      },
+      "effect": {
+        "cagr": 0.0,
+        "max_drawdown": 0.0
+      }
     }
   },
   "caveats": [
     "The benchmark, ^CRSLDX, is compared as its price index: the lake hasn't its total-return levels over the range, so its dividends are left out and the Book's lead over it is overstated",
-    "Not yet in the Book backtest: the exposure level (the breakers halve all of the Book, not the Market condition's level; agents issue 46)",
+    "The exposure level for each Market condition (100%, 80% and 40% until Saransh sets them) and the condition's thresholds are placeholders; the market's shares traded together stand in for its index's volume in counting distribution days",
+    "Over its exposure level, the Book trims its weakest holdings at each open: stocks rising back over it are trimmed again the next session, a little at a time",
     "Disaster stops are tested on daily bars, each in place from its entry's own session: a low at or under one sells the whole holding at it, or at the open when the price opens under it, with the preset's slippage and no more. A stock a stop sold is bought back only when its strategy trades it again or the breakers' buying back buys it",
     "Each strategy keeps its Stage over the whole range: no promotions or demotions",
     "The limit tolerance, 3% over the last close, is a placeholder until Saransh sets the India Book's",
     "The caps' room goes to the Sleeves in the order their strategies are named: the first named buys first, and a later one's buy is cut to what is left",
     "A buy a rule cuts isn't bought later: its money waits in the cash fund until the strategy trades the stock again, the next weighting or, after the breakers, buys resume",
     "Sectors are today's (the securities table's), as the strategies' own are",
-    "The cash fund earns one risk-free rate, 7.00% a year, throughout, and so does the cash waiting in the Sleeves, in fractions and without costs: years when bills paid less (2011–2016 and 2020–2021 in the US) earn more than they did",
+    "The cash fund earns one risk-free rate, 7.00% a year, throughout, and so does the cash waiting in the Sleeves, in fractions and without costs: years when bills paid less (2011\u20132016 and 2020\u20132021 in the US) earn more than they did",
     "Each Sleeve buys what its strategy holds on the Book's first close at the next open, so it starts from the strategy's track rather than with its first rebalance"
   ]
 }

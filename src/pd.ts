@@ -292,6 +292,8 @@ export interface PdRulePlan {
   mandate_version: string
   status: 'planned' | 'cant_plan'
   why: string | null
+  /** The exposure level its session trades under, which its market's condition on the last close sets. */
+  exposure?: { condition: PdCondition; level: number } | null
   market?: string
   currency?: string
   /** The last session: the plan knows the data to its close. */
@@ -316,9 +318,41 @@ export interface PdRulePlan {
   sales?: number
 }
 
-/** What `pd plan` prints (contract/plan.schema.json): each Book's Rule plan for the Run's day. */
+/** A market's Market condition, as ash_new reads it from the Lake (issue 46). */
+export type PdCondition = 'uptrend' | 'under_pressure' | 'correction'
+
+/** A Book's market's condition on the last close, the exposure level it sets the Book, and MarketSmith's outlook beside it. */
+export interface PdMarketCondition {
+  market: string
+  book: 'IN' | 'US' | 'HK'
+  book_name: string
+  status: 'read' | 'cant_read'
+  why: string | null
+  reading: {
+    date: string
+    condition: PdCondition
+    /** The Book's benchmark. */
+    index: string
+    close: number | null
+    short_average: number | null
+    long_average: number | null
+    /** The share of the index's members (or the market's securities) above their own 200-day average. */
+    breadth: number | null
+    /** The index whose members breadth was measured over (NIFTY500, SP500); null: the whole market's. */
+    breadth_of: string | null
+    distribution_days: number
+  } | null
+  /** The most of the Book in stocks the condition sets for the next session. */
+  exposure_level: number | null
+  levels: Record<PdCondition, number>
+  /** MarketSmith's own outlook from its latest snapshot, deciding nothing; outlook null when the snapshot hasn't one. */
+  marketsmith: { snapshot: string; day: string; outlook: string | null } | null
+}
+
+/** What `pd plan` prints (contract/plan.schema.json): each market's condition, and each Book's Rule plan for the Run's day. */
 export interface PdPlan {
   on: string
+  markets: PdMarketCondition[]
   plans: PdRulePlan[]
 }
 

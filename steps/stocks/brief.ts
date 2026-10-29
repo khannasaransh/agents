@@ -6,7 +6,8 @@
 // approval into Paper; each market's latest session in the Lake against its last finished one; the
 // To-dos the Steps raised; each Book's Sleeves with their Stages and how long each has been in its
 // Stage; each Book's real holdings and value, its latest Reconciliation's differences and this Run's
-// Broker inbox files; the India Book's state beside its shadow Rule plan, every order of it marked not
+// Broker inbox files; each market's Market condition with MarketSmith's outlook beside it and each
+// Book's exposure level; the India Book's state beside its shadow Rule plan, every order of it marked not
 // for placing; on Saturdays, what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
 // the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
@@ -21,7 +22,7 @@ import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import type { PdBook, PdBookState, PdMarketSmith, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
-import { cutText, percent, ruleName, signalText } from '../../src/plans.ts'
+import { breadthOf, conditionName, cutText, percent, ruleName, signalText } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
 import { runAsStep } from '../../src/step.ts'
@@ -410,6 +411,9 @@ function shadowPart(plan: PdRulePlan, state: PdBookState | undefined): string {
   const nameOf = (sleeve: string) => (sleeve === 'gold' ? 'gold' : (plan.strategies?.find((s) => s.id === sleeve)?.name ?? sleeve))
   const strategies = (plan.strategies ?? []).map((s) => `${esc(s.name)} (${esc(s.id)}, version ${esc(s.version)}), its Disaster stops ${percent(s.disaster_stop)} under`).join('; ')
   const weights = Object.entries(plan.weights ?? {}).map(([sleeve, w]) => `${esc(nameOf(sleeve))} ${percent(w)}`)
+  const exposure = plan.exposure
+    ? `<p>It trades under the ${esc(plan.name)}'s exposure level of ${percent(plan.exposure.level)}, which its market's ${esc(conditionName(plan.exposure.condition))} on the last close sets.</p>`
+    : ''
   const madeFrom = `Made from the Book state ${esc(plan.state_id)}, the data to ${esc(plan.as_of ?? '')}'s close (version ${esc(plan.data_version ?? '')}), ${strategies}, and the Mandate's version ${esc(plan.mandate_version)}.`
   const dropped = (plan.dropped ?? []).map((d) => `${esc(d.name ?? d.security_id)} (${esc(d.security_id)}): a ${d.side === 'BUY' ? 'buy' : 'sale'} of ${esc(shares(d.wanted))} shares stopped by ${esc(ruleName(d.rule))}`)
   const stops = (plan.stops ?? []).map((s) => `${esc(s.name ?? s.security_id)} (${esc(s.security_id)}): ${s.was === null ? 'place at' : `raise from ${esc(money(s.was, currency, 2))} to`} ${esc(money(s.price, currency, 2))}`)
@@ -420,6 +424,7 @@ function shadowPart(plan: PdRulePlan, state: PdBookState | undefined): string {
     statePart(state),
     `<h3>The shadow Rule plan ${esc(plan.id)}</h3>`,
     `<p>${madeFrom}</p>`,
+    exposure,
     `<p>${esc(money(plan.cash ?? 0, currency))} shared out${weights.length ? `: ${weights.join(', ')}` : ''}; the Book worth ${esc(money(plan.value ?? 0, currency))} on the last close. Buys of ${esc(money(plan.buys ?? 0, currency))}, sales of ${esc(money(plan.sales ?? 0, currency))}.</p>`,
     ordersPart(plan),
     ...(dropped.length ? ['<p>Stopped by a rule, so not in the plan:</p>', list(dropped)] : []),
@@ -429,14 +434,44 @@ function shadowPart(plan: PdRulePlan, state: PdBookState | undefined): string {
   ].join('\n')
 }
 
+/** An index's level as a table gives it: 21,427.6. */
+const level = (n: number | null) => (n === null ? '—' : n.toLocaleString('en-US', { maximumFractionDigits: 1 }))
+
+/** Each market's Market condition, MarketSmith's outlook beside it, and the exposure level it sets its Book. */
+function conditionsSection(plan: PdPlan): string {
+  const rows = plan.markets.map((m) => {
+    const r = m.reading
+    const outlook = m.marketsmith
+      ? `${m.marketsmith.outlook === null ? 'not in its snapshot' : esc(m.marketsmith.outlook)} <span class="muted">(${esc(m.marketsmith.snapshot)})</span>`
+      : 'no snapshot'
+    if (!r) return [esc(m.market), `Can't be read: ${esc(m.why ?? '')}`, '—', '—', '—', outlook, '—']
+    return [
+      esc(m.market),
+      esc(conditionName(r.condition)),
+      `${esc(r.index)} ${esc(level(r.close))}<br><span class="muted">50-day ${esc(level(r.short_average))}, 200-day ${esc(level(r.long_average))}</span>`,
+      r.breadth === null ? '—' : esc(`${percent(r.breadth)} ${breadthOf(r.breadth_of)}`),
+      String(r.distribution_days),
+      outlook,
+      `${esc(m.book_name)}: ${percent(m.exposure_level ?? 1)}`,
+    ]
+  })
+  const day = plan.markets.find((m) => m.reading)?.reading?.date
+  return [
+    `<section><h2>Market condition${day ? ` on ${esc(day)}'s close` : ''}</h2>`,
+    table(['Market', 'Condition', 'Index against its averages', 'Breadth', 'Distribution days', "MarketSmith's outlook", 'Exposure level'], rows),
+    "<p class=\"muted\">Breadth is the share of the index's members (or the market's stocks, where the Lake keeps no membership) above their own 200-day average; a distribution day is a fall of the index of 0.2% or more on more volume than the day before, counted over 25 sessions. The exposure level is the most of the Book in stocks for the next session: over it, a Book makes no new buys and trims its weakest holdings first. Its levels (100%, 80% and 40%) and the thresholds are placeholders until you set them. MarketSmith's outlook decides nothing.</p>",
+    '</section>',
+  ].join('\n')
+}
+
 /**
- * Each Book's state beside its shadow Rule plan; that none was made when the Plan Step failed, and
- * nothing when it didn't run.
+ * Each market's condition, then each Book's state beside its shadow Rule plan; that none was made when
+ * the Plan Step failed, and nothing when it didn't run.
  */
 function plansSection(run: RunRecord, plan: PdPlan | null, states: BookStates | null): string {
   const step = run.steps.find((s) => s.name === 'plan')
   if (!plan) return step?.status === 'failed' ? `<section><h2>Rule plans</h2><p>No Rule plan was made in this Run. See the Plan Step's log: ${logLink(step.log ?? 'logs/plan.log')}</p></section>` : ''
-  return plan.plans.map((p) => shadowPart(p, states?.states.find((s) => s.book === p.book))).join('\n')
+  return [conditionsSection(plan), ...plan.plans.map((p) => shadowPart(p, states?.states.find((s) => s.book === p.book)))].join('\n')
 }
 
 /** What MarketSmith's fetch brought, on a Saturday: nothing on other days, when the Step skips itself. */

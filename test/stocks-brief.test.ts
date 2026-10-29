@@ -493,3 +493,17 @@ test("a shadow Rule plan ash_new couldn't make says why, and a Plan Step that fa
   ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'plan', status: 'failed' }, { name: 'brief', status: 'pending' }] })
   assert.match(text(await brief()), /Rule plans No Rule plan was made in this Run\. See the Plan Step's log: logs\/plan\.log/)
 })
+
+test("each market's Market condition is shown with MarketSmith's outlook beside it and each Book's exposure level", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'plan.json', example('plan.shadow.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /Market condition on 2026-10-23's close/)
+  assert.match(page, /IN Correction \^CRSLDX 21,427\.6 50-day 22,729\.5, 200-day 22,814\.1 27\.3% of the Nifty 500 11 not in its snapshot \(IN:2026-10-24\) India Book: 40%/)
+  assert.match(page, /US Under pressure \^GSPC 7,623\.7 50-day 7,699\.6, 200-day 7,291\.3 55\.4% of the S&P 500 5 no snapshot US Book: 80%/)
+  assert.match(page, /HK Correction .* 22\.2% of the market 8 no snapshot Hong Kong Book: 40%/)
+  assert.match(page, /It trades under the India Book's exposure level of 40%, which its market's Correction on the last close sets\./)
+  assert.ok(page.indexOf('Market condition') < page.indexOf('India Book in shadow'), 'the conditions come before the plans')
+})

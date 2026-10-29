@@ -1,5 +1,86 @@
 {
   "on": "2026-10-27",
+  "markets": [
+    {
+      "market": "IN",
+      "book": "IN",
+      "book_name": "India Book",
+      "levels": {
+        "uptrend": 1.0,
+        "under_pressure": 0.8,
+        "correction": 0.4
+      },
+      "marketsmith": {
+        "snapshot": "IN:2026-10-24",
+        "day": "2026-10-24",
+        "outlook": null
+      },
+      "status": "read",
+      "why": null,
+      "reading": {
+        "date": "2026-10-23",
+        "condition": "correction",
+        "index": "^CRSLDX",
+        "close": 21427.5996,
+        "short_average": 22729.511,
+        "long_average": 22814.1275,
+        "breadth": 0.2725,
+        "breadth_of": "NIFTY500",
+        "distribution_days": 11
+      },
+      "exposure_level": 0.4
+    },
+    {
+      "market": "US",
+      "book": "US",
+      "book_name": "US Book",
+      "levels": {
+        "uptrend": 1.0,
+        "under_pressure": 0.8,
+        "correction": 0.4
+      },
+      "marketsmith": null,
+      "status": "read",
+      "why": null,
+      "reading": {
+        "date": "2026-10-23",
+        "condition": "under_pressure",
+        "index": "^GSPC",
+        "close": 7623.6802,
+        "short_average": 7699.639,
+        "long_average": 7291.3149,
+        "breadth": 0.5542,
+        "breadth_of": "SP500",
+        "distribution_days": 5
+      },
+      "exposure_level": 0.8
+    },
+    {
+      "market": "HK",
+      "book": "HK",
+      "book_name": "Hong Kong Book",
+      "levels": {
+        "uptrend": 1.0,
+        "under_pressure": 0.8,
+        "correction": 0.4
+      },
+      "marketsmith": null,
+      "status": "read",
+      "why": null,
+      "reading": {
+        "date": "2026-10-23",
+        "condition": "correction",
+        "index": "^HSI",
+        "close": 23093.3691,
+        "short_average": 24802.5526,
+        "long_average": 25426.0833,
+        "breadth": 0.2219,
+        "breadth_of": null,
+        "distribution_days": 8
+      },
+      "exposure_level": 0.4
+    }
+  ],
   "plans": [
     {
       "id": "2e56e21e912e",
@@ -11,6 +92,10 @@
       "mandate_version": "f99c88f13b5b",
       "status": "planned",
       "why": null,
+      "exposure": {
+        "condition": "correction",
+        "level": 0.4
+      },
       "market": "IN",
       "currency": "INR",
       "as_of": "2026-10-23",
