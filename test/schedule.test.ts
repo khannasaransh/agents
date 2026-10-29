@@ -255,7 +255,7 @@ test('a scheduled start sets the environment the entry gives it before the Run s
       status: { example: 'status.healthy.json' },
       'book-holdings': { example: 'book-holdings.empty.json' },
       stages: { example: 'stages-check.empty.json' },
-      plan: { example: 'plan.shadow.json' },
+      plan: { example: 'plan.normal.json' },
       'book-state': { example: 'book-state.india.json' },
     })
     const elsewhere = join(ws.dataDir, '..', 'pinned-data')

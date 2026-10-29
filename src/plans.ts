@@ -1,6 +1,6 @@
 // Rule plans, as the Stocks Brief words them: why each order was placed, the signal behind it, and
 // each cut a rule made to it.
-import type { PdCondition, PdCut, PdPlanOrder, PdRulePlan } from './pd.ts'
+import type { PdBookState, PdCondition, PdCut, PdPlanOrder, PdRulePlan } from './pd.ts'
 
 const rules: Record<string, string> = {
   position_cap: 'the position cap',
@@ -12,6 +12,7 @@ const rules: Record<string, string> = {
   exposure_level: 'the exposure level',
   unsettled: 'an open Reconciliation difference',
   quarantined: 'its Quarantine',
+  hold: 'Hold mode',
 }
 
 const conditions: Record<PdCondition, string> = { uptrend: 'Uptrend', under_pressure: 'Under pressure', correction: 'Correction' }
@@ -62,3 +63,6 @@ export function signalText(order: PdPlanOrder, plan: PdRulePlan): string {
   }
   return ownReasons[order.reason] ?? order.reason.replaceAll('_', ' ')
 }
+
+/** The state a plan was made from: its Book's, or its paper Book's. */
+export const stateOf = (states: PdBookState[], plan: Pick<PdRulePlan, 'book' | 'kind'>) => states.find((s) => s.book === plan.book && s.paper === (plan.kind === 'paper'))

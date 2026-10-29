@@ -235,6 +235,8 @@ export interface PdBookState {
   id: string
   book: 'IN' | 'US' | 'HK'
   name: string
+  /** A paper Book's state (`pd book-state <book> --paper`): all cash, its capital, until issue 33 records its fills. */
+  paper: boolean
   market: string
   currency: string
   portfolio_id: number | null
@@ -260,8 +262,9 @@ export interface PdCut {
 
 /** An order of a Rule plan, for the next session. */
 export interface PdPlanOrder {
-  /** <book>-<session>-<n>. */
+  /** <book>-<session>-<n>, or <book>-paper-<session>-<n> in a paper Book. */
   id: string
+  book: 'IN' | 'US' | 'HK'
   /** Its strategy's id, or gold. */
   sleeve: string
   security_id: string
@@ -285,12 +288,19 @@ export interface PdRulePlan {
   id: string
   book: 'IN' | 'US' | 'HK'
   name: string
-  /** shadow: the real Book's, with one Sleeve, not for placing (issue 47). */
-  kind: 'shadow'
+  /**
+   * shadow: the real Book's, with one Sleeve, not for placing (issue 47); paper: the paper Book's, each
+   * strategy from Paper up at its full share, filled at the next open once issue 33 trades it (issue 32).
+   */
+  kind: 'shadow' | 'paper'
   for_placing: boolean
   state_id: string
   mandate_version: string
-  status: 'planned' | 'cant_plan'
+  playbook_version: string
+  /** hold: the Data gate failed, so no order is made and only Disaster stops sell. */
+  mode: 'normal' | 'hold'
+  /** market_shut: its market was shut the session before the Run's day, so it has no order. */
+  status: 'planned' | 'market_shut' | 'cant_plan'
   why: string | null
   /** The exposure level its session trades under, which its market's condition on the last close sets. */
   exposure?: { condition: PdCondition; level: number } | null
@@ -302,7 +312,7 @@ export interface PdRulePlan {
   session?: string
   data_version?: string
   book_data_version?: string
-  strategies?: { id: string; name: string; version: string; stage: string; disaster_stop: number }[]
+  strategies?: { id: string; name: string; version: string; stage: PdStage; disaster_stop: number }[]
   value?: number
   /** The money its Sleeves share. */
   cash?: number
@@ -312,6 +322,8 @@ export interface PdRulePlan {
   orders?: PdPlanOrder[]
   /** Each order a rule cut to nothing. */
   dropped?: { sleeve: string; security_id: string; name: string | null; side: 'BUY' | 'SELL'; wanted: number; rule: string }[]
+  /** A paper Book's Sleeves it couldn't run, with why. */
+  left_out?: { strategy_id: string; version: string; stage: PdStage; why: string }[]
   /** The Disaster stops to place, for each new position, or raise (was: the stop it raises). */
   stops?: { sleeve: string; security_id: string; name: string | null; price: number; was: number | null }[]
   buys?: number
@@ -352,6 +364,9 @@ export interface PdMarketCondition {
 /** What `pd plan` prints (contract/plan.schema.json): each market's condition, and each Book's Rule plan for the Run's day. */
 export interface PdPlan {
   on: string
+  /** The Data gate, as pd status gives it: failing, every plan is in Hold mode. */
+  gate: { verdict: 'pass' | 'fail'; reasons: string[] }
+  mode: 'normal' | 'hold'
   markets: PdMarketCondition[]
   plans: PdRulePlan[]
 }

@@ -1,5 +1,10 @@
 {
   "on": "2026-10-27",
+  "gate": {
+    "verdict": "pass",
+    "reasons": []
+  },
+  "mode": "normal",
   "markets": [
     {
       "market": "IN",
@@ -83,15 +88,56 @@
   ],
   "plans": [
     {
-      "id": "5a0d6f3e21c4",
+      "id": "17d5de1bf32e",
       "book": "IN",
       "name": "India Book",
       "kind": "shadow",
       "for_placing": false,
       "state_id": "08c1ddde44df",
       "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
       "status": "cant_plan",
       "why": "The lake has no price for IN:GOLD1 on 2026-10-23, so the India Book can't hold it: the daily chain fetches the Books' ETFs (`pd daily`)"
+    },
+    {
+      "id": "6b2f0e81c3d7",
+      "book": "IN",
+      "name": "India Book's paper Book",
+      "kind": "paper",
+      "for_placing": false,
+      "state_id": "53f848d353e2",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "cant_plan",
+      "why": "The lake has no price for IN:GOLD1 on 2026-10-23, so the India Book can't hold it: the daily chain fetches the Books' ETFs (`pd daily`)"
+    },
+    {
+      "id": "17c7cf722c9f",
+      "book": "US",
+      "name": "US Book's paper Book",
+      "kind": "paper",
+      "for_placing": false,
+      "state_id": "4d3b34f8ef2e",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "cant_plan",
+      "why": "US has no panels yet: run `pd build-panels` (or refresh the data)"
+    },
+    {
+      "id": "e194bc2dc93f",
+      "book": "HK",
+      "name": "Hong Kong Book's paper Book",
+      "kind": "paper",
+      "for_placing": false,
+      "state_id": "09b2b5b8ae32",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "cant_plan",
+      "why": "HK has no panels yet: run `pd build-panels` (or refresh the data)"
     }
   ]
 }

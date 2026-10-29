@@ -1,5 +1,12 @@
 {
   "on": "2026-10-27",
+  "gate": {
+    "verdict": "fail",
+    "reasons": [
+      "India: the lake is as of 2026-10-23, 1 session behind its last finished session, 2026-10-26"
+    ]
+  },
+  "mode": "hold",
   "markets": [
     {
       "market": "IN",
@@ -83,13 +90,15 @@
   ],
   "plans": [
     {
-      "id": "2e56e21e912e",
+      "id": "0352fa6fccac",
       "book": "IN",
       "name": "India Book",
       "kind": "shadow",
       "for_placing": false,
-      "state_id": "cf855a19d511",
+      "state_id": "fa1dba342bad",
       "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "hold",
       "status": "planned",
       "why": null,
       "exposure": {
@@ -136,45 +145,7 @@
           "why": "unsettled"
         }
       ],
-      "orders": [
-        {
-          "id": "IN-2026-10-26-001",
-          "sleeve": "in-cw2-selected",
-          "security_id": "IN:STOVEKRAFT",
-          "name": "Stove Kraft Ltd",
-          "side": "BUY",
-          "shares": 2415,
-          "price": 62.5193,
-          "value": 150984.1095,
-          "limit": 64.3949,
-          "reason": "first_allocation",
-          "signal": {
-            "kind": "holding",
-            "weight": 0.125
-          },
-          "cuts": [
-            {
-              "rule": "position_cap",
-              "wanted": 6775.0,
-              "allowed": 2415.2225914951914
-            }
-          ]
-        },
-        {
-          "id": "IN-2026-10-26-002",
-          "sleeve": "gold",
-          "security_id": "IN:GOLD1",
-          "name": null,
-          "side": "BUY",
-          "shares": 2445,
-          "price": 40.0,
-          "value": 97800.0,
-          "limit": 41.2,
-          "reason": "first_allocation",
-          "signal": null,
-          "cuts": []
-        }
-      ],
+      "orders": [],
       "dropped": [
         {
           "sleeve": "in-cw2-selected",
@@ -182,20 +153,126 @@
           "name": "Rategain Travel Technologies Ltd",
           "side": "BUY",
           "wanted": 2642.0,
-          "rule": "unsettled"
-        }
-      ],
-      "stops": [
+          "rule": "hold"
+        },
         {
           "sleeve": "in-cw2-selected",
           "security_id": "IN:STOVEKRAFT",
           "name": "Stove Kraft Ltd",
-          "price": 50.0151,
-          "was": null
+          "side": "BUY",
+          "wanted": 6775.0,
+          "rule": "hold"
+        },
+        {
+          "sleeve": "gold",
+          "security_id": "IN:GOLD1",
+          "name": null,
+          "side": "BUY",
+          "wanted": 2445.0,
+          "rule": "hold"
         }
       ],
-      "buys": 248784.1095,
-      "sales": 0
+      "stops": [],
+      "buys": 0,
+      "sales": 0,
+      "left_out": []
+    },
+    {
+      "id": "ab3e9327a061",
+      "book": "IN",
+      "name": "India Book's paper Book",
+      "kind": "paper",
+      "for_placing": false,
+      "state_id": "53f848d353e2",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "hold",
+      "status": "planned",
+      "why": null,
+      "exposure": {
+        "condition": "correction",
+        "level": 0.4
+      },
+      "market": "IN",
+      "currency": "INR",
+      "as_of": "2026-10-23",
+      "session": "2026-10-26",
+      "data_version": "2026-10-23.70c27d24c7a7",
+      "book_data_version": "2026-10-23.4be1f0c9d2e8",
+      "strategies": [
+        {
+          "id": "in-super30-ok-tuned",
+          "name": "India Super 30 OK, tuned",
+          "version": "9d149a9b53a9",
+          "stage": "paper",
+          "disaster_stop": 0.15
+        }
+      ],
+      "value": 1000000.0,
+      "cash": 1000000.0,
+      "legacy": [],
+      "weights": {
+        "in-super30-ok-tuned": 0.9,
+        "gold": 0.1
+      },
+      "not_traded": [],
+      "orders": [],
+      "dropped": [
+        {
+          "sleeve": "in-super30-ok-tuned",
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "side": "BUY",
+          "wanted": 2684.0,
+          "rule": "hold"
+        },
+        {
+          "sleeve": "in-super30-ok-tuned",
+          "security_id": "IN:STOVEKRAFT",
+          "name": "Stove Kraft Ltd",
+          "side": "BUY",
+          "wanted": 6886.0,
+          "rule": "hold"
+        },
+        {
+          "sleeve": "gold",
+          "security_id": "IN:GOLD1",
+          "name": null,
+          "side": "BUY",
+          "wanted": 2484.0,
+          "rule": "hold"
+        }
+      ],
+      "stops": [],
+      "buys": 0,
+      "sales": 0,
+      "left_out": []
+    },
+    {
+      "id": "a70505e28ce5",
+      "book": "US",
+      "name": "US Book's paper Book",
+      "kind": "paper",
+      "for_placing": false,
+      "state_id": "4d3b34f8ef2e",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "hold",
+      "status": "cant_plan",
+      "why": "US has no panels yet: run `pd build-panels` (or refresh the data)"
+    },
+    {
+      "id": "78cae605d43c",
+      "book": "HK",
+      "name": "Hong Kong Book's paper Book",
+      "kind": "paper",
+      "for_placing": false,
+      "state_id": "09b2b5b8ae32",
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "hold",
+      "status": "cant_plan",
+      "why": "HK has no panels yet: run `pd build-panels` (or refresh the data)"
     }
   ]
 }

@@ -7,8 +7,9 @@
 // To-dos the Steps raised; each Book's Sleeves with their Stages and how long each has been in its
 // Stage; each Book's real holdings and value, its latest Reconciliation's differences and this Run's
 // Broker inbox files; each market's Market condition with MarketSmith's outlook beside it and each
-// Book's exposure level; the India Book's state beside its shadow Rule plan, every order of it marked not
-// for placing; on Saturdays, what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
+// Book's exposure level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's
+// state beside its shadow Rule plan and each paper Book's beside its Rule plan, every order marked not for
+// placing; on Saturdays, what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
 // the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 // Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
@@ -22,7 +23,7 @@ import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import type { PdBook, PdBookState, PdMarketSmith, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
-import { breadthOf, conditionName, cutText, percent, ruleName, signalText } from '../../src/plans.ts'
+import { breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
 import { runAsStep } from '../../src/step.ts'
@@ -376,9 +377,10 @@ function statePart(state: PdBookState | undefined): string {
   const unsettled = state.unsettled.map(
     (u) => `${esc(u.name ?? u.security_id ?? '')}${u.security_id ? ` (${esc(u.security_id)})` : ''}: ${esc(u.kind.replaceAll('_', ' '))}, ledger ${u.ledger_qty === null ? '—' : esc(shares(u.ledger_qty))}, broker ${esc(shares(u.broker_qty))}`,
   )
+  const cash = state.paper ? `${at(state.cash)} in cash: ${capital}, all of it in cash until issue 33 records its fills.` : `${at(state.cash)} in cash: ${capital}, with ${ledger}. No open order or Disaster stop is recorded yet.`
   return [
     `<h3>The Book state ${esc(state.id)}</h3>`,
-    `<p>${at(state.cash)} in cash: ${capital}, with ${ledger}. No open order or Disaster stop is recorded yet.</p>`,
+    `<p>${cash}</p>`,
     rows.length ? table(['Holding', 'Shares', 'Average cost', ''], rows) : '<p>It holds nothing.</p>',
     ...(unsettled.length ? ['<p>Unsettled, so neither bought nor sold on a signal until a holdings export settles it:</p>', list(unsettled)] : []),
   ].join('\n')
@@ -388,7 +390,7 @@ function statePart(state: PdBookState | undefined): string {
 function ordersPart(plan: PdRulePlan): string {
   const orders = plan.orders ?? []
   const currency = plan.currency ?? 'INR'
-  if (!orders.length) return '<p>No order for the next session.</p>'
+  if (!orders.length) return `<p>No order for the next session${plan.mode === 'hold' ? ': Hold mode' : ''}.</p>`
   const rows = orders.map((o) => [
     esc(o.id),
     securityCell(o.security_id, o.name),
@@ -403,27 +405,41 @@ function ordersPart(plan: PdRulePlan): string {
   return table(['Id', 'Security', 'Side', 'Shares', 'Last close', 'Limit', 'Signal', 'Cut', ''], rows)
 }
 
-/** A Book's state beside its shadow Rule plan: what the plan was made from, its orders, what it stopped and its Disaster stops. */
-function shadowPart(plan: PdRulePlan, state: PdBookState | undefined): string {
-  const head = `<h2>${esc(plan.name)} in shadow${plan.session ? `: its Rule plan for ${esc(plan.session)}` : ''}, not for placing</h2>`
-  if (plan.status === 'cant_plan') return [`<section>${head}`, `<p>No shadow Rule plan could be made: ${esc(plan.why ?? '')}</p>`, statePart(state), '</section>'].join('\n')
+/** What a kind of Rule plan is, under its heading. */
+const planAbout = {
+  shadow: '<p>One Book end to end before any judgement: its state, and the Rule plan the Book engine makes from it with one Sleeve at its full share beside gold and the cash fund. Nothing here is recorded as an order, and none of it is for placing.</p>',
+  paper: "<p>The paper Book holds each strategy from Paper up at its full share, beside gold and the cash fund. Its orders are filled at the next open once issue 33 trades them: none is for you to place.</p>",
+}
+
+/** A Book's state beside its Rule plan: what the plan was made from, its orders, what it stopped and its Disaster stops. */
+function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
+  const shadow = plan.kind === 'shadow'
+  const title = shadow ? `${esc(plan.name)} in shadow` : esc(plan.name)
+  const head = `<h2>${title}${plan.session ? `: its Rule plan for ${esc(plan.session)}` : ''}${shadow ? ', not for placing' : ''}</h2>`
+  if (plan.status === 'market_shut') return [`<section>${head}`, `<p>No order: ${esc(plan.why ?? '')}.</p>`, '</section>'].join('\n')
+  if (plan.status === 'cant_plan') return [`<section>${head}`, `<p>No Rule plan could be made: ${esc(plan.why ?? '')}</p>`, statePart(state), '</section>'].join('\n')
   const currency = plan.currency ?? 'INR'
   const nameOf = (sleeve: string) => (sleeve === 'gold' ? 'gold' : (plan.strategies?.find((s) => s.id === sleeve)?.name ?? sleeve))
-  const strategies = (plan.strategies ?? []).map((s) => `${esc(s.name)} (${esc(s.id)}, version ${esc(s.version)}), its Disaster stops ${percent(s.disaster_stop)} under`).join('; ')
+  const strategies = (plan.strategies ?? []).map((s) => `${esc(s.name)} (${esc(s.id)}, version ${esc(s.version)}, ${esc(stageName(s.stage))}), its Disaster stops ${percent(s.disaster_stop)} under`)
   const weights = Object.entries(plan.weights ?? {}).map(([sleeve, w]) => `${esc(nameOf(sleeve))} ${percent(w)}`)
+  const hold = plan.mode === 'hold' ? '<p><strong>Hold mode:</strong> the Data gate fails, so this plan makes no order; its Disaster stops stay.</p>' : ''
   const exposure = plan.exposure
-    ? `<p>It trades under the ${esc(plan.name)}'s exposure level of ${percent(plan.exposure.level)}, which its market's ${esc(conditionName(plan.exposure.condition))} on the last close sets.</p>`
+    ? `<p>It trades under an exposure level of ${percent(plan.exposure.level)}, which its market's ${esc(conditionName(plan.exposure.condition))} on the last close sets.</p>`
     : ''
-  const madeFrom = `Made from the Book state ${esc(plan.state_id)}, the data to ${esc(plan.as_of ?? '')}'s close (version ${esc(plan.data_version ?? '')}), ${strategies}, and the Mandate's version ${esc(plan.mandate_version)}.`
+  const sleeves = strategies.length ? `${strategies.join('; ')}, ` : 'no strategy yet (gold and the cash fund alone), '
+  const madeFrom = `Made from the Book state ${esc(plan.state_id)}, the data to ${esc(plan.as_of ?? '')}'s close (version ${esc(plan.data_version ?? '')}), ${sleeves}the Mandate's version ${esc(plan.mandate_version)} and the Playbook's ${esc(plan.playbook_version)}.`
+  const leftOut = (plan.left_out ?? []).map((l) => `${esc(l.strategy_id)} version ${esc(l.version)} (${esc(stageName(l.stage))}): ${esc(l.why)}`)
   const dropped = (plan.dropped ?? []).map((d) => `${esc(d.name ?? d.security_id)} (${esc(d.security_id)}): a ${d.side === 'BUY' ? 'buy' : 'sale'} of ${esc(shares(d.wanted))} shares stopped by ${esc(ruleName(d.rule))}`)
   const stops = (plan.stops ?? []).map((s) => `${esc(s.name ?? s.security_id)} (${esc(s.security_id)}): ${s.was === null ? 'place at' : `raise from ${esc(money(s.was, currency, 2))} to`} ${esc(money(s.price, currency, 2))}`)
   const legacy = (plan.legacy ?? []).map((h) => `${esc(h.name ?? h.security_id)} (${esc(h.security_id)}): ${esc(shares(h.qty))} shares`)
   return [
     `<section>${head}`,
-    '<p>One Book end to end before any judgement: its state, and the Rule plan the Book engine makes from it with one Sleeve at its full share beside gold and the cash fund. Nothing here is recorded as an order, and none of it is for placing.</p>',
+    planAbout[plan.kind],
+    hold,
     statePart(state),
-    `<h3>The shadow Rule plan ${esc(plan.id)}</h3>`,
+    `<h3>The ${shadow ? 'shadow ' : ''}Rule plan ${esc(plan.id)}</h3>`,
     `<p>${madeFrom}</p>`,
+    ...(leftOut.length ? ["<p>Left out, as ash_new can't run them:</p>", list(leftOut)] : []),
     exposure,
     `<p>${esc(money(plan.cash ?? 0, currency))} shared out${weights.length ? `: ${weights.join(', ')}` : ''}; the Book worth ${esc(money(plan.value ?? 0, currency))} on the last close. Buys of ${esc(money(plan.buys ?? 0, currency))}, sales of ${esc(money(plan.sales ?? 0, currency))}.</p>`,
     ordersPart(plan),
@@ -465,13 +481,17 @@ function conditionsSection(plan: PdPlan): string {
 }
 
 /**
- * Each market's condition, then each Book's state beside its shadow Rule plan; that none was made when
- * the Plan Step failed, and nothing when it didn't run.
+ * Hold mode, when the Data gate fails; each market's condition; then each Book's state beside its Rule
+ * plan, the shadow plan first; that none was made when the Plan Step failed, and nothing when it didn't run.
  */
 function plansSection(run: RunRecord, plan: PdPlan | null, states: BookStates | null): string {
   const step = run.steps.find((s) => s.name === 'plan')
   if (!plan) return step?.status === 'failed' ? `<section><h2>Rule plans</h2><p>No Rule plan was made in this Run. See the Plan Step's log: ${logLink(step.log ?? 'logs/plan.log')}</p></section>` : ''
-  return [conditionsSection(plan), ...plan.plans.map((p) => shadowPart(p, states?.states.find((s) => s.book === p.book)))].join('\n')
+  const hold =
+    plan.mode === 'hold'
+      ? `<section class="gate fail"><h2>Hold mode: no Rule plan makes an order today.</h2><p>The Data gate fails, so nothing new is bought and exits happen only through Disaster stops:</p>\n${list(plan.gate.reasons.map(esc))}</section>`
+      : ''
+  return [hold, conditionsSection(plan), ...plan.plans.map((p) => planPart(p, stateOf(states?.states ?? [], p)))].filter(Boolean).join('\n')
 }
 
 /** What MarketSmith's fetch brought, on a Saturday: nothing on other days, when the Step skips itself. */

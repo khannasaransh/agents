@@ -1,7 +1,8 @@
 {
-  "id": "cf855a19d511",
+  "id": "fa1dba342bad",
   "book": "IN",
   "name": "India Book",
+  "paper": false,
   "market": "IN",
   "currency": "INR",
   "portfolio_id": 1,
