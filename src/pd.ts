@@ -227,6 +227,102 @@ export interface PdStagesCheck {
 }
 
 /**
+ * What `pd book-state <book>` prints (contract/book-state.schema.json): what a real Book's Rule plan
+ * starts from, with an id. Its cash is its capital with its ledger's money, since the brokers' files
+ * hold none; every holding is Legacy until the Rule plan's orders are recorded.
+ */
+export interface PdBookState {
+  id: string
+  book: 'IN' | 'US' | 'HK'
+  name: string
+  market: string
+  currency: string
+  portfolio_id: number | null
+  ledger: { transactions: number; last: string | null }
+  capital: number
+  capital_set: boolean
+  cash: number
+  holdings: { security_id: string; name: string | null; qty: number; avg_cost: number | null; legacy: boolean }[]
+  reconciliation: { as_of: string; file: string; matched: number } | null
+  /** Reconciliation's open differences: neither bought nor sold on a signal until settled. */
+  unsettled: { security_id: string | null; name: string | null; kind: PdReconciliation['differences'][number]['kind']; ledger_qty: number | null; broker_qty: number }[]
+  open_orders: unknown[]
+  reserved: number
+  stops: unknown[]
+}
+
+/** A cut a rule made to an order: the rule (or why the Book mustn't trade it), the shares wanted and allowed. */
+export interface PdCut {
+  rule: string
+  wanted: number
+  allowed: number
+}
+
+/** An order of a Rule plan, for the next session. */
+export interface PdPlanOrder {
+  /** <book>-<session>-<n>. */
+  id: string
+  /** Its strategy's id, or gold. */
+  sleeve: string
+  security_id: string
+  name: string | null
+  side: 'BUY' | 'SELL'
+  shares: number
+  /** The last close it was sized at. */
+  price: number
+  value: number
+  /** A buy's limit: the last close plus the Book's tolerance; null for a sale. */
+  limit: number | null
+  /** first_allocation, rebalance, stop_loss, target, regime, untradeable, deferred, reweighting, breaker or disaster_stop. */
+  reason: string
+  /** What of its strategy's track signalled it; null for the Book's own orders and gold's. */
+  signal: { kind: 'trade' | 'holding' | 'waiting'; action?: string; weight?: number; signal_date?: string; score?: number; rank?: number } | null
+  cuts: PdCut[]
+}
+
+/** A Book's Rule plan, as `pd plan` prints it: planned, or why it couldn't be. */
+export interface PdRulePlan {
+  id: string
+  book: 'IN' | 'US' | 'HK'
+  name: string
+  /** shadow: the real Book's, with one Sleeve, not for placing (issue 47). */
+  kind: 'shadow'
+  for_placing: boolean
+  state_id: string
+  mandate_version: string
+  status: 'planned' | 'cant_plan'
+  why: string | null
+  market?: string
+  currency?: string
+  /** The last session: the plan knows the data to its close. */
+  as_of?: string
+  /** The next session, which its orders are for. */
+  session?: string
+  data_version?: string
+  book_data_version?: string
+  strategies?: { id: string; name: string; version: string; stage: string; disaster_stop: number }[]
+  value?: number
+  /** The money its Sleeves share. */
+  cash?: number
+  legacy?: { security_id: string; name: string | null; qty: number }[]
+  weights?: Record<string, number> | null
+  not_traded?: { security_id: string; name: string | null; why: 'unsettled' | 'quarantined' }[]
+  orders?: PdPlanOrder[]
+  /** Each order a rule cut to nothing. */
+  dropped?: { sleeve: string; security_id: string; name: string | null; side: 'BUY' | 'SELL'; wanted: number; rule: string }[]
+  /** The Disaster stops to place, for each new position, or raise (was: the stop it raises). */
+  stops?: { sleeve: string; security_id: string; name: string | null; price: number; was: number | null }[]
+  buys?: number
+  sales?: number
+}
+
+/** What `pd plan` prints (contract/plan.schema.json): each Book's Rule plan for the Run's day. */
+export interface PdPlan {
+  on: string
+  plans: PdRulePlan[]
+}
+
+/**
  * Runs `pd` in `cwd` and resolves with how it ended, its output kept whole. It is the first `pd`
  * on PATH, else the one in ash_new's own environment, so a `pd` put first on PATH (the tests'
  * stand-in) wins.

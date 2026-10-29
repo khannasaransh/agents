@@ -456,3 +456,40 @@ test("a Stages Step that failed leaves a Sleeves and Stages section saying so", 
 
   assert.match(page, /Sleeves and Stages The Books' Sleeves couldn't be read in this Run\. See the Stages Step's log: logs\/stages\.log/)
 })
+
+test("the India Book's state is shown beside its shadow Rule plan, with each order's signal and cut, none of it for placing", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'plan.json', example('plan.shadow.json'))
+  ws.writeRunFile(runId, 'book-states.json', JSON.stringify({ states: [JSON.parse(example('book-state.india.json'))] }))
+
+  const page = text(await brief())
+
+  assert.match(page, /India Book in shadow: its Rule plan for 2026-10-26, not for placing/)
+  // The state: its cash, its Legacy holdings and what is unsettled.
+  assert.match(page, /The Book state cf855a19d511 ₹9,84,160 in cash: its capital, ₹10,00,000 until you set it \(its market's cost preset's\), with 2 trades in its ledger, the last on 2026-07-02/)
+  assert.match(page, /Asian Paints Ltd IN:ASIANPAINT 100 ₹120\.00 Legacy/)
+  assert.match(page, /Unsettled, so neither bought nor sold on a signal until a holdings export settles it: Rategain Travel Technologies Ltd \(IN:RATEGAIN\): quantity, ledger 100, broker 50/)
+  // The plan: what it was made from, then each order with its signal and cut, marked not for placing.
+  assert.match(page, /Made from the Book state cf855a19d511, the data to 2026-10-23's close \(version 2026-10-23\.70c27d24c7a7\), India CW2, selected \(in-cw2-selected, version 7c41d0e2a9b3\), its Disaster stops 20% under, and the Mandate's version f99c88f13b5b/)
+  assert.match(page, /India CW2, selected 90%, gold 10%/)
+  assert.match(page, /IN-2026-10-26-001 Stove Kraft Ltd IN:STOVEKRAFT Buy 2415 ₹62\.52 ₹64\.39 India CW2, selected holds it at 12\.5% on the close of 2026-10-23 cut from 6775 to 2415 shares by the position cap Not for placing/)
+  assert.match(page, /IN-2026-10-26-002 IN:GOLD1 Buy 2445 ₹40\.00 ₹41\.20 Gold's share of the Book — Not for placing/)
+  assert.match(page, /Stopped by a rule, so not in the plan: Rategain Travel Technologies Ltd \(IN:RATEGAIN\): a buy of 2642 shares stopped by an open Reconciliation difference/)
+  assert.match(page, /Disaster stops to place with the buys, or raise: Stove Kraft Ltd \(IN:STOVEKRAFT\): place at ₹50\.02/)
+  assert.match(page, /Legacy holdings, held, not sold: issue 43 sells them as the Sleeves need the cash\. Asian Paints Ltd \(IN:ASIANPAINT\): 100 shares/)
+})
+
+test("a shadow Rule plan ash_new couldn't make says why, and a Plan Step that failed says so", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'plan.json', example('plan.cant-plan.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /India Book in shadow, not for placing No shadow Rule plan could be made: The lake has no price for IN:GOLD1 on 2026-10-23/)
+  assert.match(page, /Its state couldn't be read in this Run\./)
+
+  ws.cleanup()
+  ws = makeWorkspace()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'plan', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  assert.match(text(await brief()), /Rule plans No Rule plan was made in this Run\. See the Plan Step's log: logs\/plan\.log/)
+})

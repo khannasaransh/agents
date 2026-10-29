@@ -20,7 +20,13 @@ function workspace(): Workspace {
 
 test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agent on a healthy Lake, then writes the Stocks Brief', async () => {
   ws = workspace()
-  ws.setPd({ status: { example: 'status.clean.json' }, 'book-holdings': { example: 'book-holdings.empty.json' }, stages: { example: 'stages-check.empty.json' } })
+  ws.setPd({
+    status: { example: 'status.clean.json' },
+    'book-holdings': { example: 'book-holdings.empty.json' },
+    stages: { example: 'stages-check.empty.json' },
+    plan: { example: 'plan.shadow.json' },
+    'book-state': { example: 'book-state.india.json' },
+  })
 
   const result = await ws.agents('run', 'stocks', '--dry-run')
 
@@ -39,12 +45,13 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['lake', 'succeeded'],
       ['stages', 'succeeded'],
       ['health', 'skipped'],
+      ['plan', 'succeeded'],
       ['brief', 'succeeded'],
     ],
   )
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['book-holdings'], ['status'], ['stages', 'check', '--dry-run']],
+    [['book-holdings'], ['status'], ['stages', 'check', '--dry-run'], ['plan', '--on', id.slice(0, 10)], ['book-state', 'IN']],
     'nothing in ash_new is recorded, refreshed or cleared',
   )
   assert.match(result.stdout, new RegExp(`Brief: .*${id}[\\\\/]brief\\.html`))
@@ -61,6 +68,8 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     daily: { stderr: 'Stopped: Yahoo answered 429\n', exitCode: 1 },
     status: { example: 'status.hold.json' },
     stages: { example: 'stages-check.empty.json' },
+    plan: { example: 'plan.shadow.json' },
+    'book-state': { example: 'book-state.india.json' },
   })
 
   const result = await ws.agents('run', 'stocks')
@@ -81,6 +90,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['lake', 'failed'],
       ['stages', 'succeeded'],
       ['health', 'failed'],
+      ['plan', 'succeeded'],
       ['brief', 'succeeded'],
     ],
   )

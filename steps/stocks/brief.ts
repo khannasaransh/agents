@@ -6,7 +6,8 @@
 // approval into Paper; each market's latest session in the Lake against its last finished one; the
 // To-dos the Steps raised; each Book's Sleeves with their Stages and how long each has been in its
 // Stage; each Book's real holdings and value, its latest Reconciliation's differences and this Run's
-// Broker inbox files; on Saturdays, what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
+// Broker inbox files; the India Book's state beside its shadow Rule plan, every order of it marked not
+// for placing; on Saturdays, what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh ended;
 // the Health report's verdict and flags; and the Run's health.
 // It runs even when earlier Steps failed, and says when the Lake's status is missing.
 // Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
@@ -19,7 +20,8 @@ import { brokerFiles, differenceText, fileLine, securityName, shares } from '../
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
-import type { PdBook, PdMarketSmith, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import type { PdBook, PdBookState, PdMarketSmith, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import { cutText, percent, ruleName, signalText } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
 import { runAsStep } from '../../src/step.ts'
@@ -28,6 +30,7 @@ import type { AnswersResult } from './answers.ts'
 import type { BrokerInboxResult } from './broker-inbox.ts'
 import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
+import type { BookStates } from './plan.ts'
 
 /** Escapes text for HTML, so nothing from the Lake or a log is read as markup. */
 const esc = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
@@ -359,6 +362,83 @@ function booksSection(run: RunRecord, inbox: BrokerInboxResult | null): string {
   return [...books, ...files].join('\n')
 }
 
+/** A security in a table cell: its name over its id. */
+const securityCell = (id: string, name: string | null) => (name ? `${esc(name)}<br><span class="muted">${esc(id)}</span>` : esc(id))
+
+/** A Book state, as its Rule plan starts from it: its cash, its holdings, what is unsettled. */
+function statePart(state: PdBookState | undefined): string {
+  if (!state) return "<p>Its state couldn't be read in this Run.</p>"
+  const at = (amount: number) => esc(money(amount, state.currency))
+  const capital = state.capital_set ? `its capital of ${at(state.capital)}` : `its capital, ${at(state.capital)} until you set it (its market's cost preset's)`
+  const ledger = state.ledger.transactions ? `${plural(state.ledger.transactions, 'trade')} in its ledger, the last on ${esc(state.ledger.last ?? '')}` : 'nothing in its ledger yet'
+  const rows = state.holdings.map((h) => [securityCell(h.security_id, h.name), esc(shares(h.qty)), h.avg_cost === null ? '—' : esc(money(h.avg_cost, state.currency, 2)), h.legacy ? 'Legacy' : ''])
+  const unsettled = state.unsettled.map(
+    (u) => `${esc(u.name ?? u.security_id ?? '')}${u.security_id ? ` (${esc(u.security_id)})` : ''}: ${esc(u.kind.replaceAll('_', ' '))}, ledger ${u.ledger_qty === null ? '—' : esc(shares(u.ledger_qty))}, broker ${esc(shares(u.broker_qty))}`,
+  )
+  return [
+    `<h3>The Book state ${esc(state.id)}</h3>`,
+    `<p>${at(state.cash)} in cash: ${capital}, with ${ledger}. No open order or Disaster stop is recorded yet.</p>`,
+    rows.length ? table(['Holding', 'Shares', 'Average cost', ''], rows) : '<p>It holds nothing.</p>',
+    ...(unsettled.length ? ['<p>Unsettled, so neither bought nor sold on a signal until a holdings export settles it:</p>', list(unsettled)] : []),
+  ].join('\n')
+}
+
+/** A Rule plan's orders, each marked not for placing, with the signal behind it and any cut. */
+function ordersPart(plan: PdRulePlan): string {
+  const orders = plan.orders ?? []
+  const currency = plan.currency ?? 'INR'
+  if (!orders.length) return '<p>No order for the next session.</p>'
+  const rows = orders.map((o) => [
+    esc(o.id),
+    securityCell(o.security_id, o.name),
+    o.side === 'BUY' ? 'Buy' : 'Sell',
+    esc(shares(o.shares)),
+    esc(money(o.price, currency, 2)),
+    o.limit === null ? '—' : esc(money(o.limit, currency, 2)),
+    esc(signalText(o, plan)),
+    esc(o.cuts.map(cutText).join('; ')) || '—',
+    'Not for placing',
+  ])
+  return table(['Id', 'Security', 'Side', 'Shares', 'Last close', 'Limit', 'Signal', 'Cut', ''], rows)
+}
+
+/** A Book's state beside its shadow Rule plan: what the plan was made from, its orders, what it stopped and its Disaster stops. */
+function shadowPart(plan: PdRulePlan, state: PdBookState | undefined): string {
+  const head = `<h2>${esc(plan.name)} in shadow${plan.session ? `: its Rule plan for ${esc(plan.session)}` : ''}, not for placing</h2>`
+  if (plan.status === 'cant_plan') return [`<section>${head}`, `<p>No shadow Rule plan could be made: ${esc(plan.why ?? '')}</p>`, statePart(state), '</section>'].join('\n')
+  const currency = plan.currency ?? 'INR'
+  const nameOf = (sleeve: string) => (sleeve === 'gold' ? 'gold' : (plan.strategies?.find((s) => s.id === sleeve)?.name ?? sleeve))
+  const strategies = (plan.strategies ?? []).map((s) => `${esc(s.name)} (${esc(s.id)}, version ${esc(s.version)}), its Disaster stops ${percent(s.disaster_stop)} under`).join('; ')
+  const weights = Object.entries(plan.weights ?? {}).map(([sleeve, w]) => `${esc(nameOf(sleeve))} ${percent(w)}`)
+  const madeFrom = `Made from the Book state ${esc(plan.state_id)}, the data to ${esc(plan.as_of ?? '')}'s close (version ${esc(plan.data_version ?? '')}), ${strategies}, and the Mandate's version ${esc(plan.mandate_version)}.`
+  const dropped = (plan.dropped ?? []).map((d) => `${esc(d.name ?? d.security_id)} (${esc(d.security_id)}): a ${d.side === 'BUY' ? 'buy' : 'sale'} of ${esc(shares(d.wanted))} shares stopped by ${esc(ruleName(d.rule))}`)
+  const stops = (plan.stops ?? []).map((s) => `${esc(s.name ?? s.security_id)} (${esc(s.security_id)}): ${s.was === null ? 'place at' : `raise from ${esc(money(s.was, currency, 2))} to`} ${esc(money(s.price, currency, 2))}`)
+  const legacy = (plan.legacy ?? []).map((h) => `${esc(h.name ?? h.security_id)} (${esc(h.security_id)}): ${esc(shares(h.qty))} shares`)
+  return [
+    `<section>${head}`,
+    '<p>One Book end to end before any judgement: its state, and the Rule plan the Book engine makes from it with one Sleeve at its full share beside gold and the cash fund. Nothing here is recorded as an order, and none of it is for placing.</p>',
+    statePart(state),
+    `<h3>The shadow Rule plan ${esc(plan.id)}</h3>`,
+    `<p>${madeFrom}</p>`,
+    `<p>${esc(money(plan.cash ?? 0, currency))} shared out${weights.length ? `: ${weights.join(', ')}` : ''}; the Book worth ${esc(money(plan.value ?? 0, currency))} on the last close. Buys of ${esc(money(plan.buys ?? 0, currency))}, sales of ${esc(money(plan.sales ?? 0, currency))}.</p>`,
+    ordersPart(plan),
+    ...(dropped.length ? ['<p>Stopped by a rule, so not in the plan:</p>', list(dropped)] : []),
+    ...(stops.length ? ['<p>Disaster stops to place with the buys, or raise:</p>', list(stops)] : []),
+    ...(legacy.length ? ['<p>Legacy holdings, held, not sold: issue 43 sells them as the Sleeves need the cash.</p>', list(legacy)] : []),
+    '</section>',
+  ].join('\n')
+}
+
+/**
+ * Each Book's state beside its shadow Rule plan; that none was made when the Plan Step failed, and
+ * nothing when it didn't run.
+ */
+function plansSection(run: RunRecord, plan: PdPlan | null, states: BookStates | null): string {
+  const step = run.steps.find((s) => s.name === 'plan')
+  if (!plan) return step?.status === 'failed' ? `<section><h2>Rule plans</h2><p>No Rule plan was made in this Run. See the Plan Step's log: ${logLink(step.log ?? 'logs/plan.log')}</p></section>` : ''
+  return plan.plans.map((p) => shadowPart(p, states?.states.find((s) => s.book === p.book))).join('\n')
+}
+
 /** What MarketSmith's fetch brought, on a Saturday: nothing on other days, when the Step skips itself. */
 function marketSmithSection(fetched: PdMarketSmith | null): string {
   if (!fetched) return ''
@@ -451,7 +531,7 @@ a { color: inherit; }
  * `status` is the Lake's as the Lake Step read it; `latest`, as the Health Step read it again once it
  * recorded the Health Agent's Corrections, so they are among those waiting.
  */
-function render(run: RunRecord, answers: AnswersResult | null, inbox: BrokerInboxResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, stages: PdStagesCheck | null, health: HealthResult | null, todos: { step: string; todo: string }[]): string {
+function render(run: RunRecord, answers: AnswersResult | null, inbox: BrokerInboxResult | null, marketSmith: PdMarketSmith | null, lake: LakeResult | null, status: PdStatus | null, latest: PdStatus | null, stages: PdStagesCheck | null, health: HealthResult | null, plan: PdPlan | null, states: BookStates | null, todos: { step: string; todo: string }[]): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   return `<!doctype html>
@@ -474,6 +554,7 @@ ${marketsSection(status)}
 ${todosSection(todos)}
 ${stagesSection(run, stages)}
 ${booksSection(run, inbox)}
+${plansSection(run, plan, states)}
 ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
@@ -491,6 +572,6 @@ await runAsStep(({ runId, runFolder, force }) => {
     return
   }
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<BrokerInboxResult>('broker-inbox.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<PdStagesCheck>('stages.json'), read<HealthResult>('health.json'), readTodos(runFolder)))
+  writeText(out, render(readRun(runId), read<AnswersResult>('answers.json'), read<BrokerInboxResult>('broker-inbox.json'), read<PdMarketSmith>('marketsmith.json'), read<LakeResult>('lake.json'), read<PdStatus>(join('lake', 'status.json')), read<PdStatus>(join('health', 'status.json')), read<PdStagesCheck>('stages.json'), read<HealthResult>('health.json'), read<PdPlan>('plan.json'), read<BookStates>('book-states.json'), readTodos(runFolder)))
   console.log(`Wrote ${out}`)
 })

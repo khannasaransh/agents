@@ -1,0 +1,116 @@
+{
+  "on": "2026-10-27",
+  "plans": [
+    {
+      "id": "2e56e21e912e",
+      "book": "IN",
+      "name": "India Book",
+      "kind": "shadow",
+      "for_placing": false,
+      "state_id": "cf855a19d511",
+      "mandate_version": "f99c88f13b5b",
+      "status": "planned",
+      "why": null,
+      "market": "IN",
+      "currency": "INR",
+      "as_of": "2026-10-23",
+      "session": "2026-10-26",
+      "data_version": "2026-10-23.70c27d24c7a7",
+      "book_data_version": "2026-10-23.4be1f0c9d2e8",
+      "strategies": [
+        {
+          "id": "in-cw2-selected",
+          "name": "India CW2, selected",
+          "version": "7c41d0e2a9b3",
+          "stage": "real_full",
+          "disaster_stop": 0.2
+        }
+      ],
+      "value": 1006653.5050964355,
+      "cash": 984160.0,
+      "legacy": [
+        {
+          "security_id": "IN:ASIANPAINT",
+          "name": "Asian Paints Ltd",
+          "qty": 100.0
+        },
+        {
+          "security_id": "IN:IDFCFIRSTB",
+          "name": "IDFC First Bank Ltd",
+          "qty": 40.0
+        }
+      ],
+      "weights": {
+        "in-cw2-selected": 0.9,
+        "gold": 0.1
+      },
+      "not_traded": [
+        {
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "why": "unsettled"
+        }
+      ],
+      "orders": [
+        {
+          "id": "IN-2026-10-26-001",
+          "sleeve": "in-cw2-selected",
+          "security_id": "IN:STOVEKRAFT",
+          "name": "Stove Kraft Ltd",
+          "side": "BUY",
+          "shares": 2415,
+          "price": 62.5193,
+          "value": 150984.1095,
+          "limit": 64.3949,
+          "reason": "first_allocation",
+          "signal": {
+            "kind": "holding",
+            "weight": 0.125
+          },
+          "cuts": [
+            {
+              "rule": "position_cap",
+              "wanted": 6775.0,
+              "allowed": 2415.2225914951914
+            }
+          ]
+        },
+        {
+          "id": "IN-2026-10-26-002",
+          "sleeve": "gold",
+          "security_id": "IN:GOLD1",
+          "name": null,
+          "side": "BUY",
+          "shares": 2445,
+          "price": 40.0,
+          "value": 97800.0,
+          "limit": 41.2,
+          "reason": "first_allocation",
+          "signal": null,
+          "cuts": []
+        }
+      ],
+      "dropped": [
+        {
+          "sleeve": "in-cw2-selected",
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "side": "BUY",
+          "wanted": 2642.0,
+          "rule": "unsettled"
+        }
+      ],
+      "stops": [
+        {
+          "sleeve": "in-cw2-selected",
+          "security_id": "IN:STOVEKRAFT",
+          "name": "Stove Kraft Ltd",
+          "price": 50.0151,
+          "was": null
+        }
+      ],
+      "buys": 248784.1095,
+      "sales": 0
+    }
+  ]
+}
