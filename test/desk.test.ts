@@ -86,7 +86,7 @@ function promptInput(call: WorkerCliCall, name: string): any {
   return JSON.parse(block[1])
 }
 
-test("each analyst the review list needs is called at once, on Claude Code, read-only in the Run folder, with its names and its part of their dossiers", async () => {
+test("each analyst the review list needs is called at once, read-only in the Run folder, with its names and its part of their dossiers", async () => {
   ws = makeWorkspace()
   prepare()
   workersAnswer()
@@ -94,14 +94,15 @@ test("each analyst the review list needs is called at once, on Claude Code, read
   const ran = await step('desk')
 
   assert.equal(ran.status, 0, ran.stderr)
-  const [events] = callsFor('claude', '# Events analyst')
+  const [events] = callsFor('codex', '# Events analyst')
   const [risk] = callsFor('claude', '# Risk analyst')
   const [chart] = callsFor('claude', '# Chart analyst')
-  assert.equal(ws.workerCliCalls('claude').length, 3)
-  assert.deepEqual(ws.workerCliCalls('codex'), [])
+  assert.equal(ws.workerCliCalls('codex').length, 1)
+  assert.equal(ws.workerCliCalls('claude').length, 2)
   for (const call of [events, risk, chart]) assert.equal(realpathSync(call.cwd), realpathSync(join(ws.dataDir, 'runs', runId)))
-  // Events and Risk may search the web; Chart may not.
-  for (const call of [events, risk]) assert.equal(call.args[call.args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash,WebSearch')
+  // Events and Risk may search the web; Chart may not. Events runs on Codex, Chart and Risk on Claude Code.
+  assert.ok(events.args.includes('web_search="live"'))
+  assert.equal(risk.args[risk.args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash,WebSearch')
   assert.equal(chart.args[chart.args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash')
   // Events reviews the name with results coming, from its events, fundamentals and MarketSmith's snapshot.
   const [rategain] = promptInput(events, 'names')
@@ -201,12 +202,30 @@ test("a view is reused, keeping its date, while nothing its analyst reads for th
 test('each analyst falls back to the other Worker', async () => {
   ws = makeWorkspace()
   prepare()
-  workersAnswer({ failOn: 'claude' })
+  // Events starts on Codex; Chart and Risk start on Claude Code. Each primary fails, and the other answers.
+  ws.setWorkerCli('codex', {
+    ...failing,
+    byPrompt: {
+      '# Events analyst': failing,
+      '# Chart analyst': codexAnswering(answers['# Chart analyst']),
+      '# Risk analyst': codexAnswering(answers['# Risk analyst']),
+    },
+  })
+  ws.setWorkerCli('claude', {
+    ...failing,
+    byPrompt: {
+      '# Events analyst': claudeCodeAnswering(answers['# Events analyst']),
+      '# Chart analyst': failing,
+      '# Risk analyst': failing,
+    },
+  })
   assert.equal((await step('desk')).status, 0)
-  // Each fails on Claude Code and answers on Codex.
-  for (const title of Object.keys(answers)) assert.equal(callsFor('codex', title).length, 1, title)
+  assert.equal(callsFor('claude', '# Events analyst').length, 1)
+  assert.equal(callsFor('codex', '# Chart analyst').length, 1)
+  assert.equal(callsFor('codex', '# Risk analyst').length, 1)
   assert.deepEqual(desk().analysts.map((a: any) => a.status), ['answered', 'answered', 'answered'])
-  for (const analyst of ['chart', 'events', 'risk']) assert.match(log(), new RegExp(`${analyst} failed on claude-code[\\s\\S]*retrying once on codex[\\s\\S]*${analyst} answered on codex`))
+  assert.match(log(), /events failed on codex[\s\S]*retrying once on claude-code[\s\S]*events answered on claude-code/)
+  for (const analyst of ['chart', 'risk']) assert.match(log(), new RegExp(`${analyst} failed on claude-code[\\s\\S]*retrying once on codex[\\s\\S]*${analyst} answered on codex`))
 })
 
 test("an analyst that fails on both Workers fails the Step, and the buys it had to review are missing their review; a view it may not give is refused", async () => {
@@ -235,7 +254,13 @@ test("an analyst's inputs carry none of the Books' shares or amounts, and a web 
   prepare()
   workersAnswer()
   const searched = { ...(answers['# Risk analyst'] as object), searches: [{ query: 'Rategain 865 shares block deal', source: 'https://example.com/rategain' }, { query: 'Rategain results date 2026', source: 'https://www.nseindia.com/' }] }
-  ws.setWorkerCli('claude', { ...failing, byPrompt: { '# Events analyst': claudeCodeAnswering(answers['# Events analyst']), '# Risk analyst': claudeCodeAnswering(searched) } })
+  ws.setWorkerCli('claude', {
+    ...failing,
+    byPrompt: {
+      '# Chart analyst': claudeCodeAnswering(answers['# Chart analyst']),
+      '# Risk analyst': claudeCodeAnswering(searched),
+    },
+  })
 
   assert.equal((await step('desk')).status, 0)
 
@@ -262,7 +287,7 @@ test("an early exit an analyst proposes is recorded in ash_new for Saransh's Ans
   const idfc = { ...dossiers()['IN:RATEGAIN'], security_id: 'IN:IDFCFIRSTB', name: 'IDFC First Bank Ltd', orders: [] }
   prepare({ plan, dossierOf: { 'IN:IDFCFIRSTB': idfc } })
   const exit = view('IN:IDFCFIRSTB', 'exit', { reasons: "The RBI's order against its lending practices is serious enough to sell before results." })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ views: [exit], searches: [] }))
+  ws.setWorkerCli('codex', codexAnswering({ views: [exit], searches: [] }))
   ws.setPd({ exits: { example: 'exits-decide.proposed.json' } })
 
   assert.equal((await step('desk')).status, 0)
@@ -286,7 +311,7 @@ test("an early exit ash_new couldn't record fails the Step but loses nothing els
   plan.review = { ...plan.review, names: [holding], risk: [], analysts: ['events'] }
   const idfc = { ...dossiers()['IN:RATEGAIN'], security_id: 'IN:IDFCFIRSTB', name: 'IDFC First Bank Ltd', orders: [] }
   prepare({ plan, dossierOf: { 'IN:IDFCFIRSTB': idfc } })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ views: [view('IN:IDFCFIRSTB', 'exit')], searches: [] }))
+  ws.setWorkerCli('codex', codexAnswering({ views: [view('IN:IDFCFIRSTB', 'exit')], searches: [] }))
   ws.setPd({ exits: { stderr: 'database is locked\n', exitCode: 1 } })
 
   assert.equal((await step('desk')).status, 1)
@@ -298,7 +323,7 @@ test("an early exit ash_new couldn't record fails the Step but loses nothing els
   prepare({ run: later, plan, dossierOf: { 'IN:IDFCFIRSTB': idfc } })
   ws.setPd({ exits: { example: 'exits-decide.proposed.json' } })
   assert.equal((await step('desk', later)).status, 0)
-  assert.equal(ws.workerCliCalls('claude').length, 2, 'Events is asked again')
+  assert.equal(ws.workerCliCalls('codex').length, 2, 'Events is asked again')
   assert.equal(desk(later).exits[0].decided.exit.id, 4)
 })
 

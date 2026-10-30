@@ -54,6 +54,17 @@ const corrections = [
   { security_id: 'US:NFE', kind: 'dividend', date: '2023-01-03', ratio: null, value: null, why: 'A 150.00 dividend on a 42.42 close' },
 ]
 
+/** What `codex exec --json` prints when its schema-checked answer is `answer`. */
+const codexAnswering = (answer: unknown) => ({
+  stdout: [
+    { type: 'thread.started', thread_id: 'thread-1' },
+    { type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: JSON.stringify(answer) } },
+    { type: 'turn.completed', usage: { input_tokens: 900, output_tokens: 60 } },
+  ]
+    .map((event) => JSON.stringify(event))
+    .join('\n'),
+})
+
 /** What `claude --print --output-format json` prints when its schema-checked answer is `answer`. */
 const claudeCodeAnswering = (answer: unknown) => ({
   stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 6, result: JSON.stringify(answer), structured_output: answer }),
@@ -80,19 +91,20 @@ test('the Health Step skips itself when the Lake is healthy, calling no Agent an
   assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /Skipped: The Lake is healthy/)
 })
 
-test("after a failed Lake Step, the Health Agent runs on Claude Code in ash_new's folder with the Lake Step's log, what it did and the Lake's status, and its diagnosis is recorded", async () => {
+test("after a failed Lake Step, the Health Agent runs on Codex in ash_new's folder with the Lake Step's log, what it did and the Lake's status, and its diagnosis is recorded", async () => {
   prepare({ lake: 'failed', status: 'status.hold.json' })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const result = await step()
 
   assert.equal(result.status, 0, result.stderr)
-  const [call, ...more] = ws.workerCliCalls('claude')
+  const [call, ...more] = ws.workerCliCalls('codex')
   assert.deepEqual(more, [])
-  assert.deepEqual(ws.workerCliCalls('codex'), [])
+  assert.deepEqual(ws.workerCliCalls('claude'), [])
   assert.equal(realpathSync(call.cwd), realpathSync(ashNew))
-  assert.equal(call.args[call.args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash', 'no tool that writes')
-  assert.ok(!call.args.includes('--allowedTools'), 'nothing allowed beyond what Claude Code counts as read-only')
+  const permissions = call.args.find((arg) => arg.startsWith('permissions.agent='))
+  assert.ok(permissions?.includes('extends=":read-only"'), 'read-only')
+  assert.ok(!permissions?.includes('="write"'), 'no folder it may write')
   const why = promptInput(call.stdin, 'why') as string[]
   assert.equal(why[0], 'The Lake Step failed.')
   assert.match(why[1], /^The Data gate failed: The last refresh \(job 482\) failed: YahooUnavailable/)
@@ -113,29 +125,29 @@ test("after a failed Lake Step, the Health Agent runs on Claude Code in ash_new'
 
 test("after a Lake Step whose status couldn't be read, the Health Agent is told so", async () => {
   prepare({ lake: 'failed', status: null })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const result = await step()
 
   assert.equal(result.status, 0, result.stderr)
-  const [call] = ws.workerCliCalls('claude')
+  const [call] = ws.workerCliCalls('codex')
   assert.deepEqual(promptInput(call.stdin, 'why'), ['The Lake Step failed.', "The Lake's status couldn't be read."])
   assert.equal(promptInput(call.stdin, 'status'), null)
 })
 
 test('after a refresh that worked, a Health report that flags something still calls the Health Agent', async () => {
   prepare({ status: 'status.healthy.json' })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const result = await step()
 
   assert.equal(result.status, 0, result.stderr)
-  const [call] = ws.workerCliCalls('claude')
+  const [call] = ws.workerCliCalls('codex')
   assert.deepEqual(promptInput(call.stdin, 'why'), ['The Health report of 2026-10-27 has 5 flags.'])
   assert.equal(health().status, 'diagnosed')
 })
 
-test('a Health Agent that fails on Claude Code and then on Codex is recorded as failed, with both errors, and fails the Step', async () => {
+test('a Health Agent that fails on Codex and then on Claude Code is recorded as failed, with both errors, and fails the Step', async () => {
   prepare({ lake: 'failed', status: 'status.hold.json' })
   ws.setWorkerCli('claude', { stderr: 'Claude Code is down\n', exitCode: 1 })
   ws.setWorkerCli('codex', { stdout: JSON.stringify({ type: 'turn.failed', error: { message: "You've hit your usage limit." } }), exitCode: 1 })
@@ -148,8 +160,8 @@ test('a Health Agent that fails on Claude Code and then on Codex is recorded as 
   const recorded = health()
   assert.equal(recorded.status, 'failed')
   assert.equal(recorded.why[0], 'The Lake Step failed.')
-  assert.match(recorded.error, /claude-code failed: Claude Code is down; then codex failed: You've hit your usage limit\./)
-  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /health failed on claude-code[\s\S]*retrying once on codex[\s\S]*health failed on codex/)
+  assert.match(recorded.error, /codex failed: You've hit your usage limit\.; then claude-code failed: Claude Code is down/)
+  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /health failed on codex[\s\S]*retrying once on claude-code[\s\S]*health failed on claude-code/)
 })
 
 test("a Health Step that can't find ash_new is recorded as failed, saying where it looked", async () => {
@@ -159,24 +171,25 @@ test("a Health Step that can't find ash_new is recorded as failed, saying where 
   const result = await step()
 
   assert.equal(result.status, 1)
+  assert.deepEqual(ws.workerCliCalls('codex'), [])
   assert.deepEqual(ws.workerCliCalls('claude'), [])
   assert.match(health().error, /ash_new isn't at .*nowhere: set ASH_NEW_FOLDER in the env file/)
 })
 
 test('the Health Agent diagnoses once per Run unless forced, and again once the Lake Step has changed what it is given', async () => {
   prepare({ lake: 'failed', status: 'status.hold.json' })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   assert.equal((await step()).status, 0)
   assert.equal((await step()).status, 0)
-  assert.equal(ws.workerCliCalls('claude').length, 1, 'the second run found the diagnosis already made')
+  assert.equal(ws.workerCliCalls('codex').length, 1, 'the second run found the diagnosis already made')
 
   assert.equal((await step('--force')).status, 0)
-  assert.equal(ws.workerCliCalls('claude').length, 2)
+  assert.equal(ws.workerCliCalls('codex').length, 2)
 
   ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
   assert.equal((await step()).status, 0)
-  assert.equal(ws.workerCliCalls('claude').length, 3, 'the Lake Step was re-run since')
+  assert.equal(ws.workerCliCalls('codex').length, 3, 'the Lake Step was re-run since')
 })
 
 test('a dry run diagnoses on the fake Worker', async () => {
@@ -192,7 +205,7 @@ test('a dry run diagnoses on the fake Worker', async () => {
 
 test('the Corrections the Health Agent proposes are recorded in ash_new to wait for approval, and health.json says what became of them', async () => {
   prepare({ status: 'status.healthy.json' })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, corrections }))
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections }))
   ws.setPd({ corrections: { example: 'corrections-propose.recorded.json' }, status: { example: 'status.healthy.json' } })
 
   const result = await step()
@@ -214,7 +227,7 @@ test('the Corrections the Health Agent proposes are recorded in ash_new to wait 
 
 test('a diagnosis with no Corrections records none in ash_new', async () => {
   prepare({ status: 'status.healthy.json' })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   assert.equal((await step()).status, 0)
   assert.deepEqual(ws.pdCalls(), [])
@@ -223,7 +236,7 @@ test('a diagnosis with no Corrections records none in ash_new', async () => {
 
 test("Corrections that can't be recorded fail the Step, keeping the diagnosis, and a re-run records them without asking the Agent again", async () => {
   prepare({ status: 'status.healthy.json' })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, corrections }))
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections }))
   ws.setPd({ corrections: [{ stderr: 'database is locked', exitCode: 1 }, { example: 'corrections-propose.recorded.json' }] })
 
   const failed = await step()
@@ -234,7 +247,7 @@ test("Corrections that can't be recorded fail the Step, keeping the diagnosis, a
   assert.match(health().proposals.error, /pd corrections propose .* exited with 1: database is locked/)
 
   assert.equal((await step()).status, 0)
-  assert.equal(ws.workerCliCalls('claude').length, 1, 'the diagnosis is kept')
+  assert.equal(ws.workerCliCalls('codex').length, 1, 'the diagnosis is kept')
   assert.deepEqual(ws.pdCalls().map((call) => call.args[0]), ['corrections', 'corrections', 'status'])
   assert.equal(health().proposals.status, 'recorded')
 })

@@ -1,10 +1,10 @@
 import type { AgentConfig } from '../../src/agent.ts'
 
 const health: AgentConfig = {
-  // Claude Code first: on Windows, Codex's unelevated sandbox can't enforce the deny-read rules that
-  // keep it from the Tools this Agent doesn't declare, so Codex refuses to start there.
-  worker: { name: 'claude-code', model: 'opus', effort: 'high' },
-  fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  // Codex first. On Windows its unelevated sandbox can't enforce a deny-read rule, so a call there
+  // falls back to Claude Code.
+  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
   permissions: 'read-only',
   inputs: {
     why: 'Why you were called: the Lake Step failed, its status couldn\'t be read, the Data gate failed, or the Health report flags something',

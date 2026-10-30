@@ -7,16 +7,22 @@ import { git, makeWorkspace, type Workspace } from './helpers.ts'
 let ws: Workspace
 afterEach(() => ws.cleanup())
 
-/** `claude --print` answering as a PM Agent with nothing to report. */
-const claudeCodeAnsweringPm = {
-  stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: { repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null, taskStatus: [] } }),
+/** `codex exec --json` answering as a PM Agent with nothing to report. */
+const codexAnsweringPm = {
+  stdout: [
+    { type: 'thread.started', thread_id: 'thread-1' },
+    { type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: JSON.stringify({ repoLines: [], highlights: [], todos: ['Check the baselines.'], memory: null, taskStatus: [] }) } },
+    { type: 'turn.completed' },
+  ]
+    .map((event) => JSON.stringify(event))
+    .join('\n'),
 }
 
 test('agents run daily creates a Run named by local start date and time that runs its Steps in order', async () => {
   ws = makeWorkspace()
   ws.addRepo('crux_flutter')
   ws.writeRepoList()
-  ws.setWorkerCli('claude', claudeCodeAnsweringPm)
+  ws.setWorkerCli('codex', codexAnsweringPm)
 
   const result = await ws.agents('run', 'daily')
 
@@ -71,7 +77,7 @@ test('a Run whose Fetch fails still writes its Brief and ends partial', async ()
   ws.addBrokenRepo('gone')
   ws.addRepo('crux_flutter')
   ws.writeRepoList()
-  ws.setWorkerCli('claude', claudeCodeAnsweringPm)
+  ws.setWorkerCli('codex', codexAnsweringPm)
 
   const result = await ws.agents('run', 'daily')
 
@@ -126,7 +132,7 @@ test('agents run daily --dry-run reviews new commits on the fake Worker, and lea
   assert.equal(run.status, 'succeeded')
   assert.deepEqual(ws.reviewResult(id, 'crux_flutter').findings, [])
   assert.match(ws.readRunFile(id, 'brief.md'), /## To-dos\n\nNothing is waiting on you\.\n[\s\S]*### crux_flutter[\s\S]*Review: Answered by the fake Worker\.\n\nNo findings\./)
-  assert.deepEqual(ws.workerCliCalls('claude'), [])
+  assert.deepEqual([...ws.workerCliCalls('claude'), ...ws.workerCliCalls('codex')], [])
   assert.deepEqual(ws.readRepoState(), { crux_flutter: { lastReviewed: baseline } })
 })
 
@@ -205,7 +211,7 @@ test('agents run daily --worker codex runs the PM Agent on Codex, with the model
   const [call, ...more] = ws.workerCliCalls('codex')
   assert.deepEqual(more, [])
   assert.ok(call.args.includes('gpt-6-astra'), call.args.join(' '))
-  assert.ok(call.args.includes('model_reasoning_effort="medium"'), call.args.join(' '))
+  assert.ok(call.args.includes('model_reasoning_effort="high"'), call.args.join(' '))
   assert.deepEqual(ws.workerCliCalls('claude'), [])
 })
 

@@ -99,8 +99,8 @@ const book: JsonSchema = {
 }
 
 const portfolioManager: AgentConfig = {
-  // Claude Code first, as the PRD has it; and on Windows, Codex's unelevated sandbox can't enforce the
-  // deny-read rules that keep it from the Tools this Agent doesn't declare (see the Health Agent).
+  // Claude Code first: on Windows, Codex's unelevated sandbox can't enforce a deny-read rule, so Codex
+  // refuses to start there (see the Health Agent).
   worker: { name: 'claude-code', model: 'opus', effort: 'high' },
   fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   permissions: 'read-only',

@@ -144,21 +144,20 @@ test('the weekly PM is given the weekly backlog, not the daily one', async () =>
   ws.writeRunFile(weeklyRun, 'review/crux_flutter.json', { ...reviewed('crux_flutter', sha(5), sha(6)), summary: 'Last week.' })
   ws.writePmBacklog([dailyRun])
   writeJson(join(ws.dataDir, 'state', 'weekly-pm-backlog.json'), [weeklyRun])
-  ws.setWorkerCli('claude', {
-    stdout: JSON.stringify({
-      type: 'result',
-      subtype: 'success',
-      is_error: false,
-      num_turns: 1,
-      result: '{}',
-      structured_output: { repoLines: [], highlights: [], todos: [], memory: null, taskStatus: [] },
-    }),
+  ws.setWorkerCli('codex', {
+    stdout: [
+      { type: 'thread.started', thread_id: 'thread-1' },
+      { type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: JSON.stringify({ repoLines: [], highlights: [], todos: [], memory: null, taskStatus: [] }) } },
+      { type: 'turn.completed' },
+    ]
+      .map((event) => JSON.stringify(event))
+      .join('\n'),
   })
 
   const result = await ws.agents('step', 'pm', '--run', runId)
 
   assert.equal(result.status, 0, result.stderr)
-  const prompt = ws.workerCliCalls('claude')[0].stdin
+  const prompt = ws.workerCliCalls('codex')[0].stdin
   assert.match(prompt, /Last week\./)
   assert.doesNotMatch(prompt, /Daily only\./)
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'pm.json')).runs, [weeklyRun, runId])

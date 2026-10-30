@@ -124,7 +124,7 @@ test('the Portfolio Manager falls back to Codex when Claude Code fails', async (
 test('after both Workers fail, the failure is recorded and the Check Step sends the Rule plans with a note the Brief shows', async () => {
   prepare()
   ws.setWorkerCli('claude', { stderr: 'Claude Code is down\n', exitCode: 1 })
-  ws.setWorkerCli('codex', { stdout: JSON.stringify({ type: 'turn.failed', error: { message: "You've hit your usage limit." } }), exitCode: 1 })
+  ws.setWorkerCli('codex', { stderr: 'Codex is overloaded\n', exitCode: 1 })
   ws.setPd({ check: { example: 'check.recorded.json' }, 'paper-books': { example: 'paper-books.json' }, judgement: { example: 'judgement-show.books.json' }, orders: { example: 'orders.empty.json' } })
 
   const ran = await step('portfolio-manager')
@@ -134,7 +134,7 @@ test('after both Workers fail, the failure is recorded and the Check Step sends 
   assert.equal(ran.status, 1)
   assert.equal(status('portfolio-manager'), 'failed')
   assert.equal(result().status, 'failed')
-  assert.match(result().error, /claude-code failed: Claude Code is down; then codex failed: You've hit your usage limit\./)
+  assert.match(result().error, /claude-code failed: Claude Code is down; then codex failed: Codex is overloaded/)
   assert.equal(checked.status, 0, checked.stderr)
   const judgement = JSON.parse(ws.readRunFile(runId, 'judgement.json'))
   assert.equal(judgement.status, 'failed')

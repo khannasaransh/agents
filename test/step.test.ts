@@ -32,7 +32,15 @@ test('re-running a failed Step retries what failed and updates the Run record', 
   const broken = ws.addBrokenRepo('gone')
   ws.writeRepoList()
   const pmAnswer = { repoLines: [], highlights: [], todos: [], memory: null, taskStatus: [] }
-  ws.setWorkerCli('claude', { stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, structured_output: pmAnswer }) })
+  ws.setWorkerCli('codex', {
+    stdout: [
+      { type: 'thread.started', thread_id: 'thread-1' },
+      { type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: JSON.stringify(pmAnswer) } },
+      { type: 'turn.completed' },
+    ]
+      .map((event) => JSON.stringify(event))
+      .join('\n'),
+  })
   await ws.agents('run', 'daily')
   const [id] = ws.runIds()
   const before = ws.readRun(id)

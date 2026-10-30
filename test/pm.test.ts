@@ -45,6 +45,17 @@ function prepareRun() {
 
 const pm = () => ws.agents('step', 'pm', '--run', runId)
 
+/** What `codex exec --json` prints when its schema-checked answer is `answer`. */
+const codexAnswering = (answer: unknown) => ({
+  stdout: [
+    { type: 'thread.started', thread_id: 'thread-1' },
+    { type: 'item.completed', item: { id: 'item_1', type: 'agent_message', text: JSON.stringify(answer) } },
+    { type: 'turn.completed', usage: { input_tokens: 800, output_tokens: 40 } },
+  ]
+    .map((event) => JSON.stringify(event))
+    .join('\n'),
+})
+
 /** What `claude --print --output-format json` prints when its schema-checked answer is `answer`. */
 const claudeCodeAnswering = (answer: unknown) => ({
   stdout: JSON.stringify({ type: 'result', subtype: 'success', is_error: false, num_turns: 2, result: JSON.stringify(answer), structured_output: answer }),
@@ -68,16 +79,16 @@ const answer = {
 const { taskStatus: _, ...recorded } = answer
 const written = { status: 'answered', ...recorded, taskReport: null }
 
-test("the PM Agent runs on Claude Code with the Run's reviews, commits and health so far, no Discord messages and its Memory, and its answer is written to the Run", async () => {
+test("the PM Agent runs on Codex with the Run's reviews, commits and health so far, no Discord messages and its Memory, and its answer is written to the Run", async () => {
   ws = makeWorkspace()
   prepareRun()
   ws.writeMemory('pm', 'notes', '- Still open: the inpix-panel login bug.\n')
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const result = await pm()
 
   assert.equal(result.status, 0, result.stderr)
-  const [call, ...more] = ws.workerCliCalls('claude')
+  const [call, ...more] = ws.workerCliCalls('codex')
   assert.deepEqual(more, [])
   const { memory, ...reviewed } = review
   assert.deepEqual(promptInput(call.stdin, 'reviews'), [reviewed])
@@ -101,35 +112,35 @@ test('the PM Agent is not given a review of other commits, such as one from befo
   ws = makeWorkspace()
   prepareRun()
   ws.writeRunFile(runId, 'review/crux_flutter.json', { ...review, to: sha(3) })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const result = await pm()
 
   assert.equal(result.status, 0, result.stderr)
-  assert.deepEqual(promptInput(ws.workerCliCalls('claude')[0].stdin, 'reviews'), [])
+  assert.deepEqual(promptInput(ws.workerCliCalls('codex')[0].stdin, 'reviews'), [])
 })
 
 test('re-running PM after it answered calls no Worker, unless forced', async () => {
   ws = makeWorkspace()
   prepareRun()
   ws.writeRunFile(runId, 'pm.json', { status: 'answered', ...answer, todos: [] })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const rerun = await pm()
 
   assert.equal(rerun.status, 0, rerun.stderr)
-  assert.deepEqual(ws.workerCliCalls('claude'), [])
+  assert.deepEqual(ws.workerCliCalls('codex'), [])
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'pm.json')).todos, [])
 
   const forced = await ws.agents('step', 'pm', '--run', runId, '--force')
 
   assert.equal(forced.status, 0, forced.stderr)
-  assert.equal(ws.workerCliCalls('claude').length, 1)
+  assert.equal(ws.workerCliCalls('codex').length, 1)
   const { runs, inputs, memoryRead, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
   assert.deepEqual(answered, written)
 })
 
-test('a PM Agent that fails on Claude Code is retried on Codex outside any git repo, and when that fails too the Step fails and the Run records why', async () => {
+test('a PM Agent that fails on Codex is retried on Claude Code outside any git repo, and when that fails too the Step fails and the Run records why', async () => {
   ws = makeWorkspace()
   prepareRun()
   ws.setWorkerCli('claude', { stdout: JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'Session limit reached' }), exitCode: 1 })
@@ -142,13 +153,13 @@ test('a PM Agent that fails on Claude Code is retried on Codex outside any git r
   assert.ok(codex.args.includes('--skip-git-repo-check'), codex.args.join(' '))
   const recorded = JSON.parse(ws.readRunFile(runId, 'pm.json'))
   assert.equal(recorded.status, 'failed')
-  assert.match(recorded.error, /^claude-code failed: Session limit reached; then codex failed: Codex is overloaded$/)
+  assert.match(recorded.error, /^codex failed: Codex is overloaded; then claude-code failed: Session limit reached$/)
 })
 
 test('re-running PM answers again once an earlier Step changed what its answer was given, such as a forced re-read of Discord', async () => {
   ws = makeWorkspace()
   prepareRun()
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
   const first = await pm()
   assert.equal(first.status, 0, first.stderr)
   ws.writeRunFile(runId, 'discord.json', { since: '2026-10-21T00:00:00.000Z', until: '2026-10-22T00:00:00.000Z', messages: [] })
@@ -156,8 +167,8 @@ test('re-running PM answers again once an earlier Step changed what its answer w
   const rerun = await pm()
 
   assert.equal(rerun.status, 0, rerun.stderr)
-  assert.equal(ws.workerCliCalls('claude').length, 2)
-  assert.deepEqual(promptInput(ws.workerCliCalls('claude')[1].stdin, 'discord'), [])
+  assert.equal(ws.workerCliCalls('codex').length, 2)
+  assert.deepEqual(promptInput(ws.workerCliCalls('codex')[1].stdin, 'discord'), [])
 })
 
 test("the PM Agent is given what earlier Runs in the PM backlog held, since their PM failed, before this Run's, and its answer names the Runs it covers", async () => {
@@ -171,12 +182,12 @@ test("the PM Agent is given what earlier Runs in the PM backlog held, since thei
   ws.writeRunFile(earlierRun, 'review/crux_flutter.json', { ...review, from: sha(9), to: sha(1), summary: 'Adds a login.', findings: [loginFinding] } satisfies ReviewResult)
   ws.writeRunFile(earlierRun, 'discord.json', { since: '2026-10-20T00:00:00.000Z', until: '2026-10-21T00:00:00.000Z', messages: [] })
   ws.writePmBacklog([earlierRun])
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const result = await pm()
 
   assert.equal(result.status, 0, result.stderr)
-  const [call] = ws.workerCliCalls('claude')
+  const [call] = ws.workerCliCalls('codex')
   assert.deepEqual(
     (promptInput(call.stdin, 'reviews') as ReviewResult[]).map((r) => [r.from, r.to, r.status === 'reviewed' && r.findings.length]),
     [
@@ -244,12 +255,12 @@ test('with a sprint post, the PM Agent is given it and the last report on the sa
     { id: 'paywall', status: 'in-testing', note: 'The paywall is merged and waits for QA.', evidence: ['crux_flutter `2222222` Add paywall'] },
     { id: 'football-center', status: 'blocked', note: 'Still waits on the scores API.', evidence: [] },
   ]
-  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, taskStatus }))
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, taskStatus }))
 
   const result = await pm()
 
   assert.equal(result.status, 0, result.stderr)
-  const prompt = ws.workerCliCalls('claude')[0].stdin
+  const prompt = ws.workerCliCalls('codex')[0].stdin
   const { loginLinks, ...update } = sprintPost.updates[0]
   assert.deepEqual(promptInput(prompt, 'sprint'), { ...sprintPost, updates: [update] }, 'the PRD links of messages since the post are not To-dos again')
   assert.deepEqual(promptInput(prompt, 'previousTaskStatus'), {
@@ -269,12 +280,12 @@ test('with a sprint post, the PM Agent is given it and the last report on the sa
 test('without a sprint post, the PM Agent is given none and records no task status report', async () => {
   ws = makeWorkspace()
   prepareRun()
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   const result = await pm()
 
   assert.equal(result.status, 0, result.stderr)
-  const prompt = ws.workerCliCalls('claude')[0].stdin
+  const prompt = ws.workerCliCalls('codex')[0].stdin
   assert.equal(promptInput(prompt, 'sprint'), null)
   assert.equal(promptInput(prompt, 'previousTaskStatus'), null)
   assert.equal(JSON.parse(ws.readRunFile(runId, 'pm.json')).taskReport, null)
@@ -286,12 +297,12 @@ test("with a sprint post, the PM Agent is given the work on other branches since
   ws.writeRunFile(runId, 'sprint.json', sprintPost)
   const repos = [{ repo: 'inpix_flutter', team: 'flutter', production: 'development', branches: [{ branch: 'feature/jaapCounterChanges', count: 1, commits: [{ sha: sha(4), author: 'Shreyansh', date: '2026-10-22T10:00:00+05:30', subject: 'Bug fixes' }] }] }]
   ws.writeRunFile(runId, 'branches.json', { since: '2026-10-21T12:05:26.362Z', repos, failed: [] })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.setWorkerCli('codex', codexAnswering(answer))
 
   assert.equal((await pm()).status, 0)
-  assert.deepEqual(promptInput(ws.workerCliCalls('claude')[0].stdin, 'branches'), repos)
+  assert.deepEqual(promptInput(ws.workerCliCalls('codex')[0].stdin, 'branches'), repos)
 
   ws.writeRunFile(runId, 'branches.json', { since: '2026-10-14T12:00:00.000Z', repos, failed: [] })
   assert.equal((await ws.agents('step', 'pm', '--run', runId, '--force')).status, 0)
-  assert.equal(promptInput(ws.workerCliCalls('claude')[1].stdin, 'branches'), null)
+  assert.equal(promptInput(ws.workerCliCalls('codex')[1].stdin, 'branches'), null)
 })

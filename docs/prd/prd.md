@@ -10,7 +10,7 @@ He already pays for three coding-agent CLIs (Claude Code, Codex and Antigravity)
 
 ## Solution
 
-A local agent system in its own repo, run by one command or by a Schedule. Tuesday to Saturday at 03:00 IST a daily Pipeline runs on his Mac:
+A local agent system in its own repo, run by one command or by a Schedule. Tuesday to Saturday at 03:30 IST a daily Pipeline runs on his Mac:
 
 1. It fetches every Repo, without ever touching his working copies.
 2. It reviews each Repo's new commits with a Reviewer Agent.
@@ -27,7 +27,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 ### Running the Pipeline
 
-1. As Saransh, I want the daily Pipeline to run by itself Tuesday to Saturday at 03:00 IST, so that the Brief is ready before I start work.
+1. As Saransh, I want the daily Pipeline to run by itself Tuesday to Saturday at 03:30 IST, so that the Brief is ready before I start work.
 2. As Saransh, I want a missed Run to happen when the Mac next wakes, so that a sleeping laptop costs me a delay, not a day.
 3. As Saransh, I want to start the daily Pipeline by hand with one command, so that I can get a fresh Brief whenever I want.
 4. As Saransh, I want to run a single Step inside an existing Run, so that I can retry or tune one part without redoing the rest.
@@ -186,11 +186,11 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
      - A dry run saves nothing into the inbox; each message in the Run folder still lists its PRD files.
    - It records, on each message, links it can't download because they need a login, as To-do candidates for the PM Agent: Google Docs and Drive, Notion, Confluence (`atlassian.net`), SharePoint and OneDrive, and Dropbox, with their subdomains.
    - It is skipped, not failed, while the bot isn't configured.
-4. **PM** (Agent): runs on Claude Code, with Codex as its fallback. It has no Repo to read, so it runs read-only in the Run folder.
+4. **PM** (Agent): runs on Codex, with Claude Code as its fallback. It has no Repo to read, so it runs read-only in the Run folder.
    - Input: the reviews that cover the commits Fetch found, commit summaries, the Discord messages read in the Run (null when Discord wasn't read), the Run's health so far (the earlier Steps that didn't succeed and the Repos that failed to fetch), and its Memory of open items.
    - Output, checked against a schema and written to the Run folder as `pm.json`: a line per Repo, Discord highlights, To-dos, and its proposed Memory. A failed call is recorded there too, and the Step fails.
    - The rules for what counts as a To-do are open (see Further Notes). The candidates are Discord requests aimed at Saransh with no reply from him, findings on his commits, wiki drafts waiting for him, and PRD links he has to download.
-5. **Docs** (Agent): runs on Claude Code in its own worktree of the wiki, on a single rolling docs branch.
+5. **Docs** (Agent): runs on Codex, with Claude Code as its fallback, in its own worktree of the wiki, on a single rolling docs branch.
    - **Branch:** it continues an unmerged branch, starts fresh from the wiki's main line once the branch has been merged, and merges main in first if main has moved. On a conflict it stops and reports.
    - **Scope:** existing pages whose sources cite files changed by new commits, and every file in the PRD inbox. It uses the wiki's own skills: the PRD skill for PRDs and the update procedure for code changes.
    - **PRD files:** it decides whether each one is a PRD and which Codebase it belongs to, copies it into that Codebase's PRD sources, and writes the PRD page. A copy from Discord cites the Discord message link in the page's sources. Once its work is committed, it moves processed files into the inbox's `done/`, and files it set aside, such as those that aren't PRDs, into `skipped/`. Each file's `sources.json` entry moves with it.
@@ -279,7 +279,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 ### Schedule
 
-- The daily Schedule runs Tuesday to Saturday at 05:30 on the Mac's local clock (Singapore), which is 03:00 IST. The weekly Schedule runs Sunday at the same time.
+- The daily Schedule runs Tuesday to Saturday at 06:00 on the Mac's local clock (Singapore), which is 03:30 IST. The weekly Schedule runs Sunday at the same time.
 - The launchd entry is generated from the Schedule definition. It sets its own PATH, since launchd doesn't load the shell profile.
 - launchd runs a missed time once when the Mac wakes. Saransh keeps the Mac awake, so there is no scheduled wake.
 
@@ -309,7 +309,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - Memory: Review gives the Worker the current Memory; accepting or rejecting a queued edit changes the Memory accordingly and records the decision in the Run.
   - Discord: is skipped cleanly without configuration; reads channels and threads within its window, page by page, waiting out rate limits; reads a DM with the bot, or refuses it when DMs are turned off; advances the read time only on a real, successful read; routes attachments to the PRD inbox. It is tested against a local server replaying recorded API responses.
   - Docs: continues, restarts or merges the rolling branch correctly; stops on conflict; moves PRD inbox files.
-  - PM: gets the Run's reviews, commits, health and Memory on Claude Code; records a failure after its fallback fails too.
+  - PM: gets the Run's reviews, commits, health and Memory on Codex; records a failure after its fallback fails too.
   - Brief: is written, with Run health, when earlier Steps failed; is complete with the PM output; says the PM output is missing after a PM failure; says when no Discord messages were read.
   - Re-runs: skip completed work unless forced.
   - Lock: blocks a second Run.

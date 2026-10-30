@@ -4,10 +4,10 @@
 // each Book's buys together. Only the analysts the review list needs are called, all at once, each
 // with its names, what it reads of their dossiers and which Feeds were fetched; it skips itself when
 // no analyst is needed. A view of a name is reused, with its date, while nothing its analyst reads for
-// the name has changed, and an analyst whose views are all reused isn't called. Each runs on Claude
-// Code with Codex as fallback, read-only in the Run folder (the issue has Chart on Codex first; the
-// PRD's note on Codex's sandbox on Windows puts it on Claude Code until Codex enforces it). Events
-// and Risk may search the web to check one item; Chart can't.
+// the name has changed, and an analyst whose views are all reused isn't called. Events runs on Codex
+// with Claude Code as fallback; Chart and Risk run on Claude Code with Codex as fallback, because on
+// Windows Codex's unelevated sandbox can't enforce a deny-read rule (see the Health Agent). Each is
+// read-only in the Run folder. Events and Risk may search the web to check one item; Chart can't.
 // Each answer is checked against its schema, and each view against what the analyst may say of its
 // name: none, a veto or a trim of a buy, an early exit of a holding, with its evidence. A view it may
 // not give is refused. A buy without a view it needed (its analyst failed, gave none, or gave one

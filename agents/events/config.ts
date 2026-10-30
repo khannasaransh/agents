@@ -2,9 +2,9 @@ import type { AgentConfig } from '../../src/agent.ts'
 import { analystOutputSchema } from '../../src/desk.ts'
 
 const events: AgentConfig = {
-  // Claude Code first, as the PRD has it; Codex, its fallback, gives the Desk a second model's view.
-  worker: { name: 'claude-code', model: 'opus', effort: 'medium' },
-  fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'medium' },
+  // Codex first; Claude Code, its fallback, gives the Desk a second model's view.
+  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'medium' },
   permissions: 'read-only',
   // Only to check one item, citing its source; nothing about Saransh's money is in its inputs to search for.
   webSearch: true,

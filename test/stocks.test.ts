@@ -153,7 +153,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   assert.deepEqual([...new Set(judgement.missing_reviews.map((m: { analyst: string }) => m.analyst))].sort(), ['chart', 'events', 'risk'])
   const brief = ws.readRunFile(id, 'brief.html')
   assert.match(brief, /Data gate: fail/)
-  assert.match(brief, /The Health Agent failed, so there is no diagnosis: claude-code failed/)
+  assert.match(brief, /The Health Agent failed, so there is no diagnosis: codex failed/)
   assert.match(brief, /The Portfolio Manager failed, so each real and paper Book's Rule plan went out instead/)
   assert.match(brief, /lake: failed\. Log: <a href="logs\/lake\.log">/)
   assert.match(brief, /<h2>Coming events for the holdings<\/h2>/)

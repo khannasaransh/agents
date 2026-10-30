@@ -484,7 +484,7 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
   So an Agent's Memory changes can now be set per Memory file rather than per Agent.
 - **Health Agent:** Codex, with Claude Code as fallback. It reads ash_new's repo, its logs and the Lake's Health reports, read-only.
 - **The Desk:**
-  - **Workers:** Events and Risk run on Claude Code, Chart on Codex. Each falls back to the other Worker.
+  - **Workers:** Events runs on Codex. Chart and Risk run on Claude Code. Each falls back to the other Worker.
   - **Access:** all three are read-only in the Run folder. Events and Risk may use their Worker's web search, only to check one item and citing its source. Chart has no web access.
   - **Output**, checked against a schema, for each name: no view, a veto, a trim to a given size, or a proposed exit, with reasons and the evidence cited.
 - **Instructions** tell each Agent what it may and may not do, and state the Mandate and the Playbook. What enforces them is the final check, not the instructions.
@@ -677,7 +677,7 @@ There are two seams, and both are a command with files in and files out.
   - the contact for the SEC's User-Agent;
   - later, contract notes, if real brokerage is to enter the costs.
 - **Unconfirmed:**
-  - **Codex's read-only sandbox on Windows:** its unelevated sandbox holds, but it can't enforce the deny rules that keep an Agent from Tools it doesn't declare, so Codex refuses those calls (issue 19). The Health Agent therefore starts on Claude Code, and so does the Chart analyst unless Codex's elevated sandbox proves to enforce them.
+  - **Codex's read-only sandbox on Windows:** its unelevated sandbox holds, but it can't enforce the deny rules that keep an Agent from Tools it doesn't declare, so Codex refuses those calls (issue 19). The Agent then falls back to Claude Code.
   - **NSE and BSE endpoints** need browser-like headers and cookies, and change without notice. A failing Feed skips itself with a To-do.
   - **Broker charges in exports:** answered. ICICI Direct's tradebook has every charge, and its brokerage isn't ₹0: about 0.24% of each trade in Saransh's sample (issue 23). moomoo's trade history has none: its Fill Amount is the shares times the price, so the reviews can't check the $0 brokerage from it (issue 24).
   - **Web search permission:** how Claude Code's web search is allowed for the Events and Risk analysts, given that the Worker denies every command that isn't read-only.
