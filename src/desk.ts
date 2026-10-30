@@ -188,9 +188,16 @@ export interface AnalystWork {
 /** The kinds of event dated by the day they are about, which may be to come: a holding's are Risk's to weigh. */
 const comingKinds: PdEvent['kind'][] = ['board_meeting', 'results']
 
+/** Each of `items` once by its key, the first kept: a name in a Book's real and paper plans is reviewed once. */
+function once<T>(items: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>()
+  return items.filter((item) => !seen.has(key(item)) && Boolean(seen.add(key(item))))
+}
+
 /**
  * Each analyst's work in this Run, by the review list: Events and Chart by name, Risk over each Book's
- * buys, with its holdings' results and board meetings to come from the Feeds.
+ * buys, with its holdings' results and board meetings to come from the Feeds. A name in both a Book's
+ * real and paper plans (issue 42) is reviewed once for the Book: an analyst's view is of a name in a Book.
  */
 export function deskWork(plan: PdPlan, dossierOf: (path: string) => PdDossier | null, feeds: PdFeeds | null = null): AnalystWork[] {
   const review = plan.review
@@ -209,10 +216,13 @@ export function deskWork(plan: PdPlan, dossierOf: (path: string) => PdDossier | 
     }
   }
   return review.analysts.map((analyst) => {
-    if (analyst !== 'risk') return { analyst, names: review.names.filter((n) => n.analysts.some((a) => a.analyst === analyst)).map((n) => toReview(n, analyst)), holdings: {} }
-    const names = review.risk.flatMap((r) => review.names.filter((n) => n.book === r.book && n.role === 'buy' && r.buys.includes(n.security_id)).map((n) => toReview(n, analyst)))
+    const byBook = (n: { book: string; security_id: string }) => `${n.book}:${n.security_id}`
+    if (analyst !== 'risk') return { analyst, names: once(review.names.filter((n) => n.analysts.some((a) => a.analyst === analyst)), byBook).map((n) => toReview(n, analyst)), holdings: {} }
+    const books = [...new Set(review.risk.map((r) => r.book))]
+    const buys = (book: string) => new Set(review.risk.filter((r) => r.book === book).flatMap((r) => r.buys))
+    const names = books.flatMap((book) => once(review.names.filter((n) => n.book === book && n.role === 'buy' && buys(book).has(n.security_id)), byBook).map((n) => toReview(n, analyst)))
     const holdings = Object.fromEntries(
-      review.risk.map((r) => {
+      once(review.risk, (r) => r.book).map((r) => {
         const paper = plan.plans.find((p) => p.book === r.book && p.kind === 'paper')
         const held = (paper?.holdings ?? []).filter((h) => h.sleeve !== 'gold')
         const coming = (sid: string) =>
@@ -295,7 +305,7 @@ export function refusal(analyst: PdAnalyst, view: AnalystView, t: NameToReview):
 export function requiredReviews(review: PdReviewList): Omit<PdMissingReview, 'why'>[] {
   const byName = review.names.filter((n) => n.role === 'buy').flatMap((n) => n.analysts.map((a) => ({ book: n.book, security_id: n.security_id, analyst: a.analyst as PdAnalyst })))
   const risk = review.risk.flatMap((r) => r.buys.map((security_id) => ({ book: r.book, security_id, analyst: 'risk' as PdAnalyst })))
-  return [...byName, ...risk]
+  return once([...byName, ...risk], (r) => `${r.analyst}:${r.book}:${r.security_id}`)
 }
 
 /** Every amount of Saransh's Books in the Run's plans and Book states: shares, values and cash, each a whole number. */

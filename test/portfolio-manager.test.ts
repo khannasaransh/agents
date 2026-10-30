@@ -125,7 +125,7 @@ test('after both Workers fail, the failure is recorded and the Check Step sends 
   prepare()
   ws.setWorkerCli('claude', { stderr: 'Claude Code is down\n', exitCode: 1 })
   ws.setWorkerCli('codex', { stdout: JSON.stringify({ type: 'turn.failed', error: { message: "You've hit your usage limit." } }), exitCode: 1 })
-  ws.setPd({ check: { example: 'check.recorded.json' }, 'paper-books': { example: 'paper-books.json' }, judgement: { example: 'judgement-show.books.json' } })
+  ws.setPd({ check: { example: 'check.recorded.json' }, 'paper-books': { example: 'paper-books.json' }, judgement: { example: 'judgement-show.books.json' }, orders: { example: 'orders.empty.json' } })
 
   const ran = await step('portfolio-manager')
   const checked = await step('check')
@@ -142,8 +142,8 @@ test('after both Workers fail, the failure is recorded and the Check Step sends 
   assert.deepEqual(judgement.books, [])
   const [check] = ws.pdCalls()
   assert.ok(check.args[check.args.indexOf('--judgement') + 1].endsWith(join(runId, 'judgement.json')))
-  assert.match(ws.readRunFile(runId, 'logs', 'check.log'), /The Portfolio Manager failed: .*each paper Book's Rule plan goes out instead/)
-  assert.match(ws.readRunFile(runId, 'brief.html'), /The Portfolio Manager failed, so each paper Book's Rule plan went out instead, once it passed the final check: claude-code failed: Claude Code is down/)
+  assert.match(ws.readRunFile(runId, 'logs', 'check.log'), /The Portfolio Manager failed: .*each real and paper Book's Rule plan goes out instead/)
+  assert.match(ws.readRunFile(runId, 'brief.html'), /The Portfolio Manager failed, so each real and paper Book's Rule plan went out instead, once it passed the final check: claude-code failed: Claude Code is down/)
 })
 
 test('the Portfolio Manager judges nothing when the Plan Step failed, or no paper Book has a plan', async () => {

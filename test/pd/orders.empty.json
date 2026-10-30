@@ -1,0 +1,41 @@
+{
+  "at": "2026-10-30T01:30:00+00:00",
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "market": "IN",
+      "currency": "INR",
+      "started": false,
+      "orders": [],
+      "stops": [],
+      "own_trades": []
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "market": "US",
+      "currency": "USD",
+      "started": false,
+      "orders": [],
+      "stops": [],
+      "own_trades": []
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "market": "HK",
+      "currency": "HKD",
+      "started": false,
+      "orders": [],
+      "stops": [],
+      "own_trades": []
+    }
+  ]
+}

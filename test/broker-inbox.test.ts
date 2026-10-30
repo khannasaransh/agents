@@ -13,7 +13,7 @@ const stocksSteps = ['answers', 'broker-inbox', 'marketsmith', 'lake', 'brief'].
 function prepare({ dryRun = false, pd }: { dryRun?: boolean; pd: Record<string, PdAnswer | PdAnswer[]> }) {
   ws = makeWorkspace()
   ws.prepareRun(runId, { pipeline: 'stocks', steps: stocksSteps, dryRun })
-  ws.setPd(pd)
+  ws.setPd({ orders: { example: 'orders.empty.json' }, ...pd })
 }
 
 const inbox = () => join(ws.dataDir, 'broker-inbox')
@@ -65,7 +65,7 @@ test('each Reconciliation difference becomes a To-do, from the latest holdings e
   const result = await step()
 
   assert.equal(result.status, 0, result.stderr)
-  assert.deepEqual(ws.pdCalls().map((call) => call.args), [['book-holdings']], 'an empty inbox hands nothing in')
+  assert.deepEqual(ws.pdCalls().map((call) => call.args), [['book-holdings'], ['orders', 'show']], 'an empty inbox hands nothing in')
   assert.deepEqual(todos(), [
     'Reconciliation, India Book, as of 2026-10-31: ICICI Direct holds 15 of Angel One Ltd (IN:ANGELONE), which its ledger has none of. Drop the tradebook with its buys in the Broker inbox.',
     'Reconciliation, India Book, as of 2026-10-31: ICICI Direct holds 48 of Delhivery Ltd (IN:DELHIVERY), its ledger 30. Drop the tradebook with the missing buys in the Broker inbox.',
@@ -178,4 +178,20 @@ test('pd broker import failing fails the Step and leaves every file in the inbox
   assert.equal(status(), 'failed')
   assert.deepEqual(inInbox(), ['orderBook_Equity_1.csv'])
   assert.match(ws.readRunFile(runId, 'logs', 'broker-inbox.log'), /pd broker import .* exited with 1: Traceback: sqlite3\.OperationalError: database is locked/)
+})
+
+test("a placed order no tradebook has shown by the next Run raises a To-do naming the file to drop, and a fill matching no order is logged as Saransh's own trade", async () => {
+  prepare({ pd: { broker: { example: 'broker-import.recorded.json' }, 'book-holdings': { example: 'book-holdings.empty.json' }, orders: { example: 'orders.waiting.json' } } })
+  drop('orderBook_Equity_1.csv')
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.pdCalls().at(-1)?.args, ['orders', 'show'], 'the orders are read once the files are recorded')
+  assert.deepEqual(todos(), [
+    "Drop ICICI Direct's tradebook covering 2026-10-29 in the Broker inbox: the India Book's IN-2026-10-29-002 (buy 100 Senco Gold Ltd) is placed, and no tradebook has shown whether it filled.",
+  ])
+  assert.equal(recorded().orders.books[0].orders.length, 6, "pd orders show's answer is recorded for the Brief")
+  const log = ws.readRunFile(runId, 'logs', 'broker-inbox.log')
+  assert.match(log, /orderBook_Equity_1\.csv: Bought 100 IDFC First Bank Ltd at 80\.98 on 2026-10-29 matches no order of the India Book: your own trade/)
 })

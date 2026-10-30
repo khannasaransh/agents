@@ -32,11 +32,12 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     review: { example: 'review.saturday.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
-    'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
+    'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
     feeds: { example: 'feeds.fetched.json' },
     check: { example: 'check.recorded.json' },
     'paper-books': { example: 'paper-books.json' },
     judgement: { example: 'judgement-show.books.json' },
+    orders: { example: 'orders.empty.json' },
   })
 
   const result = await ws.agents('run', 'stocks', '--dry-run')
@@ -74,17 +75,21 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     ws.pdCalls().map((call) => call.args.map((arg) => (arg.endsWith('.json') ? arg.split(/[\\/]/).at(-1)! : arg))),
     [
       ['book-holdings'],
+      ['orders', 'show'],
       ['status'],
       ...(saturday ? [['review', '--dry-run']] : []),
       ['stages', 'check', '--dry-run'],
       ['plan', '--on', id.slice(0, 10), '--dossiers', 'dossiers'],
       ['book-state', 'IN'],
+      ['book-state', 'US'],
+      ['book-state', 'HK'],
       ...states,
       // A dry run fetches no Feeds: it reads the cache.
       ['feeds', '--plan', 'plan.json', '--dossiers', 'dossiers', '--cached'],
       ['check', '--plan', 'plan.json', '--judgement', 'judgement.json', '--run', id, '--dry-run'],
       ['paper-books'],
       ['judgement', 'show'],
+      ['orders', 'show'],
     ],
     'nothing in ash_new is recorded, refreshed or cleared',
   )
@@ -104,11 +109,12 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     review: { example: 'review.saturday.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
-    'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
+    'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
     feeds: { example: 'feeds.fetched.json' },
     check: { example: 'check.recorded.json' },
     'paper-books': { example: 'paper-books.json' },
     judgement: { example: 'judgement-show.books.json' },
+    orders: { example: 'orders.empty.json' },
   })
 
   const result = await ws.agents('run', 'stocks')
@@ -148,7 +154,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   const brief = ws.readRunFile(id, 'brief.html')
   assert.match(brief, /Data gate: fail/)
   assert.match(brief, /The Health Agent failed, so there is no diagnosis: claude-code failed/)
-  assert.match(brief, /The Portfolio Manager failed, so each paper Book's Rule plan went out instead/)
+  assert.match(brief, /The Portfolio Manager failed, so each real and paper Book's Rule plan went out instead/)
   assert.match(brief, /lake: failed\. Log: <a href="logs\/lake\.log">/)
   assert.match(brief, /<h2>Coming events for the holdings<\/h2>/)
 })

@@ -151,7 +151,97 @@ export interface PdBrokerFile {
   why: string | null
   /** set_aside: rows that aren't the Book's trades: not a buy or sale, another market's (moomoo's Hong Kong fills, to the US Book), or, in the US and Hong Kong Books, a security ash_new hasn't got. */
   trades: { recorded: number; in_ledger: number; set_aside: number } | null
+  /** A recorded tradebook's fills in its real Book (issue 42): matched to orders, Saransh's own trades, and the orders it settled; null otherwise, and in a dry run. */
+  fills: PdFills | null
   reconciliation: PdReconciliation | null
+}
+
+/** A trade a tradebook recorded, as `pd broker import` and `pd orders show` name it. */
+export interface PdTrade {
+  day: string
+  security_id: string | null
+  name: string | null
+  side: 'BUY' | 'SELL'
+  qty: number
+  price: number
+}
+
+/** What a recorded tradebook's fills came to in its real Book (issue 42). */
+export interface PdFills {
+  /** The last session it covers (from its first trade's): each order of a session it covers is settled. Null without a trade. */
+  covered: string | null
+  /** A trade larger than one order fills each in turn, a part for each. */
+  matched: (PdTrade & { order: string })[]
+  /** The trades Saransh made himself: fills matching no order. */
+  own: PdTrade[]
+  settled: { order: string; state: 'filled' | 'partly_filled' | 'expired'; filled: number; why: string | null }[]
+}
+
+/** Where a real Book's order stands (issue 42). */
+export type PdOrderState = 'proposed' | 'placed' | 'skipped' | 'filled' | 'partly_filled' | 'expired'
+
+/** A real Book's order, as `pd orders show` prints it (contract/orders.schema.json). */
+export interface PdOrder {
+  /** Its row's id: its Answer's item is order:<id>. */
+  id: number
+  order_id: string
+  /** The session it is valid for. */
+  session: string
+  run: string | null
+  sleeve: string
+  security_id: string
+  name: string | null
+  /** A sale is a market order, a buy a limit order at its limit. */
+  side: 'BUY' | 'SELL'
+  shares: number
+  price: number
+  limit: number | null
+  reason: string
+  /** The sale whose money a buy needs: placed only once that sale is. */
+  under: string | null
+  state: PdOrderState
+  /** not_placed: no Answer marked it placed by its session's end; not_filled: a tradebook shows it, or the rest of a partial fill, unfilled. */
+  why: string | null
+  filled: number
+  fill_price: number | null
+  fees: number
+  answer: 'placed' | 'skipped' | null
+  answered_at: string | null
+  /** Whether its session is over: a placed order then waits for a tradebook. */
+  session_over: boolean
+}
+
+/** A real Book's Disaster stop to place or raise, or placed (issue 42). */
+export interface PdStop {
+  /** Its Answer's item is stop:<id>. */
+  id: number
+  sleeve: string
+  security_id: string
+  name: string | null
+  price: number
+  /** The stop it raises; null for a new one. */
+  was: number | null
+  state: 'proposed' | 'placed'
+  answered_at: string | null
+}
+
+/** What `pd orders show` prints (contract/orders.schema.json): each real Book's orders, stops and own trades. */
+export interface PdOrders {
+  at: string
+  books: {
+    book: 'IN' | 'US' | 'HK'
+    name: string
+    broker: 'icici_direct' | 'moomoo'
+    broker_name: string
+    market: string
+    currency: string
+    /** Whether it has had an Order list recorded. */
+    started: boolean
+    /** Its orders still proposed or placed, and those of its last 5 Order lists, by session, in their lists' order. */
+    orders: PdOrder[]
+    stops: PdStop[]
+    own_trades: (PdTrade & { security_id: string; fees: number })[]
+  }[]
 }
 
 /**
@@ -357,11 +447,55 @@ export interface PdReview {
     reconciliation: (PdReconciliation & { file: string; reconciled_at: string }) | null
     /** Its paper Book's override scorecard (issue 40). */
     scorecard: PdScorecard
+    /** How far the real Book trailed its paper Book over the week, split (issue 44). */
+    real_gap: PdRealGap
   }[]
+  /** Each broker's fills of the week against their sessions' opens (issue 44). */
+  fill_costs: PdFillCosts[]
   demotions: (PdDemotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string })[]
   promotions_due: (PdPromotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string; from: PdStage })[]
   /** With --month (the first Saturday of a month, of the month before): the monthly review; else null. */
   monthly: PdMonthlyReview | null
+}
+
+/** A real Book's gap to its paper Book over the week (issue 44): the gap between their returns, split; the split adds up to the gap. */
+export interface PdRealGap {
+  status: 'measured' | 'not_measured'
+  why: string | null
+  from: string | null
+  to: string | null
+  paper_return: number | null
+  real_return: number | null
+  /** Each a part of the real Book's value at the week's start; stages: the rest of the gap, chiefly Stage scaling. */
+  split: { gap: number; fills: number; skips: number; expired: number; stages: number } | null
+}
+
+/** A broker's fills of the week against their sessions' opens, beside the slippage the cost presets assume (issue 44). */
+export interface PdFillCosts {
+  broker: 'icici_direct' | 'moomoo'
+  broker_name: string
+  books: ('IN' | 'US' | 'HK')[]
+  fills: {
+    book: 'IN' | 'US' | 'HK'
+    order: string
+    day: string
+    security_id: string
+    name: string | null
+    side: 'BUY' | 'SELL'
+    qty: number
+    price: number
+    value: number
+    open: number | null
+    /** What it cost against the open, in basis points of its value: a buy above it, a sale below it. */
+    cost_bps: number | null
+    assumed_bps: number | null
+    why: string | null
+  }[]
+  value: number
+  cost_bps: number | null
+  assumed_bps: number | null
+  /** Whether its fills cost more than the presets assume: flagged. */
+  costs_more: boolean
 }
 
 /** A tally of Overrides by one key: those judged and open, the hits (those that beat the Rule plan), and what those judged made. */
@@ -530,11 +664,14 @@ export interface PdBookState {
   reconciliation: { as_of: string; file: string; matched: number } | null
   /** Reconciliation's open differences: neither bought nor sold on a signal until settled. */
   unsettled: { security_id: string | null; name: string | null; kind: PdReconciliation['differences'][number]['kind']; ledger_qty: number | null; broker_qty: number }[]
-  /** A paper Book's: the orders of its Order lists not yet filled; a real Book's none until issue 42. */
+  /** A paper Book's: the orders of its Order lists not yet filled; a real Book's: those Saransh marked placed that no tradebook has shown yet (issue 42). */
   open_orders: { id: string; session: string; sleeve: string; security_id: string; side: 'BUY' | 'SELL'; shares: number; limit: number | null }[]
-  /** The cash its open orders reserve: its buys' shares at their limits. */
+  /** The cash its open orders reserve: its buys' shares at their limits. A real Book's placed sale's money isn't counted until its fill. */
   reserved: number
-  stops: { sleeve: string; security_id: string; price: number }[]
+  /** A real Book's say whether Saransh marked each placed. */
+  stops: { sleeve: string; security_id: string; price: number; placed?: boolean }[]
+  /** The Book engine's state its next Rule plan runs on from: a real Book's rebuilt from what its Order lists filled; null before its first. */
+  engine?: object | null
 }
 
 /** A cut a rule made to an order: the rule (or why the Book mustn't trade it), the shares wanted and allowed. */
@@ -602,8 +739,8 @@ interface PdBuyable {
   limit: number
 }
 
-/** The kinds of Rule plan: a real Book's shadow plan, a paper Book's and a rules-only paper Book's. */
-export type PdPlanKind = 'shadow' | 'paper' | 'rules_only'
+/** The kinds of Rule plan: a real Book's, a paper Book's and a rules-only paper Book's. */
+export type PdPlanKind = 'real' | 'paper' | 'rules_only'
 
 /** A Book's Rule plan, as `pd plan` prints it: planned, or why it couldn't be. */
 export interface PdRulePlan {
@@ -611,14 +748,15 @@ export interface PdRulePlan {
   book: 'IN' | 'US' | 'HK'
   name: string
   /**
-   * shadow: the real Book's, with one Sleeve, not for placing (issue 47); paper: the paper Book's, each
-   * strategy from Paper up at its full share (issue 32); rules_only: its rules-only paper Book's, the
-   * baseline the Portfolio Manager is judged against (issue 33). The Check Step records a paper and a
-   * rules-only plan as Order lists, filled at the next open.
+   * real: the real Book's, for Saransh to place, each Sleeve scaled by its Stage (issue 42); paper: the
+   * paper Book's, each strategy from Paper up at its full share (issue 32); rules_only: its rules-only
+   * paper Book's, the baseline the Portfolio Manager is judged against (issue 33). The Check Step records
+   * each as an Order list: a real Book's proposed, a paper and a rules-only plan's filled at the next open.
    */
   kind: PdPlanKind
   for_placing: boolean
-  state_id: string
+  /** The Book state it was made from; null for a real Book's plan whose state can't be read. */
+  state_id: string | null
   mandate_version: string
   playbook_version: string
   /** hold: the Data gate failed, so no order is made and only Disaster stops sell. */
@@ -932,15 +1070,15 @@ export interface PdListJudgement {
   commentary: string | null
 }
 
-/** What became of a paper Book's Order list in `pd check`. */
+/** What became of a real or paper Book's Order list in `pd check`. */
 export interface PdOrderList {
   book: 'IN' | 'US' | 'HK'
-  kind: 'paper' | 'rules_only'
+  kind: 'real' | 'paper' | 'rules_only'
   name: string
   plan_id: string
   /** The list's id: its plan's, or for a list the judgement changed, the hash of its plan's and its orders. */
   list_id: string | null
-  /** A paper Book's: what the final check made of the Portfolio Manager's judgement; null for a rules-only one's. */
+  /** A real or paper Book's: what the final check made of the Portfolio Manager's judgement; null for a rules-only one's. */
   judgement: PdListJudgement | null
   /** The session its orders are for; null without a plan. */
   session: string | null
@@ -954,8 +1092,9 @@ export interface PdOrderList {
 
 /**
  * What `pd check --plan <file> --judgement <file>` prints (contract/check.schema.json): the final
- * Order lists recorded for the paper Books to fill at the next open: each paper Book's Rule plan with
- * the Portfolio Manager's changes the final check accepted, each rules-only one's own Rule plan.
+ * Order lists recorded: each real Book's for Saransh to place, its orders proposed (issue 42), and each
+ * paper Book's to fill at the next open, each with the Portfolio Manager's changes the final check
+ * accepted; each rules-only one's own Rule plan.
  */
 export interface PdCheck {
   on: string

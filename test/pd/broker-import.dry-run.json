@@ -10,7 +10,12 @@
       "portfolio_id": 4,
       "status": "recorded",
       "why": null,
-      "trades": { "recorded": 6, "in_ledger": 1, "set_aside": 0 },
+      "trades": {
+        "recorded": 6,
+        "in_ledger": 1,
+        "set_aside": 0
+      },
+      "fills": null,
       "reconciliation": null
     }
   ]

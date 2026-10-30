@@ -1,0 +1,27 @@
+{
+  "changed": false,
+  "why": "Its session, 2026-10-30, was over when the Answer was saved: the Answer is recorded, but the order stays expired",
+  "order": {
+    "id": 21,
+    "order_id": "IN-2026-10-30-001",
+    "session": "2026-10-30",
+    "run": "2026-10-30-0700",
+    "sleeve": "in-cw2-selected",
+    "security_id": "IN:RATEGAIN",
+    "name": "Rategain Travel Technologies Ltd",
+    "side": "SELL",
+    "shares": 300,
+    "price": 520.0,
+    "limit": null,
+    "reason": "rebalance",
+    "under": null,
+    "state": "expired",
+    "why": "not_placed",
+    "filled": 0,
+    "fill_price": null,
+    "fees": 0,
+    "answer": "placed",
+    "answered_at": "2026-10-31T03:10:00Z",
+    "session_over": true
+  }
+}

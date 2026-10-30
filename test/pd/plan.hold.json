@@ -93,8 +93,8 @@
       "id": "0352fa6fccac",
       "book": "IN",
       "name": "India Book",
-      "kind": "shadow",
-      "for_placing": false,
+      "kind": "real",
+      "for_placing": true,
       "state_id": "fa1dba342bad",
       "mandate_version": "f99c88f13b5b",
       "playbook_version": "e247b5b89ff0",
@@ -176,6 +176,32 @@
       "buys": 0,
       "sales": 0,
       "left_out": []
+    },
+    {
+      "id": "0UScant00000",
+      "book": "US",
+      "name": "US Book",
+      "kind": "real",
+      "for_placing": true,
+      "state_id": null,
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "hold",
+      "status": "cant_plan",
+      "why": "US has no panels yet: run `pd build-panels` (or refresh the data)"
+    },
+    {
+      "id": "0HKcant00000",
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "kind": "real",
+      "for_placing": true,
+      "state_id": null,
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "hold",
+      "status": "cant_plan",
+      "why": "HK has no panels yet: run `pd build-panels` (or refresh the data)"
     },
     {
       "id": "ab3e9327a061",

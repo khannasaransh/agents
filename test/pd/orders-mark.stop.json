@@ -1,0 +1,12 @@
+{
+  "changed": true,
+  "why": null,
+  "stop": {
+    "id": 7,
+    "book": "IN",
+    "sleeve": "in-cw2-selected",
+    "security_id": "IN:RATEGAIN",
+    "price": 431.5,
+    "state": "placed"
+  }
+}

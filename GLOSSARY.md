@@ -83,7 +83,7 @@ The Agent that manages Saransh's portfolios, real and paper, end to end: startin
 _Avoid_: PM (that is the daily Pipeline's PM Agent), fund manager, advisor, trader
 
 **Book**:
-The real money in one market, managed as one: the India Book in INR at ICICI Direct, the US Book in USD at moomoo and the Hong Kong Book in HKD at moomoo (issue 48). Each has its own Mandate, objective, benchmark and gold Sleeve; the Hong Kong Book's gold ETF and cash fund are the US Book's, in dollars. Their combined value in INR is shown but limits nothing. Beside each is a **paper Book**, run exactly like it but filled automatically at the next open, holding every strategy from Paper up at its full share; the real Book's gap to it is what Saransh's fills, skips and the Stages cost. Beside each paper Book is a **rules-only paper Book**, which trades the Rule plan unchanged from the same start; the paper Book's gap to it is what the Portfolio Manager's judgement added.
+The real money in one market, managed as one: the India Book in INR at ICICI Direct, the US Book in USD at moomoo and the Hong Kong Book in HKD at moomoo (issue 48). Each has its own Mandate, objective, benchmark and gold Sleeve; the Hong Kong Book's gold ETF and cash fund are the US Book's, in dollars. Their combined value in INR is shown but limits nothing. Beside each is a **paper Book**, run exactly like it but filled automatically at the next open, holding every strategy from Paper up at its full share; the real Book's gap to it is what Saransh's fills, skips, expired orders and the Stages cost, which the weekly review splits out. Beside each paper Book is a **rules-only paper Book**, which trades the Rule plan unchanged from the same start; the paper Book's gap to it is what the Portfolio Manager's judgement added.
 _Avoid_: account, fund, portfolio (ash_new's Portfolio is one ledger)
 
 **Book state**:
@@ -159,7 +159,7 @@ The Portfolio Manager's look back at the Books, in Saturday's Stocks Brief: the 
 _Avoid_: retro, report
 
 **Disaster stop**:
-The stop each holding keeps at the broker, wider than its strategy's own exit, for what happens between Runs. It is set at entry and raised only on Saturdays. A strategy's own exits are end-of-day and come through the Order list.
+The stop each holding keeps at the broker, wider than its strategy's own exit, for what happens between Runs. It is set at entry and raised only on Saturdays. A strategy's own exits are end-of-day and come through the Order list. A real Book's is proposed with its Order list until Saransh marks it placed, and every Saturday's Brief lists those not yet marked.
 _Avoid_: stop-loss (ash_new's Stop-loss is end-of-day), GTT (a broker's order type), trailing stop
 
 **Feed**:
@@ -171,8 +171,12 @@ Everything the Desk may read of one name it reviews, which `pd plan` writes into
 _Avoid_: profile, factsheet
 
 **Order list**:
-What the Portfolio Manager advises Saransh to do at the next session: each buy and sale, and each Disaster stop to place or raise. A buy carries a limit price, and a buy that needs a sale's cash is listed under that sale. An order is valid only for its own session. It is **proposed** until Saransh marks it **placed** or **skipped**, a placed order is **filled** once a tradebook shows it, and an order its session passes unfilled is **expired**.
+What the Portfolio Manager advises Saransh to do at the next session: each buy and sale, and each Disaster stop to place or raise. A buy carries a limit price, and a buy that needs a sale's cash is listed under that sale. An order is valid only for its own session. It is **proposed** until Saransh marks it **placed** or **skipped**, and a placed order is **filled**, **partly filled** or **expired** once a tradebook covering its session shows it; an order its session passes unplaced is expired too, and so is the unfilled part of a partial fill. An Answer saved after an order's session is recorded but never revives it. A fill that matches no order is an **own trade**: Saransh's, recorded in the ledger and flagged in the Brief.
 _Avoid_: trade list (ash_new's Trade is a holding from its buy to its sale), recommendations, signals
+
+**Fill cost**:
+What one of Saransh's fills cost against its session's open price, the price the backtests and the paper Books fill at: a buy above the open, or a sale below it, in basis points of its value. The weekly review weighs each broker's against the slippage the cost presets assume, and flags a broker whose fills cost more.
+_Avoid_: slippage (that is what the cost presets assume), execution cost
 
 **Broker inbox**:
 Where the brokers' exports wait until the stocks Pipeline records them in ash_new's real portfolios: each tradebook, and every Saturday's holdings, from ICICI Direct for India and moomoo for the US. Saransh downloads and drops them in by hand.

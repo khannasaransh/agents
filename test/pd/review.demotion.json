@@ -311,6 +311,15 @@
           "end": "2026-10-30",
           "why": "The two paper Books have closes together only from 2026-08-03: the gate needs the 3 months from 2026-07-31"
         }
+      },
+      "real_gap": {
+        "status": "not_measured",
+        "why": "Its paper Book has no close filled in the week",
+        "from": null,
+        "to": null,
+        "paper_return": null,
+        "real_return": null,
+        "split": null
       }
     },
     {
@@ -347,6 +356,15 @@
         "lost_levers": null,
         "sum_and_gap": null,
         "gate": null
+      },
+      "real_gap": {
+        "status": "not_measured",
+        "why": "Its paper Book has no close filled in the week",
+        "from": null,
+        "to": null,
+        "paper_return": null,
+        "real_return": null,
+        "split": null
       }
     },
     {
@@ -383,6 +401,15 @@
         "lost_levers": null,
         "sum_and_gap": null,
         "gate": null
+      },
+      "real_gap": {
+        "status": "not_measured",
+        "why": "Its paper Book has no close filled in the week",
+        "from": null,
+        "to": null,
+        "paper_return": null,
+        "real_return": null,
+        "split": null
       }
     }
   ],
@@ -400,5 +427,32 @@
     }
   ],
   "promotions_due": [],
+  "fill_costs": [
+    {
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "books": [
+        "IN"
+      ],
+      "fills": [],
+      "value": 0.0,
+      "cost_bps": null,
+      "assumed_bps": null,
+      "costs_more": false
+    },
+    {
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "books": [
+        "US",
+        "HK"
+      ],
+      "fills": [],
+      "value": 0.0,
+      "cost_bps": null,
+      "assumed_bps": null,
+      "costs_more": false
+    }
+  ],
   "monthly": null
 }

@@ -301,6 +301,21 @@
           "end": "2026-10-30",
           "why": "The two paper Books have closes together only from 2026-08-03: the gate needs the 3 months from 2026-07-31"
         }
+      },
+      "real_gap": {
+        "status": "measured",
+        "why": null,
+        "from": "2026-10-23",
+        "to": "2026-10-30",
+        "paper_return": 0.0213,
+        "real_return": 0.0141,
+        "split": {
+          "gap": 0.0072,
+          "fills": 0.0004,
+          "skips": 0.0011,
+          "expired": 0.0009,
+          "stages": 0.0048
+        }
       }
     },
     {
@@ -337,6 +352,15 @@
         "lost_levers": null,
         "sum_and_gap": null,
         "gate": null
+      },
+      "real_gap": {
+        "status": "not_measured",
+        "why": "Its paper Book has no close filled in the week",
+        "from": null,
+        "to": null,
+        "paper_return": null,
+        "real_return": null,
+        "split": null
       }
     },
     {
@@ -373,6 +397,15 @@
         "lost_levers": null,
         "sum_and_gap": null,
         "gate": null
+      },
+      "real_gap": {
+        "status": "not_measured",
+        "why": "Its paper Book has no close filled in the week",
+        "from": null,
+        "to": null,
+        "paper_return": null,
+        "real_return": null,
+        "split": null
       }
     }
   ],
@@ -388,6 +421,64 @@
       "due": "2026-10-29",
       "due_now": true,
       "why": null
+    }
+  ],
+  "fill_costs": [
+    {
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "books": [
+        "IN"
+      ],
+      "fills": [
+        {
+          "book": "IN",
+          "order": "IN-2026-10-29-001",
+          "day": "2026-10-29",
+          "security_id": "IN:DELHIVERY",
+          "name": "Delhivery Ltd",
+          "side": "BUY",
+          "qty": 50,
+          "price": 472.75,
+          "value": 23637.5,
+          "open": 470.0,
+          "cost_bps": 58.51,
+          "assumed_bps": 20.0,
+          "why": null
+        },
+        {
+          "book": "IN",
+          "order": "IN-2026-10-28-002",
+          "day": "2026-10-28",
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "side": "SELL",
+          "qty": 100,
+          "price": 519.0,
+          "value": 51900.0,
+          "open": 520.0,
+          "cost_bps": 19.23,
+          "assumed_bps": 20.0,
+          "why": null
+        }
+      ],
+      "value": 75537.5,
+      "cost_bps": 31.52,
+      "assumed_bps": 20.0,
+      "costs_more": true
+    },
+    {
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "books": [
+        "US",
+        "HK"
+      ],
+      "fills": [],
+      "value": 0.0,
+      "cost_bps": null,
+      "assumed_bps": null,
+      "costs_more": false
     }
   ],
   "monthly": null

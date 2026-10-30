@@ -82,7 +82,7 @@ function findAnswersFiles(folders: string[]): { found: Found[]; unreadable: { na
 
 /** Applies one Answer through `pd`, unless its item can't take it or a newer Answer already settled it. */
 async function apply(answer: Answer, file: AnswersFile, state: Record<string, AppliedAnswer>, { runId, runFolder }: { runId: string; runFolder: string }): Promise<Applying> {
-  const command = pdArgs(answer)
+  const command = pdArgs(answer, file.savedAt)
   if ('why' in command) return { outcome: 'ignored', why: command.why }
   // The same Answer saved at the same time is another copy of one file, as when it is in Downloads and the Broker inbox both.
   const applied = state[answer.item]

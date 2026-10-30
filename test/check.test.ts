@@ -10,7 +10,7 @@ afterEach(() => ws.cleanup())
 const runId = '2026-10-27-0930'
 const example = (name: string) => JSON.parse(readFileSync(join(pdExamples, name), 'utf8'))
 const status = () => JSON.parse(ws.readRunFile(runId, 'run.json')).steps.find((s: { name: string }) => s.name === 'check').status
-const standing = { 'paper-books': { example: 'paper-books.json' }, judgement: { example: 'judgement-show.books.json' } }
+const standing = { 'paper-books': { example: 'paper-books.json' }, judgement: { example: 'judgement-show.books.json' }, orders: { example: 'orders.waiting.json' } }
 
 /** The Portfolio Manager's answer, as its Step keeps it. */
 const answered = {
@@ -43,7 +43,7 @@ function prepare({ plan = 'succeeded', desk = 'succeeded', deskResult = reviewed
   if (pm === 'succeeded') ws.writeRunFile(runId, 'portfolio-manager.json', answered)
 }
 
-test("the Check Step hands the Portfolio Manager's judgement to pd check with this Run's plans, then reads how the paper Books stand and their Judgement modes", async () => {
+test("the Check Step hands the Portfolio Manager's judgement to pd check with this Run's plans, then reads how the paper Books stand, their Judgement modes and the real Books' orders", async () => {
   prepare()
   ws.setPd({ check: { example: 'check.recorded.json' }, ...standing })
 
@@ -51,7 +51,7 @@ test("the Check Step hands the Portfolio Manager's judgement to pd check with th
 
   assert.equal(result.status, 0, result.stderr)
   assert.equal(status(), 'succeeded')
-  const [check, paperBooks, modes] = ws.pdCalls()
+  const [check, paperBooks, modes, orders] = ws.pdCalls()
   assert.deepEqual(
     check.args.filter((arg) => !arg.endsWith('.json')),
     ['check', '--plan', '--judgement', '--run', runId],
@@ -62,10 +62,13 @@ test("the Check Step hands the Portfolio Manager's judgement to pd check with th
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'judgement.json')), example('judgement.answered.json'))
   assert.deepEqual(paperBooks.args, ['paper-books'])
   assert.deepEqual(modes.args, ['judgement', 'show'])
+  assert.deepEqual(orders.args, ['orders', 'show'])
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'orders.json')), example('orders.waiting.json'))
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'check.json')), { check: example('check.recorded.json'), why: null })
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'paper-books.json')), example('paper-books.json'))
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'judgement-show.json')), example('judgement-show.books.json'))
   const log = ws.readRunFile(runId, 'logs', 'check.log')
+  assert.match(log, /India Book: Order list for 2026-10-26 as its Rule plan recorded/)
   assert.match(log, /India Book's paper Book: Order list for 2026-10-26 with the Portfolio Manager's changes recorded/)
   assert.match(log, /India Book's paper Book: dropped the Portfolio Manager's swap: IN:ZOMATO isn't in the Book's Pool/)
   assert.match(log, /India Book's rules-only paper Book: Order list for 2026-10-26 recorded/)
@@ -93,7 +96,7 @@ test('a buy whose Desk review is missing waits a session: pd check is told which
   prepare({ desk: 'failed', deskResult: { ...reviewed, missing: [missing] } })
   const recorded = example('check.recorded.json')
   const order = example('plan.normal.json').plans.find((p: { kind: string }) => p.kind === 'paper').orders.find((o: { security_id: string }) => o.security_id === 'IN:STOVEKRAFT')
-  recorded.lists[0].judgement.held_back = [{ order, why: missing.why }]
+  recorded.lists.find((l: { kind: string }) => l.kind === 'paper').judgement.held_back = [{ order, why: missing.why }]
   ws.setPd({ check: { stdout: JSON.stringify(recorded) }, ...standing })
 
   const result = await ws.agents('step', 'check', '--run', runId)
@@ -149,7 +152,7 @@ test('the Check Step records nothing when the Plan Step failed, and says why', a
   assert.equal(status(), 'skipped')
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['paper-books'], ['judgement', 'show']],
+    [['paper-books'], ['judgement', 'show'], ['orders', 'show']],
   )
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'check.json')), { check: null, why: 'the Plan Step failed, so there is no Rule plan to record' })
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'paper-books.json')), example('paper-books.json'))

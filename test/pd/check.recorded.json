@@ -5,6 +5,40 @@
   "lists": [
     {
       "book": "IN",
+      "kind": "real",
+      "name": "India Book",
+      "plan_id": "17d5de1bf32e",
+      "session": "2026-10-26",
+      "orders": 3,
+      "status": "recorded",
+      "why": null,
+      "superseded": 0,
+      "list_id": "17d5de1bf32e",
+      "judgement": {
+        "applied": "rule_plan",
+        "why": null,
+        "level": 0.4,
+        "changes": [],
+        "todo": null,
+        "commentary": "Subtract only: nothing to take away today.",
+        "held_back": []
+      }
+    },
+    {
+      "book": "US",
+      "kind": "real",
+      "name": "US Book",
+      "plan_id": "0UScant00000",
+      "session": null,
+      "orders": 0,
+      "status": "not_recorded",
+      "why": "It has no Rule plan: US has no panels yet",
+      "superseded": 0,
+      "list_id": null,
+      "judgement": null
+    },
+    {
+      "book": "IN",
       "kind": "paper",
       "name": "India Book's paper Book",
       "plan_id": "4115e6534e70",

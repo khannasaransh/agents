@@ -1,55 +1,64 @@
 // Brief: writes the Stocks Brief, one self-contained HTML page in the Run folder that loads nothing
-// from the internet, from what earlier Steps wrote there: the Data gate's verdict and its reasons;
-// under them, the Health Agent's diagnosis and proposed fix, or that it failed, with what became of
-// the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
-// for approval with what it would change; each Quarantine with its flag; each Candidate waiting for
-// approval into Paper; each promotion the Portfolio Manager proposed, waiting for approval; each
-// early exit the Desk proposed, waiting for approval, and each approved one not yet sold; each
-// proposal to move a Judgement mode or change a Playbook's ranges, the narrower ranges the Portfolio
-// Manager proposed in this Run among them; each market's latest session in
-// the Lake against its last finished one; the To-dos the Steps raised; each Book's Sleeves with their
-// Stages and how long each has been in its Stage; on Saturdays, the weekly review (the Portfolio
-// Manager's commentary, each demotion the demotion rule made, each paper Book and Sleeve against its
-// backtest's range and its benchmark, the promotions due, Reconciliation's differences and each paper
-// Book's override scorecard: its Overrides scored and tallied, the Levers that lost, the sum of the
-// scores beside the gap to its rules-only paper Book, and the gate for Playbook mode); on a
+// from the internet, from what earlier Steps wrote there. It opens with the Data gate's verdict and
+// its reasons, under them the Health Agent's diagnosis and proposed fix, or that it failed, with what
+// became of the Corrections it proposed; then the real Books' Order lists in the order Saransh places
+// them, India first (issue 42): each order to place for its session, sales at market and buys at
+// their limits, each buy that needs a sale's money under that sale, each with Placed and Skipped
+// buttons; each Disaster stop to place or raise, with a Placed button; the orders placed that wait
+// for a tradebook; what became of the last lists' orders; and the trades he made himself, flagged. On
+// Saturdays, every Disaster stop not yet marked placed. Then what waits on him: the To-dos the Steps
+// raised; each Correction waiting for approval with what it would change; each Quarantine with its
+// flag; each Candidate waiting for approval into Paper; each promotion the Portfolio Manager
+// proposed, waiting for approval; each early exit the Desk proposed, waiting for approval, and each
+// approved one not yet sold; each proposal to move a Judgement mode or change a Playbook's ranges,
+// the narrower ranges the Portfolio Manager proposed in this Run among them. Then what became of the
+// Answers this Run applied; each market's latest session in the Lake against its last finished one;
+// each Book's Sleeves with their Stages and how long each has been in its Stage; on Saturdays, the
+// weekly review (the Portfolio Manager's commentary, each demotion the demotion rule made, each paper
+// Book and Sleeve against its backtest's range and its benchmark, the promotions due,
+// Reconciliation's differences and each paper Book's override scorecard: its Overrides scored and
+// tallied, the Levers that lost, the sum of the scores beside the gap to its rules-only paper Book,
+// and the gate for Playbook mode; what each broker's fills cost against the open, against the
+// slippage the cost presets assume, a broker whose fills cost more flagged; and each real Book's gap
+// to its paper Book, split into its fills, skips, expired orders and Stage scaling: issue 44); on a
 // month's first Saturday, the monthly review (the Portfolio Manager's commentary, each paper Book's
 // return over the month attributed to its sources, the correlation between its Sleeves, its drawdown
-// against its limits and the promotions due); each
-// Book's real holdings and value, its latest Reconciliation's differences and this Run's Broker inbox
-// files; the results and board meetings coming for the Books' holdings in the next 30 days, from the
-// Feeds; each market's Market condition with MarketSmith's outlook beside it and each Book's exposure
-// level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's state
-// beside its shadow Rule plan and each paper Book's beside its Rule plan, every order marked not for
-// placing, with its rules-only paper Book's plan after it and each early exit it sells; the Desk's
-// views of each name it reviewed (each analyst's, with its reasons, evidence and date), the reviews
-// missing, the views refused and the web searches; the Portfolio Manager's judgement of each paper
-// Book (its Judgement mode, its commentary, what went out and why, each change with its Decision
-// record in plain sentences and the Desk's views behind it, each change the final check dropped with
-// why, and each buy held back a session, its Desk review missing) and each Book's Judgement modes; the
-// Order lists the Check Step recorded, or why none was; how each paper Book stands (its value and its
-// gap to its rules-only paper Book, its drawdown against its breakers, its Sleeves and Stages, the
-// Disaster stops that would lose more than 1% of it, and the Books together in rupees); on Saturdays,
-// what MarketSmith's fetch brought; how this Run's Lake Step went and how ash_new's last refresh
-// ended; the Health report's verdict and flags; and the Run's health.
-// It runs even when earlier Steps failed, and says when the Lake's status is missing.
-// Each item waiting on Saransh has its id and buttons for its Answers. The Save answers button
-// downloads them as one Answers file, built in the page by answersFile's own source, for the next
-// Run's Answers Step: the page works opened from disk, with nothing running.
+// against its limits and the promotions due); each Book's real holdings and value, its latest
+// Reconciliation's differences and this Run's Broker inbox files; the results and board meetings
+// coming for the Books' holdings in the next 30 days, from the Feeds; each market's Market condition
+// with MarketSmith's outlook beside it and each Book's exposure level; on a day the Data gate fails,
+// that every plan is in Hold mode; each real Book's state beside its Rule plan, for placing, and each
+// paper Book's beside its Rule plan, not for placing, with its rules-only paper Book's plan after it
+// and each early exit it sells; the Desk's views of each name it reviewed (each analyst's, with its
+// reasons, evidence and date), the reviews missing, the views refused and the web searches; the
+// Portfolio Manager's judgement of each real and paper Book (its Judgement mode, its commentary, what
+// went out and why, each change with its Decision record in plain sentences and the Desk's views
+// behind it, each change the final check dropped with why, and each buy held back a session, its Desk
+// review missing), and each Book's Judgement modes; the Order lists the Check Step recorded, or why
+// none was; how each paper Book stands (its value and its gap to its rules-only paper Book, its
+// drawdown against its breakers, its Sleeves and Stages, the Disaster stops that would lose more than
+// 1% of it, and the Books together in rupees); on Saturdays, what MarketSmith's fetch brought; how
+// this Run's Lake Step went and how ash_new's last refresh ended; the Health report's verdict and
+// flags; and the Run's health. It runs even when earlier Steps failed, and says when the Lake's
+// status is missing. Each item waiting on Saransh has its id and buttons for its Answers. The Save
+// answers button downloads them as one Answers file, built in the page by answersFile's own source,
+// for the next Run's Answers Step: the page works opened from disk, with nothing running.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingCandidates, waitingItems, type AnswerItem } from '../../src/answers.ts'
-import { bookNames, brokerFiles, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
+import { bookNames, brokerFiles, brokerName, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
 import { analysts, viewText, viewVerdict, type DeskResult, type DeskView } from '../../src/desk.ts'
 import { comingDays, comingEvents, kindName } from '../../src/feeds.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { changeText, decisionText, modeName, proposalText, sentence } from '../../src/judgement.ts'
-import type { PdBook, PdBookState, PdEarlyExit, PdFeeds, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally } from '../../src/pd.ts'
+import { orderWhat, ownTradeText, stateText } from '../../src/orders.ts'
+import type { PdBook, PdBookState, PdEarlyExit, PdFeeds, PdFillCosts, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrder, PdOrderList, PdOrders, PdPaperBook, PdPaperBooks, PdPlan, PdRealGap, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally } from '../../src/pd.ts'
 import { analystName, breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
+import { runWeekday } from '../../src/schedule.ts'
 import { runAsStep } from '../../src/step.ts'
 import { readTodos } from '../../src/todos.ts'
 import type { AnswersResult } from './answers.ts'
@@ -123,6 +132,94 @@ function correctionText(c: PdStatus['corrections'][number]): string {
   if (c.kind === 'demerger') return `Demerger on ${c.date}, the company keeping ${Math.round((c.ratio ?? 0) * 1000) / 10}% of its value`
   if (c.kind === 'bar') return `Bar of ${c.date} left out`
   return c.value === null ? `No dividend on ${c.date}` : `Dividend of ${c.value} on ${c.date}`
+}
+
+/** When and where a market's orders are placed: India's in the pre-open auction, the US's at that evening's open. */
+const placedAt: Record<string, string> = {
+  IN: "in the NSE's pre-open auction (9:00 to 9:08 IST) of",
+  US: "at the US open (that evening, India's time) of",
+  HK: 'at the Hong Kong open of',
+}
+
+/** An order to place, in a row: its id, what it is, how it is placed, and its Answer's buttons; a buy under its sale indented. */
+function placingRow(o: PdOrder, currency: string, under = false): string[] {
+  const how = o.side === 'SELL' ? 'At market' : `Limit ${esc(money(o.limit ?? o.price, currency, 2))}`
+  const id = under ? `<span class="under">↳ ${esc(o.order_id)}</span>` : esc(o.order_id)
+  const waits = under ? '<br><span class="muted">once its sale is placed: it needs its money</span>' : ''
+  return [id, `${esc(orderWhat(o))}<br><span class="muted">${esc(o.security_id)}, last close ${esc(money(o.price, currency, 2))}</span>`, `${how}${waits}`, answerButtons(answerItem('order', o.id))]
+}
+
+/** A real Book's Order list for Saransh to place, with its stops, its orders waiting for a tradebook, its last lists' orders and his own trades. */
+function orderListPart(book: PdOrders['books'][number], listed: PdOrderList | undefined): string {
+  const at = (n: number) => money(n, book.currency, 2)
+  const toPlace = book.orders.filter((o) => o.state === 'proposed' && !o.session_over)
+  const sessions = [...new Set(toPlace.map((o) => o.session))]
+  const sales = toPlace.filter((o) => o.side === 'SELL')
+  const underSale = (o: PdOrder) => sales.some((sale) => sale.order_id === o.under)
+  const rows = [
+    ...sales.flatMap((sale) => [placingRow(sale, book.currency), ...toPlace.filter((o) => o.under === sale.order_id).map((o) => placingRow(o, book.currency, true))]),
+    ...toPlace.filter((o) => o.side === 'BUY' && !underSale(o)).map((o) => placingRow(o, book.currency)),
+  ]
+  const stops = book.stops
+    .filter((stop) => stop.state === 'proposed')
+    .map((stop) => [
+      securityCell(stop.security_id, stop.name),
+      stop.was === null ? `Place at ${esc(at(stop.price))}` : `Raise from ${esc(at(stop.was))} to ${esc(at(stop.price))}`,
+      answerButtons(answerItem('stop', stop.id)),
+    ])
+  const waiting = book.orders.filter((o) => o.state === 'placed' && o.session_over)
+  const settled = book.orders.filter((o) => o.session_over && !(o.state === 'placed'))
+  const notListed = listed && listed.status === 'not_recorded' ? `<p>No Order list was recorded for it in this Run: ${esc(listed.why ?? '')}.</p>` : ''
+  if (!book.started && !toPlace.length) return `<h3>${esc(book.name)}</h3>
+${notListed || `<p>It has no Order list yet.</p>`}`
+  const intro = rows.length
+    ? `<p>Place these ${placedAt[book.market] ?? 'at the open of'} ${esc(sessions.join(', '))} at ${esc(book.broker_name)}: each sale at market, each buy as a limit order at its limit. A buy under a sale needs its money: place it only once the sale is placed. Each order is valid only for its session: one you haven't marked placed by its end expires, and no later Answer revives it.</p>`
+    : '<p>No order to place.</p>'
+  const own = book.own_trades.map((t) => esc(ownTradeText(t, at)))
+  return [
+    `<h3>${esc(book.name)}${sessions.length ? `: its Order list for ${esc(sessions.join(', '))}` : ''}</h3>`,
+    notListed,
+    intro,
+    rows.length ? table(['Order', '', 'How', 'Your Answer'], rows) : '',
+    ...(stops.length ? ['<p>Disaster stops to place or raise at the broker, each resting there until it is hit:</p>', table(['Security', 'Stop', 'Your Answer'], stops)] : []),
+    ...(waiting.length
+      ? [
+          `<p>Placed, and waiting for ${esc(brokerName(book.broker))}'s ${esc(brokerFiles(book.broker).tradebook)}: drop it in the Broker inbox, and the next Run records what filled.</p>`,
+          list(waiting.map((o) => `${esc(o.order_id)}: ${esc(orderWhat(o))}, for ${esc(o.session)}`)),
+        ]
+      : []),
+    ...(settled.length ? ['<p>What became of its last lists\' orders:</p>', table(['Order', 'Session', '', ''], settled.map((o) => [esc(o.order_id), esc(o.session), esc(orderWhat(o)), esc(stateText(o, at))]))] : []),
+    ...(own.length ? ['<p class="flag"><strong>Trades you made yourself, matching no order:</strong> recorded in its ledger, and outside its Sleeves until you say otherwise.</p>', list(own)] : []),
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+/**
+ * The real Books' Order lists, India first: what to place and what came of the last lists' orders, as
+ * `pd orders show` read them after the Check Step (else after the Broker inbox Step); that they couldn't
+ * be read, when neither did.
+ */
+function orderListsSection(run: RunRecord, orders: PdOrders | null, result: CheckResult | null): string {
+  const step = run.steps.find((s) => s.name === 'check')
+  if (!orders) {
+    if (!step && !run.steps.some((s) => s.name === 'broker-inbox')) return ''
+    return `<section><h2>Order lists</h2><p>The real Books' orders couldn't be read in this Run. See the Check Step's log: ${logLink(step?.log ?? 'logs/check.log')}</p></section>`
+  }
+  const lists = result?.check?.lists ?? []
+  const parts = orders.books.map((book) => orderListPart(book, lists.find((l) => l.kind === 'real' && l.book === book.book)))
+  const dry = result?.check?.dry_run ? '<p>Dry run: no Order list was recorded in this Run, so these are the lists recorded before.</p>' : ''
+  return ['<section><h2>Order lists</h2>', dry, ...parts, '</section>'].filter(Boolean).join('\n')
+}
+
+/** On Saturdays, every real Book's Disaster stop not yet marked placed, or that each is; nothing on other days. */
+function unplacedStopsSection(run: RunRecord, orders: PdOrders | null): string {
+  if (runWeekday(run.id) !== 'saturday' || !orders) return ''
+  const unplaced = orders.books.flatMap((book) =>
+    book.stops.filter((stop) => stop.state === 'proposed').map((stop) => `${esc(book.name)}: ${esc(stop.name ?? stop.security_id)} (${esc(stop.security_id)}), ${stop.was === null ? 'at' : 'raised to'} ${esc(money(stop.price, book.currency, 2))}`),
+  )
+  if (!unplaced.length) return '<section><h2>Disaster stops not marked placed</h2><p>Every Disaster stop is marked placed.</p></section>'
+  return `<section><h2>Disaster stops not marked placed</h2><p>A holding without its stop at the broker is unprotected. Place each, then mark it placed in the Order lists above:</p>\n${list(unplaced)}</section>`
 }
 
 /** An item's buttons, one per Answer it takes, and a note, shown once an Answer is chosen. */
@@ -614,11 +711,35 @@ function demotionText(d: PdReview['demotions'][number], books: Map<string, Revie
   return `${name} in the ${book?.name ?? d.book} was ${moved} from ${stageName(d.from)} to ${stageName(d.to)} by the demotion rule: ${d.why}.${d.held_why ? ` ${d.held_why}.` : ''}`
 }
 
+/** A signed part of a Book's value: +0.72%. */
+const signed = (n: number) => `${n > 0 ? '+' : ''}${(Math.round(n * 10_000) / 100).toFixed(2)}%`
+
+/** Each broker's fills of the week against their sessions' opens, beside the slippage the cost presets assume, a broker whose fills cost more flagged. */
+function fillCostsPart(costs: PdFillCosts[]): string {
+  const rows = costs.map((c) => {
+    const measured = c.fills.filter((f) => f.cost_bps !== null).length
+    if (!measured) return [esc(c.broker_name), String(c.fills.length), '—', '—', 'No fill to measure this week']
+    const flag = c.costs_more ? '<strong>Costs more than the presets assume:</strong> its fill costs should correct them' : 'Within what the presets assume'
+    return [esc(c.broker_name), String(measured), esc(bp(c.cost_bps ?? 0)), esc(bp(c.assumed_bps ?? 0)), flag]
+  })
+  return ['<h3>Fill costs against the open</h3>', table(['Broker', 'Fills', 'Cost against the open', 'The presets assume', ''], rows), '<p class="muted">Each fill against its session\'s open, the price the backtests and the paper Books fill at: a buy above the open and a sale below it cost. Weighted by value, beside the slippage its market\'s cost preset assumes for each fill\'s liquidity.</p>'].join('\n')
+}
+
+/** How far a real Book trailed its paper Book over the week, split; or why it can't be said. */
+function realGapPart(gap: PdRealGap): string {
+  if (gap.status !== 'measured' || !gap.split) return `<p>Its real Book against its paper Book: not measured: ${esc(gap.why ?? '')}.</p>`
+  const { split } = gap
+  const parts = [`fills ${signed(split.fills)}`, `skips ${signed(split.skips)}`, `expired orders ${signed(split.expired)}`, `Stage scaling and the rest ${signed(split.stages)}`]
+  const trails = split.gap >= 0 ? `trails it by ${signed(split.gap).slice(1)}` : `leads it by ${signed(-split.gap).slice(1)}`
+  return `<p>From ${esc(gap.from ?? '')} to ${esc(gap.to ?? '')} its real Book made ${signed(gap.real_return ?? 0)} and its paper Book ${signed(gap.paper_return ?? 0)}: the real Book ${trails}, of which ${parts.join(', ')}.</p>`
+}
+
 /**
  * On Saturdays, the weekly review: the Portfolio Manager's commentary, each demotion the demotion rule
- * made, each Book's paper Book and Sleeves against their backtests' ranges and benchmarks, the
- * promotions due and each real Book's Reconciliation differences; that it couldn't be had when the
- * Review Step failed, and nothing on other days.
+ * made, what each broker's fills cost against the open, each Book's paper Book and Sleeves against their
+ * backtests' ranges and benchmarks, its real Book's gap to its paper Book, the promotions due and each
+ * real Book's Reconciliation differences; that it couldn't be had when the Review Step failed, and
+ * nothing on other days.
  */
 function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioManagerResult | null, narrower: NarrowerResult | null): string {
   const step = run.steps.find((s) => s.name === 'review')
@@ -628,7 +749,7 @@ function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioMan
   const books = new Map(review.books.map((b) => [b.book, b]))
   const head = ['', 'Stage', 'Live return', 'Drawdown', 'Benchmark', "Backtest's worst", 'Return against its range', 'Its tested range']
   const sections = review.books
-    .filter((b) => b.paper.status !== 'not_started' || b.sleeves.length || b.reconciliation?.differences.length || b.scorecard.status === 'scored')
+    .filter((b) => b.paper.status !== 'not_started' || b.sleeves.length || b.reconciliation?.differences.length || b.scorecard.status === 'scored' || b.real_gap.status === 'measured')
     .map((book) => {
       const rows = [
         ['Paper Book', '', ...reviewCells(book.paper)],
@@ -638,6 +759,7 @@ function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioMan
       return [
         `<h3>${esc(book.name)}</h3>`,
         table(head, rows),
+        realGapPart(book.real_gap),
         ...(differences.length ? [`<p>Reconciliation, as of ${esc(book.reconciliation!.as_of)}:</p>`, list(differences.map((d) => esc(differenceText(d, book))))] : []),
         scorecardPart(book.scorecard, (narrower?.narrower ?? []).filter((n) => n.book === book.book)),
       ].join('\n')
@@ -650,6 +772,7 @@ function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioMan
     '<section><h2>Weekly review</h2>',
     commentary ? `<p class="text">${esc(commentary)}</p>` : pm?.status === 'failed' ? '<p class="muted">The Portfolio Manager failed, so the review has no commentary.</p>' : '',
     review.demotions.length ? `<h3>Demotions</h3>\n${list(review.demotions.map((d) => esc(demotionText(d, books))))}` : '<p>No strategy broke the demotion rule.</p>',
+    fillCostsPart(review.fill_costs),
     ...(sections.length ? sections : ['<p>No Book has a live record yet.</p>']),
     due.length ? `<h3>Promotions due</h3>\n${list(due)}` : '',
     `<p class="muted">Each live record is measured against its backtest over the ten years before it began, and against its benchmark over the same sessions. A strategy is demoted when its live drawdown passes 1.5 times its backtest's worst, or after 12 months its rolling 12-month return falls under its backtest's 5th percentile.${review.gate.verdict === 'fail' ? ' The Data gate failed, so no demotion was applied.' : ''}</p>`,
@@ -791,15 +914,18 @@ function statePart(state: PdBookState | undefined): string {
     (u) => `${esc(u.name ?? u.security_id ?? '')}${u.security_id ? ` (${esc(u.security_id)})` : ''}: ${esc(u.kind.replaceAll('_', ' '))}, ledger ${u.ledger_qty === null ? '—' : esc(shares(u.ledger_qty))}, broker ${esc(shares(u.broker_qty))}`,
   )
   const cash = !state.paper
-    ? `${at(state.cash)} in cash: ${capital}, with ${ledger}. No open order or Disaster stop is recorded yet.`
+    ? `${at(state.cash)} in cash: ${capital}, with ${ledger}.`
     : state.as_of
       ? `${at(state.cash)} in cash on its last close filled, ${esc(state.as_of)}.`
       : `${at(state.cash)} in cash: ${capital}, all of it in cash until its first Order list fills.`
   const sessions = [...new Set(state.open_orders.map((o) => o.session))]
-  const waiting = state.open_orders.length
-    ? `<p>${plural(state.open_orders.length, 'order')} of its Order list for ${esc(sessions.join(', '))} wait to be filled at the open, its buys reserving ${at(state.reserved)}.</p>`
-    : ''
-  const stops = state.stops.map((stop) => `${esc(stop.security_id)}: ${esc(money(stop.price, state.currency, 2))}`)
+  const waiting = !state.open_orders.length
+    ? ''
+    : state.paper
+      ? `<p>${plural(state.open_orders.length, 'order')} of its Order list for ${esc(sessions.join(', '))} wait to be filled at the open, its buys reserving ${at(state.reserved)}.</p>`
+      : `<p>${plural(state.open_orders.length, 'order')} you marked placed for ${esc(sessions.join(', '))} wait for a tradebook, its buys reserving ${at(state.reserved)}: the Rule plan makes no other order of their securities.</p>`
+  const marked = (placed: boolean | undefined) => (placed === undefined ? '' : placed ? ', placed' : ', not marked placed yet')
+  const stops = state.stops.map((stop) => `${esc(stop.security_id)}: ${esc(money(stop.price, state.currency, 2))}${marked(stop.placed)}`)
   return [
     `<h3>The Book state ${esc(state.id)}</h3>`,
     `<p>${cash}</p>`,
@@ -812,7 +938,7 @@ function statePart(state: PdBookState | undefined): string {
     .join('\n')
 }
 
-/** A Rule plan's orders, each marked not for placing, with the signal behind it and any cut. */
+/** A Rule plan's orders, a paper Book's each marked not for placing, with the signal behind it and any cut. */
 function ordersPart(plan: PdRulePlan): string {
   const orders = plan.orders ?? []
   const currency = plan.currency ?? 'INR'
@@ -826,14 +952,14 @@ function ordersPart(plan: PdRulePlan): string {
     o.limit === null ? '—' : esc(money(o.limit, currency, 2)),
     esc(signalText(o, plan)),
     esc(o.cuts.map(cutText).join('; ')) || '—',
-    'Not for placing',
+    plan.for_placing ? 'See its Order list' : 'Not for placing',
   ])
   return table(['Id', 'Security', 'Side', 'Shares', 'Last close', 'Limit', 'Signal', 'Cut', ''], rows)
 }
 
 /** What a kind of Rule plan is, under its heading. */
 const planAbout = {
-  shadow: '<p>One Book end to end before any judgement: its state, and the Rule plan the Book engine makes from it with one Sleeve at its full share beside gold and the cash fund. Nothing here is recorded as an order, and none of it is for placing.</p>',
+  real: "<p>The real Book holds each strategy at its Stage's share (a Paper strategy nothing, a Real-small one a quarter, a Real-full one all of it) beside gold and the cash fund, running on from what its Order lists actually filled. The Portfolio Manager judges its Rule plan in its real side's Judgement mode, and the Check Step records its final Order list for you to place: it is at the top of this Brief.</p>",
   paper: '<p>The paper Book holds each strategy from Paper up at its full share, beside gold and the cash fund. The Portfolio Manager judges its Rule plan within its Playbook, the Check Step records its final Order list and ash_new\'s daily chain fills it at the next open: none of it is for you to place.</p>',
   rules_only: "<p>The rules-only paper Book starts with the paper Book and holds the same Sleeves, but always trades its Rule plan unchanged: the paper Book's gap to it is what the Portfolio Manager's judgement added.</p>",
 }
@@ -852,7 +978,7 @@ function rulesOnlyPart(plan: PdRulePlan, paper: PdRulePlan | undefined): string 
   return [
     `<section>${head}`,
     planAbout.rules_only,
-    `<p>The Rule plan ${esc(plan.id)}, made from its Book state ${esc(plan.state_id)}: ${orders}${same ? ", the same as its paper Book's" : ''}.</p>`,
+    `<p>The Rule plan ${esc(plan.id)}, made from its Book state ${esc(plan.state_id ?? '')}: ${orders}${same ? ", the same as its paper Book's" : ''}.</p>`,
     same ? '' : ordersPart(plan),
     '</section>',
   ]
@@ -862,9 +988,7 @@ function rulesOnlyPart(plan: PdRulePlan, paper: PdRulePlan | undefined): string 
 
 /** A Book's state beside its Rule plan: what the plan was made from, its orders, what it stopped and its Disaster stops. */
 function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
-  const shadow = plan.kind === 'shadow'
-  const title = shadow ? `${esc(plan.name)} in shadow` : esc(plan.name)
-  const head = `<h2>${title}${plan.session ? `: its Rule plan for ${esc(plan.session)}` : ''}${shadow ? ', not for placing' : ''}</h2>`
+  const head = `<h2>${esc(plan.name)}${plan.session ? `: its Rule plan for ${esc(plan.session)}` : ''}${plan.for_placing ? ', for placing' : ''}</h2>`
   if (plan.status === 'market_shut') return [`<section>${head}`, `<p>No order: ${esc(plan.why ?? '')}.</p>`, '</section>'].join('\n')
   if (plan.status === 'cant_plan') return [`<section>${head}`, `<p>No Rule plan could be made: ${esc(plan.why ?? '')}</p>`, statePart(state), '</section>'].join('\n')
   const currency = plan.currency ?? 'INR'
@@ -876,7 +1000,7 @@ function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
     ? `<p>It trades under an exposure level of ${percent(plan.exposure.level)}, which its market's ${esc(conditionName(plan.exposure.condition))} on the last close sets.</p>`
     : ''
   const sleeves = strategies.length ? `${strategies.join('; ')}, ` : 'no strategy yet (gold and the cash fund alone), '
-  const madeFrom = `Made from the Book state ${esc(plan.state_id)}, the data to ${esc(plan.as_of ?? '')}'s close (version ${esc(plan.data_version ?? '')}), ${sleeves}the Mandate's version ${esc(plan.mandate_version)} and the Playbook's ${esc(plan.playbook_version)}.`
+  const madeFrom = `Made from the Book state ${esc(plan.state_id ?? '')}, the data to ${esc(plan.as_of ?? '')}'s close (version ${esc(plan.data_version ?? '')}), ${sleeves}the Mandate's version ${esc(plan.mandate_version)} and the Playbook's ${esc(plan.playbook_version)}.`
   const leftOut = (plan.left_out ?? []).map((l) => `${esc(l.strategy_id)} version ${esc(l.version)} (${esc(stageName(l.stage))}): ${esc(l.why)}`)
   const dropped = (plan.dropped ?? []).map((d) => `${esc(d.name ?? d.security_id)} (${esc(d.security_id)}): a ${d.side === 'BUY' ? 'buy' : 'sale'} of ${esc(shares(d.wanted))} shares stopped by ${esc(ruleName(d.rule))}`)
   const stops = (plan.stops ?? []).map((s) => `${esc(s.name ?? s.security_id)} (${esc(s.security_id)}): ${s.was === null ? 'place at' : `raise from ${esc(money(s.was, currency, 2))} to`} ${esc(money(s.price, currency, 2))}`)
@@ -887,7 +1011,7 @@ function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
     planAbout[plan.kind],
     hold,
     statePart(state),
-    `<h3>The ${shadow ? 'shadow ' : ''}Rule plan ${esc(plan.id)}</h3>`,
+    `<h3>The Rule plan ${esc(plan.id)}</h3>`,
     `<p>${madeFrom}</p>`,
     ...(leftOut.length ? ["<p>Left out, as ash_new can't run them:</p>", list(leftOut)] : []),
     exposure,
@@ -933,7 +1057,7 @@ function conditionsSection(plan: PdPlan): string {
 
 /**
  * Hold mode, when the Data gate fails; each market's condition; then each Book's state beside its Rule
- * plan, the shadow plan first; that none was made when the Plan Step failed, and nothing when it didn't run.
+ * plan, the real Books' first; that none was made when the Plan Step failed, and nothing when it didn't run.
  */
 function plansSection(run: RunRecord, plan: PdPlan | null, states: BookStates | null): string {
   const step = run.steps.find((s) => s.name === 'plan')
@@ -954,10 +1078,11 @@ const wentOut = {
   exits_only: 'Only its exits and Disaster stops went out',
 }
 
-/** The Portfolio Manager's judgement of a paper Book's plan, as the final check left it. */
+/** The Portfolio Manager's judgement of a real or paper Book's plan, as the final check left it. */
 function bookJudgement(listed: PdOrderList, modes: PdJudgementShow | null, desk: DeskResult | null): string {
   const judged = listed.judgement!
-  const mode = modes?.books.find((b) => b.book === listed.book)?.paper
+  const sides = modes?.books.find((b) => b.book === listed.book)
+  const mode = listed.kind === 'real' ? sides?.real : sides?.paper
   const went = judged.applied === 'judgement' ? wentOut.judgement : `${wentOut[judged.applied]}: ${esc(judged.why ?? '')}.`
   const accepted = judged.changes.filter((c) => c.accepted)
   const dropped = judged.changes.filter((c) => !c.accepted)
@@ -989,17 +1114,17 @@ function viewsBehind(named: { analyst: DeskView['analyst']; security_id: string 
 }
 
 /**
- * The Portfolio Manager's judgement of each paper Book, or that it failed or didn't run, then each
- * Book's Judgement modes; nothing when it isn't in this Run.
+ * The Portfolio Manager's judgement of each real and paper Book, or that it failed or didn't run, then
+ * each Book's Judgement modes; nothing when it isn't in this Run.
  */
 function judgementSection(run: RunRecord, pm: PortfolioManagerResult | null, result: CheckResult | null, modes: PdJudgementShow | null, desk: DeskResult | null): string {
   const step = run.steps.find((s) => s.name === 'portfolio-manager')
   if (!step && !pm) return ''
   const log = logLink(step?.log ?? 'logs/portfolio-manager.log')
   let intro = ''
-  if (pm?.status === 'failed') intro = `<p>The Portfolio Manager failed, so each paper Book's Rule plan went out instead, once it passed the final check: ${esc(pm.error)}. See its log: ${log}</p>`
-  else if (!pm) intro = `<p>The Portfolio Manager didn't judge the plans in this Run, so each paper Book's Rule plan went out, once it passed the final check. See its log: ${log}</p>`
-  const books = (result?.check?.lists ?? []).filter((l) => l.judgement && l.kind === 'paper').map((l) => bookJudgement(l, modes, desk))
+  if (pm?.status === 'failed') intro = `<p>The Portfolio Manager failed, so each real and paper Book's Rule plan went out instead, once it passed the final check: ${esc(pm.error)}. See its log: ${log}</p>`
+  else if (!pm) intro = `<p>The Portfolio Manager didn't judge the plans in this Run, so each real and paper Book's Rule plan went out, once it passed the final check. See its log: ${log}</p>`
+  const books = (result?.check?.lists ?? []).filter((l) => l.judgement && l.kind !== 'rules_only').map((l) => bookJudgement(l, modes, desk))
   const rows = (modes?.books ?? []).map((b) => [
     esc(b.name),
     esc(`${modeName(b.real.mode)}${b.real.change ? `, since ${b.real.change.date}` : ''}`),
@@ -1024,10 +1149,10 @@ function judgementSection(run: RunRecord, pm: PortfolioManagerResult | null, res
     .join('\n')
 }
 
-/** What became of each paper Book's Order list in this Run, or why none was recorded. */
+/** What became of each real and paper Book's Order list in this Run, or why none was recorded. */
 function checkSection(run: RunRecord, result: CheckResult | null): string {
   const step = run.steps.find((s) => s.name === 'check')
-  const head = '<section><h2>Order lists</h2>'
+  const head = '<section><h2>Order lists recorded</h2>'
   if (!result) return step?.status === 'failed' ? `${head}<p>No Order list was recorded: the Check Step failed. See its log: ${logLink(step.log ?? 'logs/check.log')}</p></section>` : ''
   if (!result.check) return `${head}<p>No Order list was recorded in this Run: ${esc(result.why ?? '')}.</p></section>`
   const shown = { recorded: 'Recorded', unchanged: 'Recorded already', not_recorded: 'Not recorded', would_record: 'Would be recorded' }
@@ -1040,8 +1165,8 @@ function checkSection(run: RunRecord, result: CheckResult | null): string {
   return [
     head,
     result.check.dry_run ? '<p>Dry run: nothing was recorded.</p>' : '',
-    '<p>Each paper Book\'s Order list is its Rule plan with the Portfolio Manager\'s changes that passed the final check; each rules-only paper Book\'s is always its Rule plan. Their orders fill at the next open, once ash_new\'s daily chain\'s Health report passes.</p>',
-    table(['Paper Book', 'Session', 'Orders', ''], rows),
+    '<p>Each real and paper Book\'s Order list is its Rule plan with the Portfolio Manager\'s changes that passed the final check; each rules-only paper Book\'s is always its Rule plan. A real Book\'s orders are yours to place; a paper Book\'s fill at the next open, once ash_new\'s daily chain\'s Health report passes.</p>',
+    table(['Book', 'Session', 'Orders', ''], rows),
     '</section>',
   ]
     .filter(Boolean)
@@ -1188,6 +1313,8 @@ a { color: inherit; }
 .save-bar { position: sticky; bottom: 0; background: var(--panel); border-top: 1px solid var(--line); padding: 0.5rem 1rem; margin: 2rem -1rem 0; }
 .save-bar button { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .save-bar button:disabled { opacity: 0.4; cursor: default; }
+.under { padding-left: 1rem; }
+.flag { border-left: 4px solid var(--unknown); padding-left: 0.5rem; }
 `
 
 /** What the Brief is written from: the Run, and what each earlier Step wrote (null: nothing). */
@@ -1220,15 +1347,19 @@ interface Inputs {
   narrower: NarrowerResult | null
   /** The promotions Save state recorded in this Run. */
   promotions: PromotionsResult | null
+  /** The real Books' orders, stops and own trades, as the Check Step read them (issue 42). */
+  orders: PdOrders | null
   todos: { step: string; todo: string }[]
 }
 
-function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, narrower, todos }: Inputs): string {
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, narrower, orders, todos }: Inputs): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   const promoting = waitingPromotions(stages, promotions)
   const exits = openExits(modes, desk)
   const proposals = waitingProposals(modes, narrower)
+  // The Check Step's read, else the Broker inbox Step's, before this Run's lists.
+  const placing = orders ?? inbox?.orders ?? null
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -1241,15 +1372,17 @@ function render({ run, answers, inbox, marketSmith, lake, status, latest, stages
 <h1>Stocks Brief ${esc(run.id)}</h1>
 ${run.dryRun ? '<p class="note">Dry run: the Lake was read as it is, not refreshed, and nothing was recorded in ash_new.</p>\n' : ''}${gateSection(status, lakeLog)}
 ${diagnosisSection(run, health)}
-${answersSection(answers)}
+${orderListsSection(run, placing, check)}
+${unplacedStopsSection(run, placing)}
+${todosSection(todos)}
 ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${candidatesSection(stages)}
 ${promotionsSection(promoting, stages)}
 ${exitsSection(exits)}
 ${proposalsSection(proposals, modes)}
+${answersSection(answers)}
 ${marketsSection(status)}
-${todosSection(todos)}
 ${stagesSection(run, stages)}
 ${reviewSection(run, review, pm, narrower)}
 ${monthlySection(review, pm)}
@@ -1264,7 +1397,7 @@ ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
-${saveAnswers(run.id, waitingItems(waiting, stages, { books: [], exits: [], ...modes, proposals }, promoting, exits))}
+${saveAnswers(run.id, waitingItems(waiting, stages, { books: [], exits: [], ...modes, proposals }, promoting, exits, placing))}
 </body>
 </html>
 `
@@ -1300,6 +1433,7 @@ await runAsStep(({ runId, runFolder, force }) => {
       review: read<PdReview>('review.json'),
       promotions: read<PromotionsResult>('promotions.json'),
       narrower: read<NarrowerResult>('narrower.json'),
+      orders: read<PdOrders>('orders.json'),
       todos: readTodos(runFolder),
     }),
   )

@@ -1,29 +1,35 @@
-// Check: records the final Order lists in ash_new, then reads how each paper Book stands, for the
-// Brief. It hands the Portfolio Manager's judgement to `pd check --plan plan.json --judgement
-// judgement.json --run <id>`, which holds each change to the final check: those the Book's Judgement
-// mode and Playbook allow, buying only Pool names, whose Decision records cite only figures in the
-// Run's inputs, go out once the whole Book passes the Mandate as the list would leave it; else the
-// Rule plan, once it passes; else only its exits and Disaster stops, with a To-do this Step raises.
-// A Portfolio Manager that failed, or didn't run, sends the Rule plans (its judgement is marked
-// failed, with why). A buy whose Desk review is missing (issue 39) waits a session: the judgement
-// names each review the review list required that the Desk didn't give (desk.json's, or every one
-// when the Desk Step failed or didn't run), and ash_new holds back their buys, and every buy the
-// review list required a review of when the Portfolio Manager failed; sales and Disaster stops go out
-// all the same. ash_new records each accepted change as an Override, and each rules-only paper Book's
-// own Rule plan unchanged; each order fills at the next open (ash_new's daily chain fills them once
-// its Health report passes). ash_new records nothing for a plan made from a Book state,
-// Mandate or Playbook that is no longer current, and says why; it starts a paper Book and its
-// rules-only paper Book together. A list for a session that already has one (a Run started again)
-// supersedes it, and no order is recorded twice. This Step records nothing unless this Run's Plan
-// Step succeeded: it says why and skips itself. A dry run records nothing (`--dry-run`). Either way
-// it then runs `pd paper-books` and `pd judgement show` (each Book's Judgement modes and the
-// proposals waiting on Saransh), kept as paper-books.json and judgement-show.json, and keeps what pd
-// check printed, or why it didn't run, as check.json.
+// Check: records the final Order lists in ash_new, then reads how each paper Book stands and each
+// real Book's orders, for the Brief. It hands the Portfolio Manager's judgement to `pd check --plan
+// plan.json --judgement judgement.json --run <id>`, which holds each change to the final check: those
+// the Book's Judgement mode and Playbook allow, buying only Pool names, whose Decision records cite
+// only figures in the Run's inputs, go out once the whole Book passes the Mandate as the list would
+// leave it; else the Rule plan, once it passes; else only its exits and Disaster stops, with a To-do
+// this Step raises. A Portfolio Manager that failed, or didn't run, sends the Rule plans (its
+// judgement is marked failed, with why). A buy whose Desk review is missing (issue 39) waits a
+// session: the judgement names each review the review list required that the Desk didn't give
+// (desk.json's, or every one when the Desk Step failed or didn't run), and ash_new holds back their
+// buys, and every buy the review list required a review of when the Portfolio Manager failed; sales
+// and Disaster stops go out all the same. ash_new records each accepted change as an Override, and
+// each rules-only paper Book's own Rule plan unchanged; each paper order fills at the next open
+// (ash_new's daily chain fills them once its Health report passes). Each real Book's list (issue 42)
+// goes through the same final check under its real side's Judgement mode, and its orders are recorded
+// proposed, for Saransh to place: a buy that needs a sale's money listed under that sale, with the
+// Disaster stops to place or raise. A real Book starts with its first plan outside Hold mode with a
+// strategy at Real-small or Real-full. ash_new first expires each real order still proposed once its
+// session is over. ash_new records nothing for a plan made from a Book state, Mandate or Playbook
+// that is no longer current, and says why; it starts a paper Book and its rules-only paper Book
+// together. A list for a session that already has one (a Run started again) supersedes it, and no
+// order is recorded twice. This Step records nothing unless this Run's Plan Step succeeded: it says
+// why and skips itself. A dry run records nothing (`--dry-run`). Either way it then runs `pd
+// paper-books`, `pd judgement show` (each Book's Judgement modes and the proposals waiting on
+// Saransh) and `pd orders show` (each real Book's orders, stops and own trades), kept as
+// paper-books.json, judgement-show.json and orders.json, and keeps what pd check printed, or why it
+// didn't run, as check.json.
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { requiredReviews, type DeskResult } from '../../src/desk.ts'
 import { readJson, writeJson } from '../../src/files.ts'
-import { pdJson, type PdCheck, type PdJudgement, type PdJudgementShow, type PdMissingReview, type PdPaperBooks, type PdPlan } from '../../src/pd.ts'
+import { pdJson, type PdCheck, type PdJudgement, type PdJudgementShow, type PdMissingReview, type PdOrders, type PdPaperBooks, type PdPlan } from '../../src/pd.ts'
 import { analystName } from '../../src/plans.ts'
 import { readRun, type RunRecord } from '../../src/run.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
@@ -32,7 +38,7 @@ import type { PortfolioManagerResult } from './portfolio-manager.ts'
 
 /** How long pd check may take: each plan's Book state read again, and its lists recorded. */
 const checkMs = 5 * 60_000
-/** How long pd paper-books and pd judgement show may take: a few rows per Book. */
+/** How long pd paper-books, pd judgement show and pd orders show may take: a few rows per Book. */
 const standingMs = 2 * 60_000
 
 /** What the Check Step did: what pd check printed, or why it recorded nothing. */
@@ -70,8 +76,9 @@ await runAsStep(async ({ runId, runFolder }) => {
   const out = join(runFolder, 'check.json')
   const standingFile = join(runFolder, 'paper-books.json')
   const modesFile = join(runFolder, 'judgement-show.json')
+  const ordersFile = join(runFolder, 'orders.json')
   // What an earlier run of this Step recorded would say nothing true about this one.
-  for (const file of [out, standingFile, modesFile]) rmSync(file, { force: true })
+  for (const file of [out, standingFile, modesFile, ordersFile]) rmSync(file, { force: true })
   const run = readRun(runId)
   const { dryRun = false, steps } = run
   const plan = steps.find((s) => s.name === 'plan')
@@ -88,7 +95,7 @@ await runAsStep(async ({ runId, runFolder }) => {
     const missing = missingReviews(run, readJson<PdPlan>(planFile), existsSync(deskFile) ? readJson<DeskResult>(deskFile) : null)
     const judgement = judgementOf(run, existsSync(pmFile) ? readJson<PortfolioManagerResult>(pmFile) : null, missing)
     writeJson(judgementFile, judgement)
-    if (judgement.why) console.log(`${judgement.why}: each paper Book's Rule plan goes out instead, once it passes the final check, without the buys the Desk reviewed`)
+    if (judgement.why) console.log(`${judgement.why}: each real and paper Book's Rule plan goes out instead, once it passes the final check, without the buys the Desk reviewed`)
     for (const m of missing) console.log(`${m.security_id}'s review by ${analystName[m.analyst]} is missing, so its buy waits a session: ${m.why}`)
     const args = ['check', '--plan', planFile, '--judgement', judgementFile, '--run', runId, ...(dryRun ? ['--dry-run'] : [])]
     check = await pdJson<PdCheck>(args, { cwd: runFolder, timeoutMs: checkMs })
@@ -107,5 +114,6 @@ await runAsStep(async ({ runId, runFolder }) => {
   writeJson(out, { check, why } satisfies CheckResult)
   writeJson(standingFile, await pdJson<PdPaperBooks>(['paper-books'], { cwd: runFolder, timeoutMs: standingMs }))
   writeJson(modesFile, await pdJson<PdJudgementShow>(['judgement', 'show'], { cwd: runFolder, timeoutMs: standingMs }))
+  writeJson(ordersFile, await pdJson<PdOrders>(['orders', 'show'], { cwd: runFolder, timeoutMs: standingMs }))
   if (why !== null) throw new StepSkipped(`Nothing recorded: ${why}`)
 })

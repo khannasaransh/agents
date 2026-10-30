@@ -122,7 +122,7 @@ test("the Health Agent's diagnosis and proposed fix come right under the Data ga
 
   assert.match(
     page,
-    /Data gate: fail\..*1 session behind its last finished session, 2026-10-26 Health Agent's diagnosis Yahoo rate-limited the price top-up, so both runs of pd daily stopped before the US prices were in\. Proposed fix, not applied Run pd daily again after 10:00 IST, when the limit resets\. Evidence it read: 2 items lakeLog ?: Both runs stopped on "Yahoo answered 429" data\/logs\/jobs\/482\.jsonl ?: The job failed in prices-update Corrections No Correction is waiting for your approval\. Quarantine No security is quarantined\. Markets/,
+    /Data gate: fail\..*1 session behind its last finished session, 2026-10-26 Health Agent's diagnosis Yahoo rate-limited the price top-up, so both runs of pd daily stopped before the US prices were in\. Proposed fix, not applied Run pd daily again after 10:00 IST, when the limit resets\. Evidence it read: 2 items lakeLog ?: Both runs stopped on "Yahoo answered 429" data\/logs\/jobs\/482\.jsonl ?: The job failed in prices-update To-dos Nothing is waiting on you\. Corrections No Correction is waiting for your approval\. Quarantine No security is quarantined\. Markets/,
   )
   assert.match(html, /Health Agent's diagnosis<\/h2>\n<p class="text">Yahoo rate-limited the price top-up, so both runs of pd daily stopped\nbefore/, 'its line breaks are kept')
 })
@@ -181,7 +181,7 @@ test('a Health Agent that failed is shown under the Data gate, with why and its 
 
   assert.match(
     page,
-    /2026-10-26 Health Agent The Health Agent failed, so there is no diagnosis: codex failed: You've hit your usage limit\.; then claude-code failed: Claude Code is down\. See its log: logs\/health\.log Corrections /,
+    /2026-10-26 Health Agent The Health Agent failed, so there is no diagnosis: codex failed: You've hit your usage limit\.; then claude-code failed: Claude Code is down\. See its log: logs\/health\.log To-dos /,
   )
   assert.match(page, /health: failed\. Log: logs\/health\.log/)
 })
@@ -192,7 +192,7 @@ test('a Health Step that failed before recording anything is shown as a failed H
 
   const page = text(await brief())
 
-  assert.match(page, /Health Agent The Health Agent failed before it recorded a diagnosis\. See its log: logs\/health\.log Corrections /)
+  assert.match(page, /Health Agent The Health Agent failed before it recorded a diagnosis\. See its log: logs\/health\.log To-dos /)
 })
 
 test('a Health Step that failed before recording why shows no diagnosis an earlier run of it left', async () => {
@@ -328,7 +328,7 @@ test("the Stocks Brief says what became of the Answers this Run applied, each wi
     page,
     /Your Answers 1 of your 2 Answers applied, 1 ignored\. Each Answer, by file, oldest first stocks-answers-2026-10-26-0930-20261026031000\.json, saved at 2026-10-26 03:10 UTC from the Brief of Run 2026-10-26-0930: Correction 7: approve, applied \(your note: Matches <BSE>\) Quarantine 5: dismiss, ignored: Quarantine 5 was corrected already/,
   )
-  assert.ok(page.indexOf('Your Answers') < page.indexOf('Corrections'))
+  assert.ok(page.indexOf('Corrections') < page.indexOf('Your Answers'), 'what waits on you comes first')
 
   ws.writeRunFile(runId, 'answers.json', { dryRun: false, files: [] })
   assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /Your Answers No Answers file was waiting in Downloads or the Broker inbox\./)
@@ -464,22 +464,22 @@ function planned(example_: string) {
   ws.writeRunFile(runId, 'book-states.json', JSON.stringify({ states }))
 }
 
-test("the India Book's state is shown beside its shadow Rule plan, with each order's signal and cut, none of it for placing", async () => {
+test("the India Book's state is shown beside its Rule plan, for placing, with each order's signal and cut", async () => {
   prepare()
   planned('plan.normal.json')
 
   const page = text(await brief())
 
-  assert.match(page, /India Book in shadow: its Rule plan for 2026-10-26, not for placing/)
+  assert.match(page, /India Book: its Rule plan for 2026-10-26, for placing The real Book holds each strategy at its Stage's share/)
   // The state: its cash, its Legacy holdings and what is unsettled.
   assert.match(page, /The Book state fa1dba342bad ₹9,84,160 in cash: its capital, ₹10,00,000 until you set it \(its market's cost preset's\), with 2 trades in its ledger, the last on 2026-07-02/)
   assert.match(page, /Asian Paints Ltd IN:ASIANPAINT 100 ₹120\.00 Legacy/)
   assert.match(page, /Unsettled, so neither bought nor sold on a signal until a holdings export settles it: Rategain Travel Technologies Ltd \(IN:RATEGAIN\): quantity, ledger 100, broker 50/)
-  // The plan: what it was made from, then each order with its signal and cut, marked not for placing.
-  assert.match(page, /Made from the Book state fa1dba342bad, the data to 2026-10-23's close \(version 2026-10-23\.70c27d24c7a7\), India CW2, selected \(in-cw2-selected, version 7c41d0e2a9b3, Real-full\), its Disaster stops 20% under, the Mandate's version f99c88f13b5b and the Playbook's e247b5b89ff0/)
+  // The plan: what it was made from, then each order with its signal and cut, its final list at the top.
+  assert.match(page, /Made from the Book state fa1dba342bad, the data to 2026-10-23's close \(version 2026-10-23\.70c27d24c7a7\), India CW2, selected \(in-cw2-selected, version 7c41d0e2a9b3, Real-small\), its Disaster stops 20% under, the Mandate's version f99c88f13b5b and the Playbook's e247b5b89ff0/)
   assert.match(page, /India CW2, selected 90%, gold 10%/)
-  assert.match(page, /IN-2026-10-26-001 Stove Kraft Ltd IN:STOVEKRAFT Buy 2415 ₹62\.52 ₹64\.39 India CW2, selected holds it at 12\.5% on the close of 2026-10-23 cut from 6775 to 2415 shares by the position cap Not for placing/)
-  assert.match(page, /IN-2026-10-26-002 IN:GOLD1 Buy 2445 ₹40\.00 ₹41\.20 Gold's share of the Book — Not for placing/)
+  assert.match(page, /IN-2026-10-26-001 Stove Kraft Ltd IN:STOVEKRAFT Buy 2415 ₹62\.52 ₹64\.39 India CW2, selected holds it at 12\.5% on the close of 2026-10-23 cut from 6775 to 2415 shares by the position cap See its Order list/)
+  assert.match(page, /IN-2026-10-26-002 IN:GOLD1 Buy 2445 ₹40\.00 ₹41\.20 Gold's share of the Book — See its Order list/)
   assert.match(page, /Stopped by a rule, so not in the plan: Rategain Travel Technologies Ltd \(IN:RATEGAIN\): a buy of 2642 shares stopped by an open Reconciliation difference/)
   assert.match(page, /Disaster stops to place with the buys, or raise: Stove Kraft Ltd \(IN:STOVEKRAFT\): place at ₹50\.02/)
   assert.match(page, /Legacy holdings, held, not sold: issue 43 sells them as the Sleeves need the cash\. Asian Paints Ltd \(IN:ASIANPAINT\): 100 shares/)
@@ -498,7 +498,7 @@ test("each paper Book's Rule plan is shown beside its state, its strategies from
   assert.match(page, /IN-paper-2026-10-26-001 Rategain Travel Technologies Ltd IN:RATEGAIN Buy 865 ₹173\.38 ₹178\.59 India Super 30 OK, tuned holds it at 12\.5% on the close of 2026-10-23 cut from \d+ to 865 shares by the position cap Not for placing/)
   // The US and Hong Kong paper Books say why they have no plan.
   assert.match(page, /US Book's paper Book No Rule plan could be made: US has no panels yet/)
-  assert.ok(page.indexOf('India Book in shadow') < page.indexOf("India Book's paper Book: its Rule plan"), 'the shadow plan comes first')
+  assert.ok(page.indexOf('India Book: its Rule plan') < page.indexOf("India Book's paper Book: its Rule plan"), "the real Book's plan comes first")
   // Its rules-only paper Book's plan follows it, short while it makes the same orders.
   assert.match(page, /India Book's rules-only paper Book: its Rule plan for 2026-10-26 The rules-only paper Book starts with the paper Book .* The Rule plan 9d04c6e1a7b2, made from its Book state 7c1e0b5a93d2: 3 orders, buys of ₹\S+ and sales of ₹0, the same as its paper Book's\./)
   assert.doesNotMatch(page, /IN-rules-2026-10-26-001/)
@@ -525,15 +525,16 @@ test('the Order lists the Check Step recorded are listed, or why none was', asyn
 
   const page = text(await brief())
 
-  assert.match(page, /Order lists Each paper Book's Order list is its Rule plan with the Portfolio Manager's changes that passed the final check/)
+  assert.match(page, /Order lists recorded Each real and paper Book's Order list is its Rule plan with the Portfolio Manager's changes that passed the final check/)
+  assert.match(page, /India Book 2026-10-26 3 Recorded US Book — 0 Not recorded: It has no Rule plan: US has no panels yet India Book's paper Book/)
   assert.match(page, /India Book's paper Book 2026-10-26 2 Recorded India Book's rules-only paper Book 2026-10-26 3 Recorded/)
   assert.match(page, /US Book's paper Book — 0 Not recorded: It has no Rule plan: US has no panels yet/)
 
   ws.writeRunFile(runId, 'check.json', { check: null, why: 'the Plan Step failed, so there is no Rule plan to record' })
-  assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /Order lists No Order list was recorded in this Run: the Plan Step failed, so there is no Rule plan to record\./)
+  assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /Order lists recorded No Order list was recorded in this Run: the Plan Step failed, so there is no Rule plan to record\./)
 })
 
-test("the Portfolio Manager's judgement of each paper Book is shown: its mode, commentary, each change with its Decision record and each change the final check dropped", async () => {
+test("the Portfolio Manager's judgement of each real and paper Book is shown: its mode, commentary, each change with its Decision record and each change the final check dropped", async () => {
   prepare()
   ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'portfolio-manager', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
   ws.writeRunFile(runId, 'portfolio-manager.json', { status: 'answered', answer: { books: [], journal: { entries: [], open: [] } }, journalRead: '', inputs: [] })
@@ -542,7 +543,8 @@ test("the Portfolio Manager's judgement of each paper Book is shown: its mode, c
 
   const page = text(await brief())
 
-  assert.match(page, /The Portfolio Manager India Book's paper Book, in Playbook mode India is in a Correction, so the paper Book starts at its 40% exposure level\./)
+  assert.match(page, /The Portfolio Manager India Book, in subtract only mode Subtract only: nothing to take away today\. Its Rule plan went out instead: \. Its exposure level for the day: 40%\./)
+  assert.match(page, /India Book's paper Book, in Playbook mode India is in a Correction, so the paper Book starts at its 40% exposure level\./)
   assert.match(page, /Its Order list went out with the Portfolio Manager's changes that passed the final check\. Its exposure level for the day: 40%\./)
   assert.match(
     page,
@@ -649,7 +651,7 @@ test('a dry run says no Order list was recorded', async () => {
 
   const page = text(await brief())
 
-  assert.match(page, /Order lists Dry run: nothing was recorded\./)
+  assert.match(page, /Order lists recorded Dry run: nothing was recorded\./)
   assert.match(page, /India Book's paper Book 2026-10-26 2 Would be recorded/)
 })
 
@@ -685,17 +687,18 @@ test("a Book whose market was shut the session before gets no order", async () =
 
   const page = text(await brief())
 
-  assert.match(page, /India Book in shadow, not for placing No order: Its market was shut on 2026-11-24, the session before the Run's day: no order for it\./)
+  assert.match(page, /India Book, for placing No order: Its market was shut on 2026-11-24, the session before the Run's day: no order for it\./)
   assert.match(page, /India Book's paper Book No order: Its market was shut on 2026-11-24/)
 })
 
-test("a shadow Rule plan ash_new couldn't make says why, and a Plan Step that failed says so", async () => {
+test("a real Book's Rule plan ash_new couldn't make says why, and a Plan Step that failed says so", async () => {
   prepare()
   ws.writeRunFile(runId, 'plan.json', example('plan.cant-plan.json'))
 
   const page = text(await brief())
 
-  assert.match(page, /India Book in shadow, not for placing No Rule plan could be made: The lake has no price for IN:GOLD1 on 2026-10-23/)
+  assert.match(page, /India Book, for placing No Rule plan could be made: The lake has no price for IN:GOLD1 on 2026-10-23/)
+  assert.match(page, /US Book, for placing No Rule plan could be made: US has no panels yet/)
   assert.match(page, /Its state couldn't be read in this Run\./)
 
   ws.cleanup()
@@ -715,7 +718,7 @@ test("each market's Market condition is shown with MarketSmith's outlook beside 
   assert.match(page, /US Under pressure \^GSPC 7,623\.7 50-day 7,699\.6, 200-day 7,291\.3 55\.4% of the S&P 500 5 no snapshot US Book: 80%/)
   assert.match(page, /HK Correction .* 22\.2% of the market 8 no snapshot Hong Kong Book: 40%/)
   assert.match(page, /It trades under an exposure level of 40%, which its market's Correction on the last close sets\./)
-  assert.ok(page.indexOf('Market condition') < page.indexOf('India Book in shadow'), 'the conditions come before the plans')
+  assert.ok(page.indexOf('Market condition') < page.indexOf('India Book: its Rule plan'), 'the conditions come before the plans')
 })
 
 test("on Saturdays the weekly review shows the Portfolio Manager's commentary and each Book and Sleeve against its tested range, its benchmark and Reconciliation", async () => {
@@ -858,4 +861,68 @@ test('a Feeds Step that failed is shown with its log', async () => {
   const page = text(await brief())
 
   assert.match(page, /Coming events for the holdings The Feeds weren't fetched in this Run\. See the Feeds Step's log: logs\/feeds\.log/)
+})
+
+/** A stocks Run whose Check Step read the real Books' orders: India's list for 30 October to place. */
+function withOrders(id = runId) {
+  ws = makeWorkspace()
+  ws.prepareRun(id, { pipeline: 'stocks', steps: [{ name: 'check', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(id, 'lake/status.json', JSON.parse(example('status.clean.json')))
+  ws.writeRunFile(id, 'check.json', { check: JSON.parse(example('check.recorded.json')), why: null })
+  ws.writeRunFile(id, 'orders.json', JSON.parse(example('orders.waiting.json')))
+}
+
+test("the real Books' Order lists come right after the Data gate, India first: each order to place with its buttons, a buy needing a sale's money under it, and the stops to place", async () => {
+  withOrders()
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(page, /^ ?Stocks Brief 2026-10-27-0930 Data gate: pass\. .* Order lists India Book: its Order list for 2026-10-30/)
+  assert.match(page, /Place these in the NSE's pre-open auction \(9:00 to 9:08 IST\) of 2026-10-30 at ICICI Direct: each sale at market, each buy as a limit order at its limit\. A buy under a sale needs its money: place it only once the sale is placed\./)
+  // The sale, the buy that needs its money under it, then the buy the cash pays for.
+  assert.match(page, /IN-2026-10-30-001 Sell 300 Rategain Travel Technologies Ltd IN:RATEGAIN, last close ₹520\.00 At market Placed Skipped ↳ IN-2026-10-30-002 Buy 2415 Stove Kraft Ltd IN:STOVEKRAFT, last close ₹62\.52 Limit ₹64\.39 once its sale is placed: it needs its money Placed Skipped IN-2026-10-30-003 Buy 400 IN:GOLD1/)
+  assert.match(html, /<div class="answer" data-item="order:22"><button type="button" data-answer="placed" aria-pressed="false">Placed<\/button><button type="button" data-answer="skipped" aria-pressed="false">Skipped<\/button>/)
+  assert.match(page, /Disaster stops to place or raise at the broker, each resting there until it is hit: Security Stop Your Answer Rategain Travel Technologies Ltd IN:RATEGAIN Raise from ₹402\.00 to ₹431\.50 Placed Stove Kraft Ltd IN:STOVEKRAFT Place at ₹50\.02 Placed/)
+  assert.match(html, /<div class="answer" data-item="stop:8"><button type="button" data-answer="placed" aria-pressed="false">Placed<\/button><input/)
+  // The order placed that waits for a tradebook, and what became of the last list's orders.
+  assert.match(page, /Placed, and waiting for ICICI Direct's tradebook: drop it in the Broker inbox, and the next Run records what filled\. IN-2026-10-29-002: Buy 100 Senco Gold Ltd, for 2026-10-29/)
+  assert.match(page, /IN-2026-10-29-001 2026-10-29 Buy 50 Delhivery Ltd filled 50 at ₹472\.75 IN-2026-10-29-003 2026-10-29 Buy 900 IN:GOLD1 expired: the tradebook shows no fill/)
+  // A trade he made himself, flagged.
+  assert.match(page, /Trades you made yourself, matching no order: recorded in its ledger, and outside its Sleeves until you say otherwise\. Bought 100 IDFC First Bank Ltd at ₹80\.98 on 2026-10-29/)
+  assert.match(page, /US Book No Order list was recorded for it in this Run: It has no Rule plan: US has no panels yet\. Hong Kong Book It has no Order list yet\./)
+  assert.ok(page.indexOf('Order lists') < page.indexOf('To-dos'), 'then what waits on you')
+  // Each order to place and stop to place is an item the Save answers button saves.
+  const items = JSON.parse(html.match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
+  assert.deepEqual(items.slice(0, 5), [
+    { item: 'order:21', answers: ['placed', 'skipped'] },
+    { item: 'order:22', answers: ['placed', 'skipped'] },
+    { item: 'order:23', answers: ['placed', 'skipped'] },
+    { item: 'stop:7', answers: ['placed'] },
+    { item: 'stop:8', answers: ['placed'] },
+  ])
+  assert.doesNotMatch(page, /Disaster stops not marked placed/, 'only on Saturdays')
+})
+
+test('every Saturday the Brief lists the Disaster stops not yet marked placed', async () => {
+  const saturday = '2026-10-31-0930'
+  withOrders(saturday)
+
+  const result = await ws.agents('step', 'brief', '--run', saturday)
+  assert.equal(result.status, 0, result.stderr)
+  const page = text(ws.readRunFile(saturday, 'brief.html'))
+
+  assert.match(page, /Disaster stops not marked placed A holding without its stop at the broker is unprotected\. Place each, then mark it placed in the Order lists above: India Book: Rategain Travel Technologies Ltd \(IN:RATEGAIN\), raised to ₹431\.50 India Book: Stove Kraft Ltd \(IN:STOVEKRAFT\), at ₹50\.02/)
+  assert.doesNotMatch(page, /Delhivery Ltd \(IN:DELHIVERY\), at/, 'a stop marked placed isn\'t listed')
+  assert.ok(page.indexOf('Disaster stops not marked placed') < page.indexOf('To-dos'))
+})
+
+test("on Saturdays the weekly review shows what each broker's fills cost against the open, flagging one that costs more, and each real Book's gap to its paper Book, split", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.saturday.json')))
+
+  const page = text(await brief())
+
+  assert.match(page, /Fill costs against the open Broker Fills Cost against the open The presets assume ICICI Direct 2 \+31\.5 bp \+20\.0 bp Costs more than the presets assume: its fill costs should correct them moomoo 0 — — No fill to measure this week/)
+  assert.match(page, /From 2026-10-23 to 2026-10-30 its real Book made \+1\.41% and its paper Book \+2\.13%: the real Book trails it by 0\.72%, of which fills \+0\.04%, skips \+0\.11%, expired orders \+0\.09%, Stage scaling and the rest \+0\.48%\./)
 })

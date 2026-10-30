@@ -108,7 +108,7 @@ test('an Answer to a settled item is ignored and logged, and its file still move
       { item: 'correction:7', answer: 'reject' },
       { item: 'quarantine:99', answer: 'dismiss' },
       { item: 'quarantine:5', answer: 'approve' },
-      { item: 'order:12', answer: 'placed' },
+      { item: 'lesson:12', answer: 'approve' },
     ]),
   )
   ws.setPd({ corrections: { example: 'corrections-decide.decided.json' }, quarantines: { example: 'quarantines-dismiss.none.json', exitCode: 1 } })
@@ -127,7 +127,7 @@ test('an Answer to a settled item is ignored and logged, and its file still move
       ['correction:7', 'ignored', 'Correction 7 was approved already'],
       ['quarantine:99', 'ignored', 'There is no Quarantine 99'],
       ['quarantine:5', 'ignored', 'A quarantine takes dismiss, not approve'],
-      ['order:12', 'ignored', "order:12 isn't an item the Brief asks about"],
+      ['lesson:12', 'ignored', "lesson:12 isn't an item the Brief asks about"],
     ],
   )
   const log = ws.readRunFile(nextRun, 'logs/answers.log')
@@ -346,4 +346,36 @@ test('an Answer on a promotion approves it through pd stages promote, or rejects
     ['promotion:4', 'approve', 'applied'],
     ['promotion:5', 'reject', 'applied'],
   ])
+})
+
+test("an Answer on a real Book's order or Disaster stop is applied with when it was saved, and a late one is recorded but ignored", async () => {
+  ws = makeWorkspace()
+  prepareRun(nextRun)
+  save(
+    file('2026-10-27T03:10:00.000Z', [
+      { item: 'order:21', answer: 'placed' },
+      { item: 'order:12', answer: 'placed' },
+      { item: 'stop:7', answer: 'placed' },
+      { item: 'stop:8', answer: 'skipped' },
+    ]),
+  )
+  ws.setPd({ orders: [{ example: 'orders-mark.placed.json' }, { example: 'orders-mark.late.json', exitCode: 1 }, { example: 'orders-mark.stop.json' }] })
+
+  const ran = await step(nextRun)
+
+  assert.equal(ran.status, 0, ran.stderr)
+  assert.deepEqual(pdCallArgs(), [
+    ['orders', 'mark', '21', 'placed', '--saved-at', '2026-10-27T03:10:00.000Z'],
+    ['orders', 'mark', '12', 'placed', '--saved-at', '2026-10-27T03:10:00.000Z'],
+    ['orders', 'stop', '7', '--saved-at', '2026-10-27T03:10:00.000Z'],
+  ])
+  assert.deepEqual(
+    result(nextRun).files[0].answers.map((a: any) => [a.item, a.outcome, a.why]),
+    [
+      ['order:21', 'applied', undefined],
+      ['order:12', 'ignored', 'Its session, 2026-10-30, was over when the Answer was saved: the Answer is recorded, but the order stays expired'],
+      ['stop:7', 'applied', undefined],
+      ['stop:8', 'ignored', 'A stop takes placed, not skipped'],
+    ],
+  )
 })

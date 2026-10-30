@@ -65,14 +65,14 @@ export function signalText(order: PdPlanOrder, plan: PdRulePlan): string {
   return ownReasons[order.reason] ?? order.reason.replaceAll('_', ' ')
 }
 
-/** The kind of plan a Book state is for: its real Book's shadow plan, its paper Book's or its rules-only paper Book's. */
-const kindOf = (state: PdBookState): PdPlanKind => (!state.paper ? 'shadow' : state.rules_only ? 'rules_only' : 'paper')
+/** The kind of plan a Book state is for: its real Book's plan, its paper Book's or its rules-only paper Book's. */
+const kindOf = (state: PdBookState): PdPlanKind => (!state.paper ? 'real' : state.rules_only ? 'rules_only' : 'paper')
 
 /** The state a plan was made from: its Book's, its paper Book's or its rules-only paper Book's. */
 export const stateOf = (states: PdBookState[], plan: Pick<PdRulePlan, 'book' | 'kind'>) => states.find((s) => s.book === plan.book && kindOf(s) === plan.kind)
 
 /** The `pd book-state` command that prints the state a plan of `kind` starts from. */
-export const stateArgs = (book: string, kind: PdPlanKind) => ['book-state', book, ...{ shadow: [], paper: ['--paper'], rules_only: ['--rules-only'] }[kind]]
+export const stateArgs = (book: string, kind: PdPlanKind) => ['book-state', book, ...{ real: [], paper: ['--paper'], rules_only: ['--rules-only'] }[kind]]
 
 /** The folder in the Run folder `pd plan` writes the dossiers into, one per name the Desk reviews (issue 37). */
 export const dossiersFolder = 'dossiers'

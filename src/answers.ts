@@ -3,9 +3,12 @@
 // naming the Run and each Answer, and the next Run's Answers Step applies it through `pd`. A kind of
 // item is added here, with its Answers and the `pd` command that applies one, and the Brief and the
 // Step follow (the stocks Pipeline PRD's "Answers").
-import type { PdEarlyExit, PdJudgementShow, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from './pd.ts'
+import type { PdEarlyExit, PdJudgementShow, PdOrders, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from './pd.ts'
 
-/** Each kind of item waiting on Saransh: the Answers it takes, and the `pd` command that applies one to the item with this id. */
+/**
+ * Each kind of item waiting on Saransh: the Answers it takes, and the `pd` command that applies one to
+ * the item with this id, saved at `savedAt` (the Answers file's time).
+ */
 const kinds = {
   correction: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['corrections', answer, id] },
   quarantine: { answers: ['dismiss'], pd: (id: string) => ['quarantines', 'dismiss', id] },
@@ -17,7 +20,12 @@ const kinds = {
   promotion: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['stages', answer === 'approve' ? 'promote' : 'reject', id] },
   // An early exit the Desk proposed (issue 39): approving it sells the holding on the paper Book's next Rule plan.
   exit: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['exits', answer, id] },
-} satisfies Record<string, { answers: string[]; pd(id: string, answer: string): string[] }>
+  // A real Book's order (issue 42): placed or skipped at the broker. An Answer saved once its session is
+  // over is recorded, but never revives the order, so ash_new is told when it was saved.
+  order: { answers: ['placed', 'skipped'], pd: (id: string, answer: string, savedAt: string) => ['orders', 'mark', id, answer, '--saved-at', savedAt] },
+  // A real Book's Disaster stop to place or raise: placed at the broker.
+  stop: { answers: ['placed'], pd: (id: string, _answer: string, savedAt: string) => ['orders', 'stop', id, '--saved-at', savedAt] },
+} satisfies Record<string, { answers: string[]; pd(id: string, answer: string, savedAt: string): string[] }>
 
 /** An item waiting on Saransh, as the Brief embeds it: its id and the Answers it takes. */
 export interface AnswerItem {
@@ -51,13 +59,26 @@ export function waitingCandidates(stages: PdStagesCheck | null): (PdSleeve & { i
   return (stages?.books ?? []).flatMap((b) => b.sleeves.filter((s): s is PdSleeve & { id: number } => s.stage === 'candidate' && s.id !== null && s.version === s.current_version))
 }
 
+/** The real Books' orders still to place whose sessions aren't over, Book by Book, in their lists' order. */
+export function ordersToPlace(orders: PdOrders | null) {
+  return (orders?.books ?? []).flatMap((b) => b.orders.filter((o) => o.state === 'proposed' && !o.session_over))
+}
+
+/** The real Books' Disaster stops still to place or raise, Book by Book. */
+export function stopsToPlace(orders: PdOrders | null) {
+  return (orders?.books ?? []).flatMap((b) => b.stops.filter((s) => s.state === 'proposed'))
+}
+
 /**
- * The items waiting on Saransh: each waiting Correction and each Quarantine in the Lake's status, then
- * each Candidate, then each promotion, then each early exit, then each proposal to move a Judgement
- * mode or change a Playbook's ranges.
+ * The items waiting on Saransh: each real Book's order still to place and Disaster stop to place or
+ * raise, then each waiting Correction and each Quarantine in the Lake's status, then each Candidate,
+ * then each promotion, then each early exit, then each proposal to move a Judgement mode or change a
+ * Playbook's ranges.
  */
-export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null, judgement: PdJudgementShow | null = null, promotions: PdStageProposal[] = [], exits: PdEarlyExit[] = []): AnswerItem[] {
+export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null, judgement: PdJudgementShow | null = null, promotions: PdStageProposal[] = [], exits: PdEarlyExit[] = [], orders: PdOrders | null = null): AnswerItem[] {
   return [
+    ...ordersToPlace(orders).map((o) => answerItem('order', o.id)),
+    ...stopsToPlace(orders).map((s) => answerItem('stop', s.id)),
     ...(status?.corrections ?? []).map((c) => answerItem('correction', c.id)),
     ...(status?.quarantines ?? []).map((q) => answerItem('quarantine', q.id)),
     ...waitingCandidates(stages).map((s) => answerItem('candidate', s.id)),
@@ -119,12 +140,12 @@ export function answersFileError(value: unknown): string | null {
   return bad === -1 ? null : `its Answer ${bad + 1} names no item or no Answer`
 }
 
-/** The `pd` arguments that apply an Answer, or why the Answer isn't one its item takes. */
-export function pdArgs({ item, answer }: Answer): { args: string[] } | { why: string } {
+/** The `pd` arguments that apply an Answer saved at `savedAt`, or why the Answer isn't one its item takes. */
+export function pdArgs({ item, answer }: Answer, savedAt: string): { args: string[] } | { why: string } {
   const { kind, id } = parseItem(item)
   const known = Object.hasOwn(kinds, kind) ? kinds[kind as keyof typeof kinds] : null
   if (!known || !/^\d+$/.test(id)) return { why: `${item} isn't an item the Brief asks about` }
   if (!known.answers.includes(answer)) return { why: `A ${kind} takes ${known.answers.join(' or ')}, not ${answer}` }
-  return { args: known.pd(id, answer) }
+  return { args: known.pd(id, answer, savedAt) }
 }
 

@@ -5,15 +5,21 @@
 // seen before or reconciled moves into the Run's broker-inbox/ folder; one ash_new can't read is set
 // aside in the inbox's set-aside/ folder, with a To-do. Then it reads each Book's holdings and latest
 // Reconciliation (`pd book-holdings`) for the Brief, and raises a To-do for each difference until a
-// later holdings export settles it. Answers files, which the Answers Step reads, downloads still under
-// way and hidden files stay where they are. A dry run records nothing and moves nothing.
+// later holdings export settles it. ash_new matches each tradebook's fills to the real Books' orders as
+// it records them (issue 42): each settles the orders of the sessions it covers, and a fill that
+// matches no order is Saransh's own trade, flagged in the Brief. Last it reads the real Books' orders
+// (`pd orders show`) and raises a To-do for each Book with orders he marked placed whose sessions are
+// over but no tradebook has shown, naming the file to drop. Answers files, which the Answers Step
+// reads, downloads still under way and hidden files stay where they are. A dry run records nothing and
+// moves nothing.
 import { existsSync, readdirSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { isAnswersFileName } from '../../src/answers.ts'
 import { bookName, brokerName, fileLine, reconciliationTodos } from '../../src/brokers.ts'
 import { moveInto, readJson, writeJson } from '../../src/files.ts'
+import { missingTradebookTodos, ownTradeText } from '../../src/orders.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
-import { pdJson, type PdBookHoldings, type PdBrokerFile, type PdBrokerImport } from '../../src/pd.ts'
+import { pdJson, type PdBookHoldings, type PdBrokerFile, type PdBrokerImport, type PdOrders } from '../../src/pd.ts'
 import { readRun } from '../../src/run.ts'
 import { runAsStep } from '../../src/step.ts'
 import { writeTodos } from '../../src/todos.ts'
@@ -34,6 +40,8 @@ export interface BrokerInboxResult {
   files: InboxFileRecord[]
   /** Each Book's real money, as `pd book-holdings` printed it after the files were recorded. */
   books: PdBookHoldings | null
+  /** The real Books' orders, stops and own trades, as `pd orders show` printed it after the files were recorded (issue 42). */
+  orders?: PdOrders | null
 }
 
 // How long a `pd` command may take: a few files' trades and a holdings export, or reading the Books, take
@@ -93,13 +101,19 @@ await runAsStep(async ({ runFolder, runId }) => {
     const args = ['broker', 'import', ...waiting.map((name) => join(brokerInboxDir(), name)), ...(dryRun ? ['--dry-run'] : [])]
     const imported = await pdJson<PdBrokerImport>(args, { cwd: runFolder, timeoutMs: pdMs })
     for (const file of imported.files) console.log(fileLine(file))
+    for (const file of imported.files) {
+      for (const own of file.fills?.own ?? []) console.log(`${file.file}: ${ownTradeText(own)} matches no order of ${bookName(file.book)}: your own trade`)
+    }
     if (dryRun) console.log('Dry run: nothing was recorded in ash_new, and every file stays in the Broker inbox')
     result.files.push(...(dryRun ? imported.files.map((file) => ({ ...file, movedTo: null, setAside: null })) : moveOut(imported.files, runFolder)))
     writeJson(out, result)
   }
 
   result.books = await pdJson<PdBookHoldings>(['book-holdings'], { cwd: runFolder, timeoutMs: pdMs })
+  result.orders = await pdJson<PdOrders>(['orders', 'show'], { cwd: runFolder, timeoutMs: pdMs })
   writeJson(out, result)
   const unreadable = result.files.filter((f) => f.status === 'unreadable')
-  writeTodos(runFolder, 'broker-inbox', [...unreadable.map(unreadableTodo), ...result.books.books.flatMap(reconciliationTodos)])
+  const missing = missingTradebookTodos(result.orders)
+  for (const todo of missing) console.log(todo)
+  writeTodos(runFolder, 'broker-inbox', [...unreadable.map(unreadableTodo), ...result.books.books.flatMap(reconciliationTodos), ...missing])
 })

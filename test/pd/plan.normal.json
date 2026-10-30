@@ -91,8 +91,8 @@
       "id": "17d5de1bf32e",
       "book": "IN",
       "name": "India Book",
-      "kind": "shadow",
-      "for_placing": false,
+      "kind": "real",
+      "for_placing": true,
       "state_id": "fa1dba342bad",
       "mandate_version": "f99c88f13b5b",
       "playbook_version": "e247b5b89ff0",
@@ -114,7 +114,7 @@
           "id": "in-cw2-selected",
           "name": "India CW2, selected",
           "version": "7c41d0e2a9b3",
-          "stage": "real_full",
+          "stage": "real_small",
           "disaster_stop": 0.2
         }
       ],
@@ -141,9 +141,33 @@
           "security_id": "IN:RATEGAIN",
           "name": "Rategain Travel Technologies Ltd",
           "why": "unsettled"
+        },
+        {
+          "security_id": "IN:SENCO",
+          "name": "Senco Gold Ltd",
+          "why": "open_order"
         }
       ],
       "orders": [
+        {
+          "id": "IN-2026-10-26-000",
+          "book": "IN",
+          "sleeve": "in-cw2-selected",
+          "security_id": "IN:WAAREEENER",
+          "name": "Waaree Energies Ltd",
+          "side": "SELL",
+          "shares": 53,
+          "price": 3120.0,
+          "value": 165360.0,
+          "limit": null,
+          "reason": "rebalance",
+          "signal": {
+            "kind": "trade",
+            "action": "sell",
+            "weight": 0.0
+          },
+          "cuts": []
+        },
         {
           "id": "IN-2026-10-26-001",
           "book": "IN",
@@ -204,8 +228,34 @@
         }
       ],
       "buys": 248784.1095,
-      "sales": 0,
+      "sales": 165360.0,
       "left_out": []
+    },
+    {
+      "id": "0UScant00000",
+      "book": "US",
+      "name": "US Book",
+      "kind": "real",
+      "for_placing": true,
+      "state_id": null,
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "cant_plan",
+      "why": "US has no panels yet: run `pd build-panels` (or refresh the data)"
+    },
+    {
+      "id": "0HKcant00000",
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "kind": "real",
+      "for_placing": true,
+      "state_id": null,
+      "mandate_version": "f99c88f13b5b",
+      "playbook_version": "e247b5b89ff0",
+      "mode": "normal",
+      "status": "cant_plan",
+      "why": "HK has no panels yet: run `pd build-panels` (or refresh the data)"
     },
     {
       "id": "4115e6534e70",

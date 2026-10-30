@@ -1,16 +1,17 @@
-// Portfolio Manager: the Portfolio Manager Agent judges each paper Book's Rule plan within its
-// Playbook: its exposure level for the day and its changes from the Rule plan, each with a Decision
-// record, the Brief's commentary on each Book, and its Journal's new entries. On Saturdays it also
-// writes the weekly review's commentary, proposes the promotions the review lists as due, and
-// proposes a narrower range for each Lever the override scorecard (issue 40) says lost to the Rule
-// plan over the last 3 months; on a month's first Saturday it writes the monthly review's commentary.
-// It runs read-only in the Run folder, on Claude Code with Codex as fallback, given the Rule plans,
-// the Book states, the Stages, the Health Agent's diagnosis, the review's figures (null on other
-// days), the Desk's views (issue 39; null when the Desk didn't review) and its Journal; not the
-// dossiers, which the Desk reads. Each Decision record names the Desk's views it follows. Its answer
-// is kept as portfolio-manager.json, with the Journal it read, for the Check Step (which holds each
-// change to the final check in ash_new) and Save state (which applies the Journal and records the
-// promotions and the narrower ranges). It skips itself unless this Run's Plan Step succeeded with a
+// Portfolio Manager: the Portfolio Manager Agent judges each real and paper Book's Rule plan within
+// its Playbook and that side's Judgement mode (a real Book's plan, issue 42, for Saransh to place):
+// its exposure level for the day and its changes from the Rule plan, each with a Decision record, the
+// Brief's commentary on each Book, and its Journal's new entries. On Saturdays it also writes the
+// weekly review's commentary, proposes the promotions the review lists as due, and proposes a
+// narrower range for each Lever the override scorecard (issue 40) says lost to the Rule plan over the
+// last 3 months; on a month's first Saturday it writes the monthly review's commentary. It runs
+// read-only in the Run folder, on Claude Code with Codex as fallback, given the Rule plans, the Book
+// states, the Stages, the Health Agent's diagnosis, the review's figures (null on other days), the
+// Desk's views (issue 39; null when the Desk didn't review) and its Journal; not the dossiers, which
+// the Desk reads. Each Decision record names the Desk's views it follows. Its answer is kept as
+// portfolio-manager.json, with the Journal it read, for the Check Step (which holds each change to
+// the final check in ash_new) and Save state (which applies the Journal and records the promotions
+// and the narrower ranges). It skips itself unless this Run's Plan Step succeeded with a real or
 // paper Book's plan to judge, or there is a review to comment on. An Agent that fails on both Workers
 // is recorded as failed, and fails the Step: the Rule plans go out instead.
 import { existsSync, rmSync } from 'node:fs'
@@ -67,12 +68,12 @@ await runAsStep(async ({ runId, runFolder }) => {
   const plan = run.steps.find((s) => s.name === 'plan')
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
   const plans = plan?.status === 'succeeded' ? read<PdPlan>(inputFiles.plans) : null
-  const judged = (plans?.plans ?? []).filter((p) => p.kind === 'paper' && p.status === 'planned')
+  const judged = (plans?.plans ?? []).filter((p) => (p.kind === 'paper' || p.kind === 'real') && p.status === 'planned')
   // A weekly review is commented on even when there is no plan to judge.
   const review = read<PdReview>(inputFiles.review)
   if (!judged.length && !review) {
     if (plan?.status !== 'succeeded') throw new StepSkipped(`The Plan Step ${plan ? plan.status : 'is not in this Run'}, so there is no Rule plan to judge`)
-    throw new StepSkipped(plans ? 'No paper Book has a Rule plan to judge' : `The Plan Step left no ${inputFiles.plans}`)
+    throw new StepSkipped(plans ? 'No real or paper Book has a Rule plan to judge' : `The Plan Step left no ${inputFiles.plans}`)
   }
 
   const journal = readMemory('portfolio-manager', journalMemory)
@@ -98,7 +99,7 @@ await runAsStep(async ({ runId, runFolder }) => {
   const cited = Object.entries(inputFiles).flatMap(([name, file]) => (inputs[name as keyof typeof inputFiles] !== null ? [file] : []))
   writeJson(out, { status: 'answered', answer, journalRead: journal, inputs: cited } satisfies PortfolioManagerResult)
   for (const book of answer.books) {
-    const name = judged.find((p) => p.book === book.book)?.name ?? book.book
+    const name = (judged.find((p) => p.id === book.plan_id) ?? judged.find((p) => p.book === book.book))?.name ?? book.book
     console.log(`${name}: exposure level ${percent(book.exposure.level)}, ${book.changes.length} change${book.changes.length === 1 ? '' : 's'} from the Rule plan`)
   }
   for (const promotion of answer.promotions) console.log(`Proposes promoting Sleeve ${promotion.sleeve}: ${promotion.why}`)

@@ -269,6 +269,7 @@ test('a scheduled start sets the environment the entry gives it before the Run s
       feeds: { example: 'feeds.fetched.json' },
       check: { example: 'check.dry-run.json' },
       'paper-books': { example: 'paper-books.json' },
+      orders: { example: 'orders.empty.json' },
       judgement: { example: 'judgement-show.books.json' },
     })
     const elsewhere = join(ws.dataDir, '..', 'pinned-data')
