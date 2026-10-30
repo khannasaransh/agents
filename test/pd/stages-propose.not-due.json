@@ -1,0 +1,13 @@
+{
+  "changed": false,
+  "why": "Its promotion isn't due: Its record is outside its tested range",
+  "proposal": null,
+  "sleeve": {
+    "id": 2,
+    "book": "IN",
+    "strategy_id": "in-super30-ok-tuned",
+    "version": "b0a30c3545e3",
+    "stage": "paper",
+    "since": "2026-07-29"
+  }
+}

@@ -636,3 +636,54 @@ test("each market's Market condition is shown with MarketSmith's outlook beside 
   assert.match(page, /It trades under an exposure level of 40%, which its market's Correction on the last close sets\./)
   assert.ok(page.indexOf('Market condition') < page.indexOf('India Book in shadow'), 'the conditions come before the plans')
 })
+
+test("on Saturdays the weekly review shows the Portfolio Manager's commentary and each Book and Sleeve against its tested range, its benchmark and Reconciliation", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.saturday.json')))
+  const commentary = 'India Super 30 OK is inside its tested range after three months of Paper: its promotion is due.'
+  ws.writeRunFile(runId, 'portfolio-manager.json', { status: 'answered', answer: { books: [], review: commentary, promotions: [], journal: { entries: [], open: [] } }, journalRead: '', inputs: [] })
+
+  const page = text(await brief())
+
+  assert.match(page, new RegExp(`Weekly review ${commentary}`))
+  assert.match(page, /No strategy broke the demotion rule\./)
+  assert.match(page, /India Book .* Paper Book 2\.2% since 2026-07-30 -1\.1% now, -3\.5% at worst 1\.9%, -4\.7% at worst -19\.3% 3 months: 2\.1% against -6\.9% to 12\.2% Inside/)
+  assert.match(page, /India Super 30 OK, tuned Paper since 2026-07-29 4\.1% since 2026-07-29 -2\.1% now, -6\.3% at worst 1\.9%, -4\.7% at worst -28\.7% 3 months: 3\.9% against -11% to 18\.9% Inside/)
+  assert.match(page, /Reconciliation, as of 2026-10-30: ICICI Direct holds 80 of Tata Motors Ltd \(IN:TATAMOTORS\), its ledger 40: 2 for 1/)
+  assert.match(page, /Promotions due India Super 30 OK, tuned in the India Book: from Paper to Real-small, its time up on 2026-10-29/)
+  assert.doesNotMatch(page, /US Book .* Paper Book/, 'a Book with no record and no Sleeve is left out')
+})
+
+test('a demotion the demotion rule made is said, with why, and the Sleeve is shown outside its range', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.demotion.json')))
+
+  const page = text(await brief())
+
+  assert.match(page, /Demotions India Super 30 OK, tuned in the India Book was demoted from Paper to Retired by the demotion rule: Its live drawdown, -45\.1%, passed 1\.5 times its backtest's worst, -28\.7% \(-43\.1%\)\./)
+  assert.match(page, /Outside: Its drawdown, -45\.1%, is deeper than its backtest's worst, -28\.7%; Its 3-month return/)
+  assert.doesNotMatch(page, /Promotions due/)
+})
+
+test('a Review Step that failed says so, and on other days there is no review', async () => {
+  prepare()
+  assert.doesNotMatch(text(await brief()), /Weekly review/)
+
+  ws.cleanup()
+  ws = makeWorkspace()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'review', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  assert.match(text(await brief()), /Weekly review The weekly review's figures couldn't be had in this Run\. See the Review Step's log: logs\/review\.log/)
+})
+
+test('a promotion the Portfolio Manager proposed waits for an Approve or Reject, whether proposed in this Run or before', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'stages.json', JSON.parse(example('stages-check.promotion.json')))
+  ws.writeRunFile(runId, 'promotions.json', { promotions: [{ sleeve: 2, why: 'Again', decided: JSON.parse(example('stages-propose.proposed.json')) }] })
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(page, /Promotions waiting for your approval: 1 /, 'the same promotion once')
+  assert.match(page, /4 India Book India Super 30 OK, tuned in-super30-ok-tuned Paper to Real-small 2026-10-31, the Portfolio Manager Three months of Paper inside its tested range/)
+  assert.match(html, /data-item="promotion:4"><button type="button" data-answer="approve" aria-pressed="false">Approve<\/button><button type="button" data-answer="reject" aria-pressed="false">Reject<\/button>/)
+})

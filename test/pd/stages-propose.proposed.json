@@ -1,0 +1,25 @@
+{
+  "changed": true,
+  "why": null,
+  "proposal": {
+    "id": 4,
+    "sleeve": 2,
+    "book": "IN",
+    "strategy_id": "in-super30-ok-tuned",
+    "version": "b0a30c3545e3",
+    "from": "paper",
+    "stage": "real_small",
+    "why": "Three months of Paper inside its tested range: its 3-month return 3.9% against its backtest's 5th to 95th percentiles of -11.1% to 18.9%, its drawdown -6.3% against its worst of -28.7%",
+    "by": "the Portfolio Manager",
+    "at": "2026-10-31T01:31:05.402000+00:00",
+    "decision": null
+  },
+  "sleeve": {
+    "id": 2,
+    "book": "IN",
+    "strategy_id": "in-super30-ok-tuned",
+    "version": "b0a30c3545e3",
+    "stage": "paper",
+    "since": "2026-07-29"
+  }
+}

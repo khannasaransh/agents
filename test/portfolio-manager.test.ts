@@ -16,6 +16,8 @@ const result = () => JSON.parse(ws.readRunFile(runId, 'portfolio-manager.json'))
 /** The Portfolio Manager's answer: the judgement pd check is handed, and its Journal. */
 const answer = {
   books: example('judgement.answered.json').books,
+  review: null,
+  promotions: [],
   journal: { entries: ['Dropped Rategain: the weakest RS Rating of the plan in a Correction; judge on 2026-12-24'], open: ['Is Rategain still lagging on 2026-12-24?'] },
 }
 
@@ -193,4 +195,53 @@ test('a Journal Saransh changed after the Portfolio Manager read it is queued fo
 
   assert.equal(ws.readMemory('portfolio-manager', 'journal'), 'Saransh edited it')
   assert.match(ws.readRunFile(runId, 'logs', 'save-state.log'), /Queued the Journal for Saransh/)
+})
+
+test("on Saturdays the Portfolio Manager gets the review's figures, writes its commentary and proposes the promotions due, which Save state records for Saransh's Answer", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', example('review.saturday.json'))
+  const proposing = {
+    ...answer,
+    review: 'India Super 30 OK is inside its tested range after three months of Paper.',
+    promotions: [
+      { sleeve: 2, why: 'Three months of Paper inside its tested range' },
+      { sleeve: 7, why: 'Not due' },
+    ],
+  }
+  ws.setWorkerCli('claude', claudeCodeAnswering(proposing))
+  ws.setPd({ stages: [{ example: 'stages-propose.proposed.json' }, { example: 'stages-propose.not-due.json' }] })
+
+  assert.equal((await step('portfolio-manager')).status, 0)
+  const saved = await step('save-state')
+
+  const [call] = ws.workerCliCalls('claude')
+  assert.deepEqual(promptInput(call.stdin, 'review'), example('review.saturday.json'))
+  assert.deepEqual(result().inputs, ['plan.json', 'book-states.json', 'stages.json', 'review.json'], 'a Decision record may cite the review')
+  assert.match(ws.readRunFile(runId, 'logs', 'portfolio-manager.log'), /Proposes promoting Sleeve 2: Three months of Paper inside its tested range/)
+  assert.equal(saved.status, 0, saved.stderr)
+  assert.deepEqual(
+    ws.pdCalls().map((c) => c.args),
+    [
+      ['stages', 'propose', '2', '--why', 'Three months of Paper inside its tested range', '--by', 'the Portfolio Manager'],
+      ['stages', 'propose', '7', '--why', 'Not due', '--by', 'the Portfolio Manager'],
+    ],
+  )
+  const recorded = JSON.parse(ws.readRunFile(runId, 'promotions.json'))
+  assert.deepEqual(recorded.promotions.map((p: { sleeve: number; decided: { changed: boolean } }) => [p.sleeve, p.decided.changed]), [[2, true], [7, false]])
+  const log = ws.readRunFile(runId, 'logs', 'save-state.log')
+  assert.match(log, /Proposed promoting Sleeve 2 into Real-small, as promotion 4, for Saransh's Answer/)
+  assert.match(log, /Didn't propose promoting Sleeve 7: Its promotion isn't due: Its record is outside its tested range/)
+})
+
+test('a weekly review is commented on even on a day the Plan Step failed', async () => {
+  prepare({ plan: 'failed' })
+  ws.writeRunFile(runId, 'review.json', example('review.saturday.json'))
+  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, books: [], review: 'Nothing to judge today; the India Book is inside its range.' }))
+
+  assert.equal((await step('portfolio-manager')).status, 0)
+
+  assert.equal(status('portfolio-manager'), 'succeeded')
+  const [call] = ws.workerCliCalls('claude')
+  assert.equal(promptInput(call.stdin, 'plans'), null)
+  assert.equal(result().answer.review, 'Nothing to judge today; the India Book is inside its range.')
 })

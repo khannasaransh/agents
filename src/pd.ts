@@ -224,6 +224,139 @@ export interface PdStagesCheck {
   recorded: PdSleeve[]
   /** India, the US and Hong Kong, each with its day now: how long a Sleeve has been in its Stage is counted to it. */
   books: { book: 'IN' | 'US' | 'HK'; name: string; market: string; today: string; sleeves: PdSleeve[] }[]
+  /** The promotions waiting on Saransh (issue 35), oldest first: each Sleeve still in the Stage it was proposed from. */
+  proposals: PdStageProposal[]
+}
+
+/** A Sleeve's promotion up a Stage, proposed by the Portfolio Manager for Saransh's Answer (issue 35): its item in the Brief is promotion:<id>. */
+export interface PdStageProposal {
+  id: number
+  sleeve: number
+  book: 'IN' | 'US' | 'HK'
+  strategy_id: string
+  version: string
+  from: PdStage
+  stage: PdStage
+  why: string
+  by: string
+  at: string
+  decision: 'approved' | 'rejected' | null
+}
+
+/**
+ * What `pd stages propose` and `pd stages promote|reject` print (contract/stages-propose.schema.json,
+ * stages-decide.schema.json): whether it changed anything and why not, the promotion, and its Sleeve now.
+ */
+export interface PdStagesDecided {
+  changed: boolean
+  why: string | null
+  proposal: PdStageProposal | null
+  sleeve: { id: number; book: 'IN' | 'US' | 'HK'; strategy_id: string; version: string; stage: PdStage; since: string } | null
+}
+
+/** The distribution of a backtest's returns over windows: its least, 5th to 95th percentiles and most. */
+export interface PdQuantiles {
+  min: number
+  p5: number
+  p25: number
+  p50: number
+  p75: number
+  p95: number
+  max: number
+}
+
+/** A live record, from its first session (a launch, or its last demotion) to the last. */
+export interface PdLiveRecord {
+  start: string
+  end: string
+  sessions: number
+  return: number
+  /** Its fall from its highest close, on its last: 0 or less. */
+  drawdown: number
+  max_drawdown: number
+  /** Its return over its whole months, which its backtest's range is compared over; null under a month. */
+  window: { months: number; return: number | null } | null
+  /** Its return over the last 12 months; null before it has 12. */
+  rolling_12m: number | null
+  /** The benchmark's over the same sessions; null without its levels. */
+  benchmark: { return: number; max_drawdown: number } | null
+}
+
+/** A live record against its backtest's range: the ten years before it began. */
+interface PdJudgedRecord {
+  record: PdLiveRecord | null
+  backtest: { start: string; end: string; max_drawdown: number; rolling_12m: PdQuantiles | null; window: (PdQuantiles & { months: number }) | null } | null
+  backtest_why: string | null
+  /** Its drawdown no deeper than its backtest's worst, and its return over its whole months between its 5th and 95th percentiles; null without both. */
+  in_range: boolean | null
+  /** How it is outside its range, in sentences. */
+  outside: string[]
+}
+
+/** A demotion: the half of the demotion rule a Sleeve broke, the Stage it moves down into, and whether it was applied. */
+export interface PdDemotion {
+  /** drawdown: past 1.5 times its backtest's worst; rolling_12m: after 12 months, under its backtest's 5th percentile. */
+  rule: 'drawdown' | 'rolling_12m'
+  why: string
+  from: PdStage
+  to: PdStage
+  /** held: in a dry run, or while the Data gate fails. */
+  status: 'demoted' | 'held'
+  held_why: string | null
+}
+
+/** A Sleeve's next promotion: due now when its time is up, its record inside its tested range and it breaks no demotion rule. */
+export interface PdPromotion {
+  to: PdStage
+  to_name: string
+  /** The day its time in its Stage is up: 3 months of Paper, 6 of Real-small. */
+  due: string
+  due_now: boolean
+  why: string | null
+}
+
+/** A Sleeve from Paper up, as the weekly review measured it. */
+export interface PdSleeveReview extends PdJudgedRecord {
+  id: number
+  strategy_id: string
+  version: string
+  stage: PdStage
+  stage_name: string
+  since: string
+  name: string | null
+  /** no_record: its version isn't tracked live, or its track has no two sessions yet. */
+  status: 'measured' | 'no_record'
+  why: string | null
+  demotion: PdDemotion | null
+  promotion: PdPromotion | null
+}
+
+/**
+ * What `pd review` prints (contract/review.schema.json): the weekly review. Each Book's paper Book and
+ * its Sleeves against their backtests' ranges and benchmarks, the demotions the demotion rule made by
+ * itself, the promotions due, and each real Book's latest Reconciliation.
+ */
+export interface PdReview {
+  reviewed_at: string
+  dry_run: boolean
+  gate: { verdict: 'pass' | 'fail'; reasons: string[] }
+  books: {
+    book: 'IN' | 'US' | 'HK'
+    name: string
+    market: string
+    currency: string
+    /** Its real Book's broker, as the Reconciliation's differences are worded. */
+    broker: 'icici_direct' | 'moomoo'
+    broker_name: string
+    benchmark: string
+    today: string
+    /** The paper Book's live record; not_started before it has two closes filled. */
+    paper: PdJudgedRecord & { status: 'measured' | 'not_started' | 'no_record'; why: string | null }
+    sleeves: PdSleeveReview[]
+    reconciliation: (PdReconciliation & { file: string; reconciled_at: string }) | null
+  }[]
+  demotions: (PdDemotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string })[]
+  promotions_due: (PdPromotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string; from: PdStage })[]
 }
 
 /**

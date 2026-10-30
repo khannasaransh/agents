@@ -1,0 +1,207 @@
+{
+  "reviewed_at": "2026-10-31T01:12:40.118000+00:00",
+  "dry_run": false,
+  "gate": {
+    "verdict": "pass",
+    "reasons": []
+  },
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "market": "IN",
+      "currency": "INR",
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "benchmark": "^CRSLDX",
+      "today": "2026-10-31",
+      "paper": {
+        "status": "measured",
+        "why": null,
+        "record": {
+          "start": "2026-07-30",
+          "end": "2026-10-30",
+          "sessions": 65,
+          "return": 0.0221,
+          "drawdown": -0.0114,
+          "max_drawdown": -0.0352,
+          "window": {
+            "months": 3,
+            "return": 0.0209
+          },
+          "rolling_12m": null,
+          "benchmark": {
+            "return": 0.0187,
+            "max_drawdown": -0.0472
+          }
+        },
+        "backtest": {
+          "start": "2016-07-28",
+          "end": "2026-07-29",
+          "max_drawdown": -0.1934,
+          "rolling_12m": {
+            "min": -0.1139,
+            "p5": -0.0712,
+            "p25": 0.0378,
+            "p50": 0.1468,
+            "p75": 0.269,
+            "p95": 0.3911,
+            "max": 0.5475
+          },
+          "window": {
+            "months": 3,
+            "min": -0.1099,
+            "p5": -0.0687,
+            "p25": -0.0173,
+            "p50": 0.0341,
+            "p75": 0.0778,
+            "p95": 0.1215,
+            "max": 0.1701
+          }
+        },
+        "backtest_why": null,
+        "in_range": true,
+        "outside": []
+      },
+      "sleeves": [
+        {
+          "id": 2,
+          "strategy_id": "in-super30-ok-tuned",
+          "version": "b0a30c3545e3",
+          "stage": "paper",
+          "stage_name": "Paper",
+          "since": "2026-07-29",
+          "name": "India Super 30 OK, tuned",
+          "status": "measured",
+          "why": null,
+          "record": {
+            "start": "2026-07-29",
+            "end": "2026-10-30",
+            "sessions": 66,
+            "return": 0.0412,
+            "drawdown": -0.0215,
+            "max_drawdown": -0.0634,
+            "window": {
+              "months": 3,
+              "return": 0.0388
+            },
+            "rolling_12m": null,
+            "benchmark": {
+              "return": 0.0187,
+              "max_drawdown": -0.0472
+            }
+          },
+          "backtest": {
+            "start": "2016-07-28",
+            "end": "2026-07-28",
+            "max_drawdown": -0.2871,
+            "rolling_12m": {
+              "min": -0.2147,
+              "p5": -0.1342,
+              "p25": 0.0436,
+              "p50": 0.2215,
+              "p75": 0.4171,
+              "p95": 0.6127,
+              "max": 0.8578
+            },
+            "window": {
+              "months": 3,
+              "min": -0.1768,
+              "p5": -0.1105,
+              "p25": -0.0296,
+              "p50": 0.0512,
+              "p75": 0.1202,
+              "p95": 0.1893,
+              "max": 0.265
+            }
+          },
+          "backtest_why": null,
+          "in_range": true,
+          "outside": [],
+          "demotion": null,
+          "promotion": {
+            "to": "real_small",
+            "to_name": "Real-small",
+            "due": "2026-10-29",
+            "due_now": true,
+            "why": null
+          }
+        }
+      ],
+      "reconciliation": {
+        "as_of": "2026-10-30",
+        "matched": 11,
+        "differences": [
+          {
+            "kind": "quantity",
+            "security_id": "IN:TATAMOTORS",
+            "isin": "INE155A01022",
+            "symbol": null,
+            "name": "Tata Motors Ltd",
+            "ledger_qty": 40,
+            "broker_qty": 80,
+            "ratio": "2 for 1"
+          }
+        ],
+        "file": "Holdings_2026-10-30.csv",
+        "reconciled_at": "2026-10-31T01:05:12+00:00"
+      }
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "market": "US",
+      "currency": "USD",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "benchmark": "^GSPC",
+      "today": "2026-10-31",
+      "paper": {
+        "status": "not_started",
+        "why": "It has no two closes filled yet",
+        "record": null,
+        "backtest": null,
+        "backtest_why": null,
+        "in_range": null,
+        "outside": []
+      },
+      "sleeves": [],
+      "reconciliation": null
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "market": "HK",
+      "currency": "HKD",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "benchmark": "^HSI",
+      "today": "2026-10-31",
+      "paper": {
+        "status": "not_started",
+        "why": "It has no two closes filled yet",
+        "record": null,
+        "backtest": null,
+        "backtest_why": null,
+        "in_range": null,
+        "outside": []
+      },
+      "sleeves": [],
+      "reconciliation": null
+    }
+  ],
+  "demotions": [],
+  "promotions_due": [
+    {
+      "book": "IN",
+      "sleeve": 2,
+      "strategy_id": "in-super30-ok-tuned",
+      "from": "paper",
+      "to": "real_small",
+      "to_name": "Real-small",
+      "due": "2026-10-29",
+      "due_now": true,
+      "why": null
+    }
+  ]
+}

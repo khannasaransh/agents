@@ -3,14 +3,17 @@
 // under them, the Health Agent's diagnosis and proposed fix, or that it failed, with what became of
 // the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
 // for approval with what it would change; each Quarantine with its flag; each Candidate waiting for
-// approval into Paper; each market's latest session in the Lake against its last finished one; the
-// To-dos the Steps raised; each proposal to move a Judgement mode or change a Playbook's ranges; each
-// Book's Sleeves with their Stages and how long each has been in its Stage; each Book's real holdings
-// and value, its latest Reconciliation's differences and this Run's Broker inbox files; each market's
-// Market condition with MarketSmith's outlook beside it and each Book's exposure level; on a day the
-// Data gate fails, that every plan is in Hold mode; the India Book's state beside its shadow Rule plan
-// and each paper Book's beside its Rule plan, every order marked not for placing, with its rules-only
-// paper Book's plan after it; the Portfolio Manager's judgement of each paper Book (its Judgement
+// approval into Paper; each promotion the Portfolio Manager proposed, waiting for approval; each
+// proposal to move a Judgement mode or change a Playbook's ranges; each market's latest session in
+// the Lake against its last finished one; the To-dos the Steps raised; each Book's Sleeves with their
+// Stages and how long each has been in its Stage; on Saturdays, the weekly review (the Portfolio
+// Manager's commentary, each demotion the demotion rule made, each paper Book and Sleeve against its
+// backtest's range and its benchmark, the promotions due and Reconciliation's differences); each
+// Book's real holdings and value, its latest Reconciliation's differences and this Run's Broker inbox
+// files; each market's Market condition with MarketSmith's outlook beside it and each Book's exposure
+// level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's state
+// beside its shadow Rule plan and each paper Book's beside its Rule plan, every order marked not for
+// placing, with its rules-only paper Book's plan after it; the Portfolio Manager's judgement of each paper Book (its Judgement
 // mode, its commentary, what went out and why, each change with its Decision record in plain
 // sentences, and each change the final check dropped with why) and each Book's Judgement modes; the
 // Order lists the Check Step recorded, or why none was; how each paper Book stands (its value and its
@@ -30,7 +33,7 @@ import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { changeText, decisionText, modeName, proposalText } from '../../src/judgement.ts'
-import type { PdBook, PdBookState, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdRulePlan, PdSleeve, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import type { PdBook, PdBookState, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from '../../src/pd.ts'
 import { breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -43,6 +46,7 @@ import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 import type { BookStates } from './plan.ts'
 import type { PortfolioManagerResult } from './portfolio-manager.ts'
+import type { PromotionsResult } from './save-state.ts'
 
 /** Escapes text for HTML, so nothing from the Lake or a log is read as markup. */
 const esc = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
@@ -293,6 +297,110 @@ function proposalsSection(modes: PdJudgementShow | null): string {
     table(['Id', 'Proposal', 'Proposed', 'Why', 'Your Answer'], rows),
     '</section>',
   ].join('\n')
+}
+
+/** The promotions waiting on Saransh: those the Stages Step read, then those Save state recorded in this Run. */
+function waitingPromotions(stages: PdStagesCheck | null, promotions: PromotionsResult | null): PdStageProposal[] {
+  const proposed = (promotions?.promotions ?? []).flatMap(({ decided }) => (decided.changed && decided.proposal ? [decided.proposal] : []))
+  const found = [...(stages?.proposals ?? []), ...proposed]
+  return found.filter((p, i) => found.findIndex((q) => q.id === p.id) === i)
+}
+
+/** Each promotion waiting for Saransh's Answer, with its Approve and Reject buttons; nothing when none waits. */
+function promotionsSection(waiting: PdStageProposal[], stages: PdStagesCheck | null): string {
+  if (!waiting.length) return ''
+  const books = new Map((stages?.books ?? []).map((b) => [b.book, b]))
+  const rows = waiting.map((p) => {
+    const sleeve = books.get(p.book)?.sleeves.find((s) => s.id === p.sleeve)
+    return [
+      String(p.id),
+      esc(books.get(p.book)?.name ?? p.book),
+      sleeve ? strategyCell(sleeve) : esc(p.strategy_id),
+      esc(`${stageName(p.from)} to ${stageName(p.stage)}`),
+      esc(`${p.at.slice(0, 10)}, ${p.by}`),
+      esc(p.why),
+      answerButtons(answerItem('promotion', p.id)),
+    ]
+  })
+  return [
+    `<section><h2>Promotions waiting for your approval: ${waiting.length}</h2>`,
+    "<p>A strategy gets more money only by your Answer. The Portfolio Manager proposes a promotion when its time in its Stage is up (3 months of Paper, 6 of Real-small) and its live record is inside its tested range. Approve or reject each, then Save answers: the next Run records your Answers in ash_new, and its Rule plans hold an approved one at its new Stage. One you don't answer waits here while it stays in its Stage.</p>",
+    table(['Id', 'Book', 'Strategy', 'Promotion', 'Proposed', 'Why', 'Your Answer'], rows),
+    '</section>',
+  ].join('\n')
+}
+
+type ReviewedBook = PdReview['books'][number]
+type Judged = ReviewedBook['paper'] | ReviewedBook['sleeves'][number]
+
+/** A live record against its backtest's range and its benchmark, as a row's cells after its name. */
+function reviewCells(judged: Judged): string[] {
+  const { record, backtest } = judged
+  if (!record) return [`<span class="muted">${esc(judged.why ?? '')}</span>`, '', '', '', '', '']
+  const window = record.window
+  const range = backtest?.window ? `${percent(backtest.window.p5)} to ${percent(backtest.window.p95)}` : '—'
+  const inRange =
+    judged.in_range === null ? `<span class="muted">${esc(judged.backtest_why ?? "Its range can't be measured yet")}</span>` : judged.in_range ? 'Inside' : `Outside: ${esc(judged.outside.join('; '))}`
+  return [
+    esc(`${percent(record.return)} since ${record.start}`),
+    esc(`${percent(record.drawdown)} now, ${percent(record.max_drawdown)} at worst`),
+    esc(record.benchmark ? `${percent(record.benchmark.return)}, ${percent(record.benchmark.max_drawdown)} at worst` : '—'),
+    esc(backtest ? percent(backtest.max_drawdown) : '—'),
+    esc(window ? `${window.months} months: ${window.return === null ? '—' : percent(window.return)} against ${range}` : 'Under a month'),
+    inRange,
+  ]
+}
+
+/** A demotion in a sentence: what the demotion rule did, or would have, and why. */
+function demotionText(d: PdReview['demotions'][number], books: Map<string, ReviewedBook>): string {
+  const book = books.get(d.book)
+  const name = book?.sleeves.find((s) => s.id === d.sleeve)?.name ?? d.strategy_id
+  const moved = d.status === 'demoted' ? 'demoted' : 'not demoted'
+  return `${name} in the ${book?.name ?? d.book} was ${moved} from ${stageName(d.from)} to ${stageName(d.to)} by the demotion rule: ${d.why}.${d.held_why ? ` ${d.held_why}.` : ''}`
+}
+
+/**
+ * On Saturdays, the weekly review: the Portfolio Manager's commentary, each demotion the demotion rule
+ * made, each Book's paper Book and Sleeves against their backtests' ranges and benchmarks, the
+ * promotions due and each real Book's Reconciliation differences; that it couldn't be had when the
+ * Review Step failed, and nothing on other days.
+ */
+function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioManagerResult | null): string {
+  const step = run.steps.find((s) => s.name === 'review')
+  if (!review)
+    return step?.status === 'failed' ? `<section><h2>Weekly review</h2><p>The weekly review's figures couldn't be had in this Run. See the Review Step's log: ${logLink(step.log ?? 'logs/review.log')}</p></section>` : ''
+  const commentary = pm?.status === 'answered' ? pm.answer.review : null
+  const books = new Map(review.books.map((b) => [b.book, b]))
+  const head = ['', 'Stage', 'Live return', 'Drawdown', 'Benchmark', "Backtest's worst", 'Return against its range', 'Its tested range']
+  const sections = review.books
+    .filter((b) => b.paper.status !== 'not_started' || b.sleeves.length || b.reconciliation?.differences.length)
+    .map((book) => {
+      const rows = [
+        ['Paper Book', '', ...reviewCells(book.paper)],
+        ...book.sleeves.map((s) => [esc(s.name ?? s.strategy_id), esc(`${s.stage_name} since ${s.since}`), ...reviewCells(s)]),
+      ]
+      const differences = book.reconciliation?.differences ?? []
+      return [
+        `<h3>${esc(book.name)}</h3>`,
+        table(head, rows),
+        ...(differences.length ? [`<p>Reconciliation, as of ${esc(book.reconciliation!.as_of)}:</p>`, list(differences.map((d) => esc(differenceText(d, book))))] : []),
+      ].join('\n')
+    })
+  const due = review.promotions_due.map((p) => {
+    const name = books.get(p.book)?.sleeves.find((s) => s.id === p.sleeve)?.name ?? p.strategy_id
+    return esc(`${name} in the ${books.get(p.book)?.name ?? p.book}: from ${stageName(p.from)} to ${p.to_name}, its time up on ${p.due}`)
+  })
+  return [
+    '<section><h2>Weekly review</h2>',
+    commentary ? `<p class="text">${esc(commentary)}</p>` : pm?.status === 'failed' ? '<p class="muted">The Portfolio Manager failed, so the review has no commentary.</p>' : '',
+    review.demotions.length ? `<h3>Demotions</h3>\n${list(review.demotions.map((d) => esc(demotionText(d, books))))}` : '<p>No strategy broke the demotion rule.</p>',
+    ...(sections.length ? sections : ['<p>No Book has a live record yet.</p>']),
+    due.length ? `<h3>Promotions due</h3>\n${list(due)}` : '',
+    `<p class="muted">Each live record is measured against its backtest over the ten years before it began, and against its benchmark over the same sessions. A strategy is demoted when its live drawdown passes 1.5 times its backtest's worst, or after 12 months its rolling 12-month return falls under its backtest's 5th percentile.${review.gate.verdict === 'fail' ? ' The Data gate failed, so no demotion was applied.' : ''}</p>`,
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 /**
@@ -808,12 +916,17 @@ interface Inputs {
   paperBooks: PdPaperBooks | null
   /** Each Book's Judgement modes and Playbook, and the proposals waiting, as the Check Step read them. */
   modes: PdJudgementShow | null
+  /** On Saturdays, the weekly review's figures. */
+  review: PdReview | null
+  /** The promotions Save state recorded in this Run. */
+  promotions: PromotionsResult | null
   todos: { step: string; todo: string }[]
 }
 
-function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, pm, check, paperBooks, modes, todos }: Inputs): string {
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, pm, check, paperBooks, modes, review, promotions, todos }: Inputs): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
+  const promoting = waitingPromotions(stages, promotions)
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -830,10 +943,12 @@ ${answersSection(answers)}
 ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${candidatesSection(stages)}
+${promotionsSection(promoting, stages)}
 ${proposalsSection(modes)}
 ${marketsSection(status)}
 ${todosSection(todos)}
 ${stagesSection(run, stages)}
+${reviewSection(run, review, pm)}
 ${booksSection(run, inbox)}
 ${plansSection(run, plan, states)}
 ${judgementSection(run, pm, check, modes)}
@@ -843,7 +958,7 @@ ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
-${saveAnswers(run.id, waitingItems(waiting, stages, modes))}
+${saveAnswers(run.id, waitingItems(waiting, stages, modes, promoting))}
 </body>
 </html>
 `
@@ -874,6 +989,8 @@ await runAsStep(({ runId, runFolder, force }) => {
       check: read<CheckResult>('check.json'),
       paperBooks: read<PdPaperBooks>('paper-books.json'),
       modes: read<PdJudgementShow>('judgement-show.json'),
+      review: read<PdReview>('review.json'),
+      promotions: read<PromotionsResult>('promotions.json'),
       todos: readTodos(runFolder),
     }),
   )

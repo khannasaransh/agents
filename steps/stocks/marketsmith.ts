@@ -14,7 +14,7 @@ import { capitalised } from '../../src/answers.ts'
 import { bookRegions, fetchLine, regionName } from '../../src/marketsmith.ts'
 import { runPd, type PdMarketSmith } from '../../src/pd.ts'
 import { readRun } from '../../src/run.ts'
-import { weekdays } from '../../src/schedule.ts'
+import { runWeekday } from '../../src/schedule.ts'
 import { runAsStep, skippedExitCode, StepSkipped } from '../../src/step.ts'
 import { writeTodos } from '../../src/todos.ts'
 
@@ -22,11 +22,6 @@ type Region = PdMarketSmith['regions'][number]
 
 // A full fetch is every symbol, paced as MarketSmith allows: hours for each region, fetched at once.
 const fetchMs = Number(process.env.AGENTS_MARKETSMITH_TIMEOUT_SECONDS ?? 14 * 60 * 60) * 1000
-/** The weekday the Run started on, by its id, which is its local start date and time. */
-function runWeekday(runId: string): string {
-  const [year, month, day] = runId.split('-').map(Number)
-  return weekdays[new Date(year, month - 1, day).getDay()]
-}
 
 /** One To-do per cookie MarketSmith rejected, naming it and the regions it left unfetched. */
 function cookieTodos(regions: Region[]): string[] {

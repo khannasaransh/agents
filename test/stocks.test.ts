@@ -18,11 +18,18 @@ function workspace(): Workspace {
   return made
 }
 
+/** Whether the Run started on a Saturday, by its id: MarketSmith and the weekly review run only then. */
+function onSaturday(id: string): boolean {
+  const [year, month, day] = id.split('-').map(Number)
+  return new Date(year, month - 1, day).getDay() === 6
+}
+
 test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agent on a healthy Lake, judges on the fake Worker, then writes the Stocks Brief', async () => {
   ws = workspace()
   ws.setPd({
     status: { example: 'status.clean.json' },
     'book-holdings': { example: 'book-holdings.empty.json' },
+    review: { example: 'review.saturday.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
@@ -38,6 +45,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
   const run = ws.readRun(id)
   assert.equal(run.pipeline, 'stocks')
   assert.equal(run.status, 'succeeded')
+  const saturday = onSaturday(id)
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
@@ -46,6 +54,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       // A dry run fetches nothing from MarketSmith, whatever the day.
       ['marketsmith', 'skipped'],
       ['lake', 'succeeded'],
+      ['review', saturday ? 'succeeded' : 'skipped'],
       ['stages', 'succeeded'],
       ['health', 'skipped'],
       ['plan', 'succeeded'],
@@ -63,6 +72,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     [
       ['book-holdings'],
       ['status'],
+      ...(saturday ? [['review', '--dry-run']] : []),
       ['stages', 'check', '--dry-run'],
       ['plan', '--on', id.slice(0, 10)],
       ['book-state', 'IN'],
@@ -86,6 +96,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     marketsmith: { example: 'marketsmith.fetched.json' },
     daily: { stderr: 'Stopped: Yahoo answered 429\n', exitCode: 1 },
     status: { example: 'status.hold.json' },
+    review: { example: 'review.saturday.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
@@ -100,9 +111,8 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   const [id] = ws.runIds()
   const run = ws.readRun(id)
   assert.equal(run.status, 'partial')
-  // MarketSmith is fetched only when the Run started on a Saturday.
-  const [year, month, day] = id.split('-').map(Number)
-  const saturday = new Date(year, month - 1, day).getDay() === 6
+  // MarketSmith is fetched, and the Books reviewed, only when the Run started on a Saturday.
+  const saturday = onSaturday(id)
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
@@ -110,6 +120,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['broker-inbox', 'succeeded'],
       ['marketsmith', saturday ? 'succeeded' : 'skipped'],
       ['lake', 'failed'],
+      ['review', saturday ? 'succeeded' : 'skipped'],
       ['stages', 'succeeded'],
       ['health', 'failed'],
       ['plan', 'succeeded'],

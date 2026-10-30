@@ -1,12 +1,15 @@
 // Portfolio Manager: the Portfolio Manager Agent judges each paper Book's Rule plan within its
 // Playbook: its exposure level for the day and its changes from the Rule plan, each with a Decision
-// record, the Brief's commentary on each Book, and its Journal's new entries. It runs read-only in
-// the Run folder, on Claude Code with Codex as fallback, given the Rule plans, the Book states, the
-// Stages, the Health Agent's diagnosis and its Journal (the dossiers are null until issue 37). Its
-// answer is kept as portfolio-manager.json, with the Journal it read, for the Check Step (which
-// holds each change to the final check in ash_new) and Save state (which applies the Journal). It
-// skips itself unless this Run's Plan Step succeeded with a paper Book's plan to judge. An Agent that
-// fails on both Workers is recorded as failed, and fails the Step: the Rule plans go out instead.
+// record, the Brief's commentary on each Book, and its Journal's new entries. On Saturdays it also
+// writes the weekly review's commentary and proposes the promotions the review lists as due. It runs
+// read-only in the Run folder, on Claude Code with Codex as fallback, given the Rule plans, the Book
+// states, the Stages, the Health Agent's diagnosis, the review's figures (null on other days) and its
+// Journal (the dossiers are null until issue 37). Its answer is kept as portfolio-manager.json, with
+// the Journal it read, for the Check Step (which holds each change to the final check in ash_new) and
+// Save state (which applies the Journal and records the promotions). It skips itself unless this
+// Run's Plan Step succeeded with a paper Book's plan to judge, or there is a review to comment on. An
+// Agent that fails on both Workers is recorded as failed, and fails the Step: the Rule plans go out
+// instead.
 import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { inputFiles, journalMemory } from '../../agents/portfolio-manager/config.ts'
@@ -14,7 +17,7 @@ import { loadAgent } from '../../src/agent.ts'
 import { readJson, writeJson } from '../../src/files.ts'
 import { readMemory } from '../../src/memory.ts'
 import { percent } from '../../src/plans.ts'
-import type { PdJudgedBook, PdPlan } from '../../src/pd.ts'
+import type { PdJudgedBook, PdPlan, PdReview } from '../../src/pd.ts'
 import { readRun } from '../../src/run.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
 import { callAgent } from '../../src/worker.ts'
@@ -22,6 +25,10 @@ import { callAgent } from '../../src/worker.ts'
 /** The Portfolio Manager's answer, as its output schema shapes it. */
 export interface PortfolioManagerAnswer {
   books: PdJudgedBook[]
+  /** On Saturdays, the weekly review's commentary; null on other days. */
+  review: string | null
+  /** The promotions it proposes, each by its Sleeve's id. */
+  promotions: { sleeve: number; why: string }[]
   journal: { entries: string[]; open: string[] }
 }
 
@@ -36,12 +43,15 @@ await runAsStep(async ({ runId, runFolder }) => {
   rmSync(out, { force: true })
   const run = readRun(runId)
   const plan = run.steps.find((s) => s.name === 'plan')
-  if (plan?.status !== 'succeeded') throw new StepSkipped(`The Plan Step ${plan ? plan.status : 'is not in this Run'}, so there is no Rule plan to judge`)
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
-  const plans = read<PdPlan>(inputFiles.plans)
-  if (!plans) throw new StepSkipped(`The Plan Step left no ${inputFiles.plans}`)
-  const judged = plans.plans.filter((p) => p.kind === 'paper' && p.status === 'planned')
-  if (!judged.length) throw new StepSkipped('No paper Book has a Rule plan to judge')
+  const plans = plan?.status === 'succeeded' ? read<PdPlan>(inputFiles.plans) : null
+  const judged = (plans?.plans ?? []).filter((p) => p.kind === 'paper' && p.status === 'planned')
+  // A weekly review is commented on even when there is no plan to judge.
+  const review = read<PdReview>(inputFiles.review)
+  if (!judged.length && !review) {
+    if (plan?.status !== 'succeeded') throw new StepSkipped(`The Plan Step ${plan ? plan.status : 'is not in this Run'}, so there is no Rule plan to judge`)
+    throw new StepSkipped(plans ? 'No paper Book has a Rule plan to judge' : `The Plan Step left no ${inputFiles.plans}`)
+  }
 
   const journal = readMemory('portfolio-manager', journalMemory)
   const inputs = {
@@ -49,6 +59,7 @@ await runAsStep(async ({ runId, runFolder }) => {
     bookStates: read(inputFiles.bookStates),
     stages: read(inputFiles.stages),
     health: read(inputFiles.health),
+    review,
     dossiers: null,
     journal,
   }
@@ -67,4 +78,5 @@ await runAsStep(async ({ runId, runFolder }) => {
     const name = judged.find((p) => p.book === book.book)?.name ?? book.book
     console.log(`${name}: exposure level ${percent(book.exposure.level)}, ${book.changes.length} change${book.changes.length === 1 ? '' : 's'} from the Rule plan`)
   }
+  for (const promotion of answer.promotions) console.log(`Proposes promoting Sleeve ${promotion.sleeve}: ${promotion.why}`)
 })

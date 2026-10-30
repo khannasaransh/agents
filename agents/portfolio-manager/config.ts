@@ -11,6 +11,7 @@ export const inputFiles = {
   bookStates: 'book-states.json',
   stages: 'stages.json',
   health: 'health.json',
+  review: 'review.json',
 } as const
 
 const nullable = (type: 'string' | 'number' | 'integer', description: string): JsonSchema => ({ type: [type, 'null'], description })
@@ -93,23 +94,40 @@ const portfolioManager: AgentConfig = {
   fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   permissions: 'read-only',
   inputs: {
-    plans: `The Run's Rule plans, as pd plan printed them (${inputFiles.plans}): the Data gate's verdict and the mode, each market's Market condition and the exposure level it sets, and each Book's plans. A paper Book's plan has its Judgement mode, Playbook, Pool, holdings and the buys waiting`,
+    plans: `The Run's Rule plans, as pd plan printed them (${inputFiles.plans}): the Data gate's verdict and the mode, each market's Market condition and the exposure level it sets, and each Book's plans. A paper Book's plan has its Judgement mode, Playbook, Pool, holdings and the buys waiting. Null on a Saturday whose Plan Step failed: then there is only the review`,
     bookStates: `The state each plan was made from (${inputFiles.bookStates}): holdings, cash, open orders and Disaster stops`,
     stages: `Each Book's Sleeves and their Stages (${inputFiles.stages}); null when they couldn't be read`,
     health: `The Health Agent's diagnosis of the Lake in this Run (${inputFiles.health}); null when the Lake was healthy and it didn't run`,
+    review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, and each real Book's Reconciliation differences; null on other days`,
     dossiers: "The dossiers of the Rule plan's names: null until the Feeds and dossiers are built",
     journal: 'Your Journal: the Decision records behind your earlier changes, what each was expected to do, and what is still open. Empty when you have none yet',
   },
   outputs: {
     books: "Your judgement of each paper Book's Rule plan: its exposure level for the day and your changes, each with its Decision record, and the Brief's commentary on it",
+    review: "On Saturdays, the weekly review's commentary for the Brief; null on other days",
+    promotions: "The promotions you propose for Saransh's Answer: only those the review lists as due",
     journal: "The Journal's new entries, and the whole list of what is still open",
   },
   outputSchema: {
     type: 'object',
     additionalProperties: false,
-    required: ['books', 'journal'],
+    required: ['books', 'review', 'promotions', 'journal'],
     properties: {
       books: { type: 'array', items: book },
+      review: nullable('string', "The weekly review's commentary for the Brief, in a few short paragraphs: how each Book and Sleeve stands against its tested range and its benchmark, the demotions and why, the promotions due, and Reconciliation's differences. Null when there is no review"),
+      promotions: {
+        type: 'array',
+        description: "Each promotion you propose, from the review's promotions_due. Empty on other days",
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['sleeve', 'why'],
+          properties: {
+            sleeve: { type: 'integer', description: "The Sleeve's id, as the review gives it" },
+            why: { type: 'string', description: 'Why: its time in its Stage, and its record against its tested range and its benchmark, with the figures' },
+          },
+        },
+      },
       journal: {
         type: 'object',
         additionalProperties: false,

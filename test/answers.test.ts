@@ -301,3 +301,30 @@ test("an Answer on a Judgement proposal approves or rejects it through pd judgem
   assert.deepEqual(pdCallArgs(), [['judgement', 'reject', '3']])
   assert.deepEqual(outcomes(nextRun), [['judgement:3', 'reject', 'applied']])
 })
+
+test('an Answer on a promotion approves it through pd stages promote, or rejects it through pd stages reject', async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(briefRun, { pipeline: 'stocks', steps: [{ name: 'stages', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(briefRun, 'stages.json', JSON.parse(readFileSync(join(pdExamples, 'stages-check.promotion.json'), 'utf8')))
+  assert.equal((await ws.agents('step', 'brief', '--run', briefRun)).status, 0)
+  const items: AnswerItem[] = JSON.parse(ws.readRunFile(briefRun, 'brief.html').match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
+  assert.deepEqual(items, [
+    { item: 'candidate:3', answers: ['approve'] },
+    { item: 'promotion:4', answers: ['approve', 'reject'] },
+  ])
+  save(answersFile(briefRun, items, { 'promotion:4': { answer: 'approve' } }, '2026-10-31T03:10:00.000Z'))
+  save(file('2026-10-31T03:20:00.000Z', [{ item: 'promotion:5', answer: 'reject' }]), inbox())
+  prepareRun(nextRun)
+  ws.setPd({ stages: [{ example: 'stages-decide.promoted.json' }, { stdout: JSON.stringify({ changed: true, why: null, proposal: null, sleeve: null }) }] })
+
+  assert.equal((await step(nextRun)).status, 0)
+
+  assert.deepEqual(pdCallArgs(), [
+    ['stages', 'promote', '4'],
+    ['stages', 'reject', '5'],
+  ])
+  assert.deepEqual(outcomes(nextRun), [
+    ['promotion:4', 'approve', 'applied'],
+    ['promotion:5', 'reject', 'applied'],
+  ])
+})

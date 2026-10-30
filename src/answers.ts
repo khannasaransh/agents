@@ -3,7 +3,7 @@
 // naming the Run and each Answer, and the next Run's Answers Step applies it through `pd`. A kind of
 // item is added here, with its Answers and the `pd` command that applies one, and the Brief and the
 // Step follow (the stocks Pipeline PRD's "Answers").
-import type { PdJudgementShow, PdSleeve, PdStagesCheck, PdStatus } from './pd.ts'
+import type { PdJudgementShow, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from './pd.ts'
 
 /** Each kind of item waiting on Saransh: the Answers it takes, and the `pd` command that applies one to the item with this id. */
 const kinds = {
@@ -13,6 +13,8 @@ const kinds = {
   candidate: { answers: ['approve'], pd: (id: string) => ['stages', 'approve', id] },
   // A proposal to move a Book's Judgement mode or change its Playbook's ranges.
   judgement: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['judgement', answer, id] },
+  // A Sleeve's promotion up a Stage, which the Portfolio Manager proposed: approving it moves the Sleeve.
+  promotion: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['stages', answer === 'approve' ? 'promote' : 'reject', id] },
 } satisfies Record<string, { answers: string[]; pd(id: string, answer: string): string[] }>
 
 /** An item waiting on Saransh, as the Brief embeds it: its id and the Answers it takes. */
@@ -49,13 +51,15 @@ export function waitingCandidates(stages: PdStagesCheck | null): (PdSleeve & { i
 
 /**
  * The items waiting on Saransh: each waiting Correction and each Quarantine in the Lake's status, then
- * each Candidate, then each proposal to move a Judgement mode or change a Playbook's ranges.
+ * each Candidate, then each promotion, then each proposal to move a Judgement mode or change a
+ * Playbook's ranges.
  */
-export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null, judgement: PdJudgementShow | null = null): AnswerItem[] {
+export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null, judgement: PdJudgementShow | null = null, promotions: PdStageProposal[] = []): AnswerItem[] {
   return [
     ...(status?.corrections ?? []).map((c) => answerItem('correction', c.id)),
     ...(status?.quarantines ?? []).map((q) => answerItem('quarantine', q.id)),
     ...waitingCandidates(stages).map((s) => answerItem('candidate', s.id)),
+    ...promotions.map((p) => answerItem('promotion', p.id)),
     ...(judgement?.proposals ?? []).map((p) => answerItem('judgement', p.id)),
   ]
 }
