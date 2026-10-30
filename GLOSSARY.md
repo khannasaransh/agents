@@ -37,7 +37,7 @@ One execution of a Pipeline, with its own folder of inputs and outputs.
 _Avoid_: execution, session, job
 
 **Schedule**:
-When a Pipeline runs on its own, such as weekdays at 03:00 IST.
+When a Pipeline runs on its own, such as Tuesday to Saturday at 03:00 IST.
 _Avoid_: cron, trigger
 
 ### Sources

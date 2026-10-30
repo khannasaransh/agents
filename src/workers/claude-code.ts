@@ -4,6 +4,7 @@
 import { cpSync, mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { Agent } from '../agent.ts'
+import { workerTokenUsage } from '../token-usage.ts'
 import type { ProcessResult } from '../process.ts'
 import type { CallOptions, Inputs, Worker } from '../worker.ts'
 import { agentPrompt, jsonResult, runCommandLine, withTempFolder, writeFolders, type CommandLine } from './cli.ts'
@@ -73,7 +74,10 @@ export const claudeCodeWorker: Worker = {
   call(agent, inputs, options) {
     return withTempFolder('agents-claude-code-', async (pluginDir) => {
       if (agent.skills.length) writeSessionPlugin(agent, pluginDir)
-      return claudeCodeAnswer(agent, await runCommandLine(claudeCodeCommandLine(agent, inputs, { ...options, pluginDir }), options.cwd))
+      return claudeCodeAnswer(agent, await runCommandLine(claudeCodeCommandLine(agent, inputs, { ...options, pluginDir }), options.cwd, result => {
+        const usage = workerTokenUsage('claude-code', result.stdout, result.timedOut)
+        if (usage) options.onUsage?.(usage)
+      }))
     })
   },
 }

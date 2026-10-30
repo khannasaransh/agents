@@ -1,4 +1,5 @@
 import type { Agent, Effort, WorkerChoice, WorkerName } from './agent.ts'
+import type { TokenUsage } from './token-usage.ts'
 import { schemaErrors } from './schema.ts'
 import { antigravityWorker } from './workers/antigravity.ts'
 import { claudeCodeWorker } from './workers/claude-code.ts'
@@ -13,6 +14,8 @@ export interface CallOptions {
   cwd: string
   model: string
   effort: Effort
+  /** Usage reported by the CLI, including failed calls when available. */
+  onUsage?: (usage: TokenUsage) => void
 }
 
 /** A coding-agent CLI that runs Agents, or the fake that stands in for one. */
@@ -53,15 +56,17 @@ export async function callAgent(
   if (dryRun) return checkedAnswer(agent, await fakeWorker.call(agent, inputs, { cwd, model: main.model, effort: main.effort }))
 
   const attempt = async (choice: WorkerChoice) => {
+    let usage: TokenUsage | null = null
+    const usageSuffix = () => usage ? ` [tokens=${JSON.stringify(usage)}]` : ''
     const started = Date.now()
     const took = () => `${Math.round((Date.now() - started) / 1000)}s`
     try {
-      const answer = checkedAnswer(agent, await workers[choice.name].call(agent, inputs, { cwd, model: choice.model, effort: choice.effort }))
-      log(`${agent.name} answered on ${described(choice)} in ${took()}`)
+      const answer = checkedAnswer(agent, await workers[choice.name].call(agent, inputs, { cwd, model: choice.model, effort: choice.effort, onUsage: reported => { usage = reported } }))
+      log(`${agent.name} answered on ${described(choice)} in ${took()}${usageSuffix()}`)
       return answer
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
-      log(`${agent.name} failed on ${described(choice)} after ${took()}: ${message}${choice === main ? `; retrying once on ${described(fallback)}` : ''}`)
+      log(`${agent.name} failed on ${described(choice)} after ${took()}: ${message.replace(/\r?\n/g, '\\n')}${choice === main ? `; retrying once on ${described(fallback)}` : ''}${usageSuffix()}`)
       throw new Error(`${choice.name} failed: ${message}`)
     }
   }

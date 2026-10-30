@@ -65,9 +65,10 @@ export async function withTempFolder<T>(prefix: string, use: (folder: string) =>
 }
 
 /** Runs a command line in `cwd` and returns how it ended. Rejects when it can't start or runs past its timeout. */
-export async function runCommandLine(line: CommandLine, cwd: string): Promise<ProcessResult> {
+export async function runCommandLine(line: CommandLine, cwd: string, onResult?: (result: ProcessResult) => void): Promise<ProcessResult> {
   const { stdin, env, timeoutSeconds } = line
   const ended = await runProcess(line.command, line.args, { cwd, env, stdin, timeoutMs: timeoutSeconds * 1000 })
+  onResult?.(ended)
   if (ended.timedOut) throw new Error(`timed out after ${timeoutSeconds}s`)
   return ended
 }

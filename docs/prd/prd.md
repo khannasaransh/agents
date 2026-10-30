@@ -10,7 +10,7 @@ He already pays for three coding-agent CLIs (Claude Code, Codex and Antigravity)
 
 ## Solution
 
-A local agent system in its own repo, run by one command or by a Schedule. Every weekday at 03:00 IST a daily Pipeline runs on his Mac:
+A local agent system in its own repo, run by one command or by a Schedule. Tuesday to Saturday at 03:00 IST a daily Pipeline runs on his Mac:
 
 1. It fetches every Repo, without ever touching his working copies.
 2. It reviews each Repo's new commits with a Reviewer Agent.
@@ -27,7 +27,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 ### Running the Pipeline
 
-1. As Saransh, I want the daily Pipeline to run by itself every weekday at 03:00 IST, so that the Brief is ready before I start work.
+1. As Saransh, I want the daily Pipeline to run by itself Tuesday to Saturday at 03:00 IST, so that the Brief is ready before I start work.
 2. As Saransh, I want a missed Run to happen when the Mac next wakes, so that a sleeping laptop costs me a delay, not a day.
 3. As Saransh, I want to start the daily Pipeline by hand with one command, so that I can get a fresh Brief whenever I want.
 4. As Saransh, I want to run a single Step inside an existing Run, so that I can retry or tune one part without redoing the rest.
@@ -279,7 +279,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 ### Schedule
 
-- The daily Schedule runs Monday to Friday at 05:30 on the Mac's local clock (Singapore), which is 03:00 IST.
+- The daily Schedule runs Tuesday to Saturday at 05:30 on the Mac's local clock (Singapore), which is 03:00 IST. The weekly Schedule runs Sunday at the same time.
 - The launchd entry is generated from the Schedule definition. It sets its own PATH, since launchd doesn't load the shell profile.
 - launchd runs a missed time once when the Mac wakes. Saransh keeps the Mac awake, so there is no scheduled wake.
 

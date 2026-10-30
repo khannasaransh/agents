@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import './node-version.ts'
 import { join } from 'node:path'
+import { startDashboard } from './dashboard.ts'
 import { parseArgs } from 'node:util'
 import { workerNames, type WorkerName } from './agent.ts'
 import { acquireLock } from './lock.ts'
@@ -22,6 +23,7 @@ const usage = `Usage:
                                             for the Run, as a Task Scheduler entry does, which can't
                                             set one itself
   agents step <name> --run <id> [--force]   Run one Step inside an existing Run
+  agents dashboard [--port <number>]        Open the local pipeline dashboard server (default 4310)
   agents memory                             List the Memory changes Agents proposed, waiting for you
   agents memory accept <agent> <name>       Make a proposed change the Memory the next Run reads
   agents memory reject <agent> <name>       Drop a proposed change, leaving the Memory as it is
@@ -41,6 +43,11 @@ const usage = `Usage:
 async function main(argv: string[]): Promise<number> {
   const [command, ...rest] = argv
   switch (command) {
+    case 'dashboard': {
+      const { values } = parseArgs({ args: rest, options: { port: { type: 'string', default: '4310' } } })
+      startDashboard(Number(values.port))
+      return 0
+    }
     case 'run': {
       const { values, positionals } = parseArgs({
         args: rest,

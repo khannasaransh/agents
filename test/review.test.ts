@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict'
+import { agentAttempts } from '../src/dashboard.ts'
+import { summarizeTokenUsage } from '../src/token-usage.ts'
 import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
@@ -282,6 +284,9 @@ test('a Run that is not a dry run reviews each changed Repo on Codex, in its wor
   assert.ok(call.cwd.startsWith(realpathSync(join(ws.dataDir, 'worktrees'))), call.cwd)
   assert.ok(call.stdin.includes(to), call.stdin)
   assert.deepEqual(ws.workerCliCalls('claude'), [])
+  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review')
+  assert.equal(attempts[0].usage?.totalTokens, 1280)
+  assert.equal(attempts[0].target, 'crux_flutter')
 })
 
 test('a review that fails on Codex, such as on a quota limit, is retried once on Claude Code, and both attempts are logged in the Run', async () => {
@@ -588,4 +593,48 @@ test("a review fails when the Step doesn't pass every input the Reviewer's confi
 
   assert.notEqual(result.status, 0)
   assert.match(ws.reviewResult(runId, 'crux_flutter').error, /The reviewer Agent was called without its styleGuide input/)
+})
+
+
+test('token usage survives schema failure and fallback, and is counted for both attempts', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Add paywall')
+  ws.setWorkerCli('codex', codexAnswering({ summary: 'Missing required fields.' }))
+  ws.setWorkerCli('claude', { stdout: JSON.stringify({
+    type: 'result', subtype: 'success', is_error: false,
+    structured_output: { summary: 'Reviewed.', findings: [], memory: null },
+    usage: { input_tokens: 100, output_tokens: 40, cache_read_input_tokens: 500, cache_creation_input_tokens: 200 },
+  }) })
+  prepareRun([[repo, from]], { dryRun: false })
+  assert.equal((await review()).status, 0)
+  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review')
+  assert.equal(attempts.length, 2)
+  assert.equal(attempts[0].outcome, 'failed')
+  assert.equal(attempts[0].usage?.totalTokens, 1280)
+  assert.equal(attempts[1].worker, 'claude-code')
+  assert.equal(attempts[1].usage?.totalTokens, 840)
+  assert.equal(summarizeTokenUsage(attempts).tokens?.totalTokens, 2120)
+  assert.equal(summarizeTokenUsage(attempts).complete, true)
+})
+
+test('a failed Claude result retains usage even when both workers fail', async () => {
+  ws = makeWorkspace()
+  const repo = ws.addRepo('crux_flutter')
+  const from = lastFetched(repo)
+  repo.pushCommit('Add paywall')
+  ws.setWorkerCli('codex', { stdout: JSON.stringify({ type: 'turn.failed', error: { message: 'quota' } }), exitCode: 1 })
+  ws.setWorkerCli('claude', { stdout: JSON.stringify({
+    type: 'result', subtype: 'error_max_turns', is_error: true,
+    usage: { input_tokens: 100, output_tokens: 40, cache_read_input_tokens: 500, cache_creation_input_tokens: 200 },
+  }), exitCode: 1 })
+  prepareRun([[repo, from]], { dryRun: false })
+  assert.notEqual((await review()).status, 0)
+  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review')
+  assert.equal(attempts.length, 2)
+  assert.equal(attempts[0].usage, null)
+  assert.equal(attempts[1].outcome, 'failed')
+  assert.equal(attempts[1].usage?.totalTokens, 840)
+  assert.equal(summarizeTokenUsage(attempts).complete, false)
 })

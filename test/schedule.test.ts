@@ -37,8 +37,8 @@ async function stocksSchedule(): Promise<NamedSchedule> {
   return stocks
 }
 
-test('the daily Schedule runs the daily Pipeline on the Mac, Monday to Friday at 05:30', async () => {
-  assert.deepEqual(await dailySchedule(), { name: 'daily', pipeline: 'daily', machine: 'mac', days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'], time: '05:30' })
+test('the daily Schedule runs the daily Pipeline on the Mac, Tuesday to Saturday at 05:30', async () => {
+  assert.deepEqual(await dailySchedule(), { name: 'daily', pipeline: 'daily', machine: 'mac', days: ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], time: '05:30' })
 })
 
 test('the stocks Schedule runs the stocks Pipeline on the Windows machine, Tuesday to Saturday at 09:30 Singapore time, 07:00 IST', async () => {
@@ -80,7 +80,7 @@ test('each machine installs only its own Schedules', async () => {
   assert.throws(() => machineSchedules(schedules, 'linux'), /Schedules install on the Mac \(launchd\) and on Windows \(Task Scheduler\), not on linux/)
 })
 
-test("the daily Schedule's launchd entry starts a scheduled Run of the daily Pipeline Monday to Friday at 05:30", async () => {
+test("the daily Schedule's launchd entry starts a scheduled Run of the daily Pipeline Tuesday to Saturday at 05:30", async () => {
   const daily = await dailySchedule()
 
   const entry = launchdEntry(daily, install)
@@ -92,11 +92,11 @@ test("the daily Schedule's launchd entry starts a scheduled Run of the daily Pip
     ['/opt/homebrew/bin/node', join(agentsRoot, 'src', 'cli.ts'), 'run', 'daily', '--scheduled'],
   )
   assert.deepEqual(calendarTimes(entry.plist), [
-    [1, 5, 30],
     [2, 5, 30],
     [3, 5, 30],
     [4, 5, 30],
     [5, 5, 30],
+    [6, 5, 30],
   ])
 })
 
@@ -259,8 +259,9 @@ test("a Task Scheduler entry's arguments reach the agents command as they were g
 test('a scheduled start sets the environment the entry gives it before the Run starts', async () => {
   const ws = makeWorkspace()
   try {
+    // This test checks environment forwarding; use a clean Lake so it needs no Health-agent workspace.
     ws.setPd({
-      status: { example: 'status.healthy.json' },
+      status: { example: 'status.clean.json' },
       'book-holdings': { example: 'book-holdings.empty.json' },
       review: { example: 'review.saturday.json' },
       stages: { example: 'stages-check.empty.json' },

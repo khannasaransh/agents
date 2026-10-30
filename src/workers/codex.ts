@@ -5,6 +5,7 @@ import { readdirSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join } from 'node:path'
 import { undeclaredTools, type Agent } from '../agent.ts'
+import { workerTokenUsage } from '../token-usage.ts'
 import type { ProcessResult } from '../process.ts'
 import type { CallOptions, Inputs, Worker } from '../worker.ts'
 import { agentPrompt, lastLine, runCommandLine, withTempFolder, writeFolders, type CommandLine } from './cli.ts'
@@ -100,12 +101,15 @@ function skillsCodexFinds(cwd: string): string[] {
 
 export const codexWorker: Worker = {
   name: 'codex',
-  call(agent, inputs, { cwd, model, effort }) {
+  call(agent, inputs, { cwd, model, effort, onUsage }) {
     return withTempFolder('agents-codex-', async (temp) => {
       const schemaFile = join(temp, 'output-schema.json')
       if (agent.config.outputSchema) writeFileSync(schemaFile, JSON.stringify(agent.config.outputSchema))
       const line = codexCommandLine(agent, inputs, { cwd, model, effort, schemaFile, undeclaredTools: undeclaredTools(agent), foundSkills: skillsCodexFinds(cwd) })
-      return codexAnswer(agent, await runCommandLine(line, cwd))
+      return codexAnswer(agent, await runCommandLine(line, cwd, result => {
+        const usage = workerTokenUsage('codex', result.stdout, result.timedOut)
+        if (usage) onUsage?.(usage)
+      }))
     })
   },
 }

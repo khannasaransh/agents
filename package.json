@@ -9,6 +9,7 @@
     "node": ">=26"
   },
   "scripts": {
+    "dashboard": "node src/cli.ts dashboard",
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc"
   },
