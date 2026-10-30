@@ -49,7 +49,8 @@ export function decisionText(decision: PdDecisionRecord): string {
   ].join(' ')
 }
 
-const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`)
+/** Text as a sentence: ending in a full stop unless it ends in one already. */
+export const sentence = (text: string) => (/[.!?]$/.test(text.trim()) ? text.trim() : `${text.trim()}.`)
 
 /** What a proposal would change: "Move the India Book's paper Book into plan only", "Set the India Book's Playbook's size_max to 1.25". */
 export function proposalText(proposal: PdJudgementProposal, bookName: string): string {

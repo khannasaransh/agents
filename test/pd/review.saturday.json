@@ -145,6 +145,162 @@
         ],
         "file": "Holdings_2026-10-30.csv",
         "reconciled_at": "2026-10-31T01:05:12+00:00"
+      },
+      "scorecard": {
+        "status": "scored",
+        "why": null,
+        "currency": "INR",
+        "last": "2026-10-30",
+        "overrides": [
+          {
+            "id": 4,
+            "kind": "drop",
+            "lever": "selection",
+            "session": "2026-08-04",
+            "security_id": "IN:RATEGAIN",
+            "name": "Rategain Travel Technologies",
+            "analysts": [
+              "events"
+            ],
+            "lessons": [],
+            "expected": "It lags the Sleeve into its results",
+            "judged_on": "2026-09-01",
+            "status": "judged",
+            "valued_to": "2026-09-01",
+            "value": 3120.5,
+            "bps": 31.2,
+            "came_true": true
+          },
+          {
+            "id": 7,
+            "kind": "wait",
+            "lever": "timing",
+            "session": "2026-09-15",
+            "security_id": "IN:STOVEKRAFT",
+            "name": "Stove Kraft",
+            "analysts": [
+              "chart"
+            ],
+            "lessons": [],
+            "expected": "It comes back to its base within 3 sessions",
+            "judged_on": "2026-10-13",
+            "status": "judged",
+            "valued_to": "2026-10-13",
+            "value": -1840.0,
+            "bps": -18.1,
+            "came_true": false
+          },
+          {
+            "id": 9,
+            "kind": "wait",
+            "lever": "timing",
+            "session": "2026-10-20",
+            "security_id": "IN:KPIGREEN",
+            "name": "KPI Green Energy",
+            "analysts": [],
+            "lessons": [],
+            "expected": "A cheaper entry after the gap",
+            "judged_on": "2026-11-17",
+            "status": "open",
+            "valued_to": "2026-10-30",
+            "value": -420.0,
+            "bps": -4.1,
+            "came_true": null
+          }
+        ],
+        "tallies": {
+          "lever": [
+            {
+              "key": "selection",
+              "count": 1,
+              "open": 0,
+              "hits": 1,
+              "hit_rate": 1.0,
+              "value": 3120.5,
+              "bps": 31.2
+            },
+            {
+              "key": "timing",
+              "count": 1,
+              "open": 1,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "value": -1840.0,
+              "bps": -18.1
+            }
+          ],
+          "analyst": [
+            {
+              "key": "events",
+              "count": 1,
+              "open": 0,
+              "hits": 1,
+              "hit_rate": 1.0,
+              "value": 3120.5,
+              "bps": 31.2
+            },
+            {
+              "key": "chart",
+              "count": 1,
+              "open": 0,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "value": -1840.0,
+              "bps": -18.1
+            },
+            {
+              "key": "none",
+              "count": 0,
+              "open": 1,
+              "hits": 0,
+              "hit_rate": null,
+              "value": 0.0,
+              "bps": 0.0
+            }
+          ],
+          "lesson": []
+        },
+        "lost_levers": {
+          "start": "2026-07-31",
+          "end": "2026-10-30",
+          "levers": [
+            {
+              "key": "selection",
+              "count": 1,
+              "open": 0,
+              "hits": 1,
+              "hit_rate": 1.0,
+              "value": 3120.5,
+              "bps": 31.2,
+              "lost": false
+            },
+            {
+              "key": "timing",
+              "count": 1,
+              "open": 0,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "value": -1840.0,
+              "bps": -18.1,
+              "lost": true
+            }
+          ]
+        },
+        "sum_and_gap": {
+          "start": "2026-08-03",
+          "from_start": true,
+          "end": "2026-10-30",
+          "overrides": 3,
+          "sum_bps": 9.0,
+          "gap_bps": 14.6,
+          "note": "The Overrides interact: cash a veto leaves funds another buy, and a cut changes what later caps allow. So the sum of their scores isn't the paper Book's gap to its rules-only paper Book, which is what the judgement added, and the gate"
+        },
+        "gate": {
+          "status": "too_soon",
+          "start": "2026-07-31",
+          "end": "2026-10-30",
+          "why": "The two paper Books have closes together only from 2026-08-03: the gate needs the 3 months from 2026-07-31"
+        }
       }
     },
     {
@@ -166,7 +322,22 @@
         "outside": []
       },
       "sleeves": [],
-      "reconciliation": null
+      "reconciliation": null,
+      "scorecard": {
+        "status": "not_started",
+        "why": "Its paper Book hasn't started",
+        "currency": "USD",
+        "last": null,
+        "overrides": [],
+        "tallies": {
+          "lever": [],
+          "analyst": [],
+          "lesson": []
+        },
+        "lost_levers": null,
+        "sum_and_gap": null,
+        "gate": null
+      }
     },
     {
       "book": "HK",
@@ -187,7 +358,22 @@
         "outside": []
       },
       "sleeves": [],
-      "reconciliation": null
+      "reconciliation": null,
+      "scorecard": {
+        "status": "not_started",
+        "why": "Its paper Book hasn't started",
+        "currency": "HKD",
+        "last": null,
+        "overrides": [],
+        "tallies": {
+          "lever": [],
+          "analyst": [],
+          "lesson": []
+        },
+        "lost_levers": null,
+        "sum_and_gap": null,
+        "gate": null
+      }
     }
   ],
   "demotions": [],

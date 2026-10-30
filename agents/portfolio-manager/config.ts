@@ -1,6 +1,6 @@
 import type { AgentConfig } from '../../src/agent.ts'
 import { analysts } from '../../src/desk.ts'
-import { changeKinds, levers } from '../../src/pd.ts'
+import { changeKinds, levers, playbookRanges } from '../../src/pd.ts'
 import type { JsonSchema } from '../../src/schema.ts'
 
 /** The name of the Portfolio Manager's Journal, its Memory file. */
@@ -109,7 +109,7 @@ const portfolioManager: AgentConfig = {
     bookStates: `The state each plan was made from (${inputFiles.bookStates}): holdings, cash, open orders and Disaster stops`,
     stages: `Each Book's Sleeves and their Stages (${inputFiles.stages}); null when they couldn't be read`,
     health: `The Health Agent's diagnosis of the Lake in this Run (${inputFiles.health}); null when the Lake was healthy and it didn't run`,
-    review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, and each real Book's Reconciliation differences; on a month's first Saturday also the monthly review of the month before (monthly): each paper Book's return attributed to its sources, the correlation between its Sleeves and its drawdown against its limits; null on other days`,
+    review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, and each real Book's Reconciliation differences, and each paper Book's override scorecard (each of your Overrides scored against the Rule plan's order, their tallies by Lever, analyst and Lesson, the Levers that lost over the last 3 months, their sum beside the paper Book's gap to its rules-only paper Book, and the gate for moving its real Book to Playbook mode); on a month's first Saturday also the monthly review of the month before (monthly): each paper Book's return attributed to its sources, the correlation between its Sleeves and its drawdown against its limits; null on other days`,
     dossiers: "The dossiers of the Rule plan's names: null until the Feeds and dossiers are built",
     desk: "The Desk's views of the names it reviewed (desk.json): each analyst's (Events, Chart, Risk) view of each name (none, a veto, a trim to a size, or an early exit proposed for Saransh), its reasons, the evidence it cites and when it was made (a view reused from an earlier Run keeps its date), and each review that is missing, whose buy waits a session whatever you decide. Null when the Desk didn't review, no analyst being needed or its Step failing",
     journal: 'Your Journal: the Decision records behind your earlier changes, what each was expected to do, and what is still open. Empty when you have none yet',
@@ -119,15 +119,16 @@ const portfolioManager: AgentConfig = {
     review: "On Saturdays, the weekly review's commentary for the Brief; null on other days",
     monthly: "On a month's first Saturday, the monthly review's commentary for the Brief; null on other days",
     promotions: "The promotions you propose for Saransh's Answer: only those the review lists as due",
+    narrower: "The narrower Playbook ranges you propose for Saransh's Answer: one for each Lever the override scorecard says lost to the Rule plan over the last 3 months",
     journal: "The Journal's new entries, and the whole list of what is still open",
   },
   outputSchema: {
     type: 'object',
     additionalProperties: false,
-    required: ['books', 'review', 'monthly', 'promotions', 'journal'],
+    required: ['books', 'review', 'monthly', 'promotions', 'narrower', 'journal'],
     properties: {
       books: { type: 'array', items: book },
-      review: nullable('string', "The weekly review's commentary for the Brief, in a few short paragraphs: how each Book and Sleeve stands against its tested range and its benchmark, the demotions and why, the promotions due, and Reconciliation's differences. Null when there is no review"),
+      review: nullable('string', "The weekly review's commentary for the Brief, in a few short paragraphs: how each Book and Sleeve stands against its tested range and its benchmark, the demotions and why, the promotions due, Reconciliation's differences, and what the override scorecard says of your Overrides and the gate. Null when there is no review"),
       monthly: nullable(
         'string',
         "The monthly review's commentary for the Brief, in a few short paragraphs: where each Book's return over the month came from, what the correlation between its Sleeves and its drawdown against its limits say about its risk, and the promotions due. Null when the review has no monthly figures",
@@ -142,6 +143,30 @@ const portfolioManager: AgentConfig = {
           properties: {
             sleeve: { type: 'integer', description: "The Sleeve's id, as the review gives it" },
             why: { type: 'string', description: 'Why: its time in its Stage, and its record against its tested range and its benchmark, with the figures' },
+          },
+        },
+      },
+      narrower: {
+        type: 'array',
+        description: "Each narrower range you propose for a Lever whose Overrides lost to the Rule plan over the last 3 months (the scorecard's lost_levers). Empty on other days",
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['book', 'lever', 'ranges', 'why'],
+          properties: {
+            book: { type: 'string', enum: ['IN', 'US', 'HK'] },
+            lever: { type: 'string', enum: levers },
+            ranges: {
+              type: 'array',
+              description: "Each of the Lever's ranges you narrow, by its name in the Playbook, with its new value",
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['name', 'value'],
+                properties: { name: { type: 'string', enum: playbookRanges }, value: { type: 'number' } },
+              },
+            },
+            why: { type: 'string', description: "Why: the Lever's tally over the last 3 months, with the figures" },
           },
         },
       },

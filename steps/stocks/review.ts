@@ -11,10 +11,15 @@
 // (`--dry-run`). On the first Saturday of a month it adds the monthly review of the month before
 // (`--month`): each paper Book's return over the month attributed to Sleeve weights, picks within
 // Sleeves, gold, cash, costs, Overrides and (for a Book not in rupees) the currency, the correlation
-// between its Sleeves and its drawdown against its limits.
+// between its Sleeves and its drawdown against its limits. Each Saturday it also gives each paper
+// Book's override scorecard (issue 40): each Override scored against the Rule plan's order, the
+// tallies by Lever, analyst and Lesson, the Levers that lost over the last 3 months, the sum of the
+// scores beside the gap to the rules-only paper Book, and the gate for moving its real Book to
+// Playbook mode.
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { capitalised } from '../../src/answers.ts'
+import { plural } from '../../src/brief.ts'
 import { writeJson } from '../../src/files.ts'
 import { pdJson, type PdReview } from '../../src/pd.ts'
 import { percent } from '../../src/plans.ts'
@@ -40,6 +45,11 @@ await runAsStep(async ({ runId, runFolder }) => {
   for (const book of review.books) {
     const paper = book.paper.record ? `paper Book ${percent(book.paper.record.return)} since ${book.paper.record.start}` : 'paper Book not started'
     console.log(`${book.name}: ${paper}; ${book.sleeves.length} Sleeve${book.sleeves.length === 1 ? '' : 's'} reviewed`)
+    const card = book.scorecard
+    if (card.status !== 'scored') continue
+    const lost = card.lost_levers?.levers.filter((l) => l.lost).map((l) => l.key) ?? []
+    const gate = card.gate?.status === 'judged' ? (card.gate.passed ? 'matched its rules-only paper Book' : "didn't match its rules-only paper Book") : `not judged (${card.gate?.why ?? 'no closes'})`
+    console.log(`${book.name}: ${plural(card.overrides.length, 'Override')} open or judged in the last 3 months${lost.length ? `; lost to the Rule plan: ${lost.join(', ')}` : ''}; the gate: ${gate}`)
   }
   for (const d of review.demotions) {
     const done = d.status === 'demoted' ? 'Demoted' : 'Would demote'

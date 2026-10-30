@@ -334,7 +334,8 @@ export interface PdSleeveReview extends PdJudgedRecord {
 /**
  * What `pd review` prints (contract/review.schema.json): the weekly review. Each Book's paper Book and
  * its Sleeves against their backtests' ranges and benchmarks, the demotions the demotion rule made by
- * itself, the promotions due, and each real Book's latest Reconciliation.
+ * itself, the promotions due, each real Book's latest Reconciliation and each paper Book's override
+ * scorecard.
  */
 export interface PdReview {
   reviewed_at: string
@@ -354,11 +355,84 @@ export interface PdReview {
     paper: PdJudgedRecord & { status: 'measured' | 'not_started' | 'no_record'; why: string | null }
     sleeves: PdSleeveReview[]
     reconciliation: (PdReconciliation & { file: string; reconciled_at: string }) | null
+    /** Its paper Book's override scorecard (issue 40). */
+    scorecard: PdScorecard
   }[]
   demotions: (PdDemotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string })[]
   promotions_due: (PdPromotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string; from: PdStage })[]
   /** With --month (the first Saturday of a month, of the month before): the monthly review; else null. */
   monthly: PdMonthlyReview | null
+}
+
+/** A tally of Overrides by one key: those judged and open, the hits (those that beat the Rule plan), and what those judged made. */
+export interface PdTally {
+  /** The Lever (early_exit: an early exit), the analyst (none: the Portfolio Manager's alone) or the Lesson. */
+  key: string
+  count: number
+  open: number
+  hits: number
+  hit_rate: number | null
+  /** In the Book's currency, and in basis points of the Book. */
+  value: number
+  bps: number
+}
+
+/** One side's return and deepest drawdown over the gate's 3 months. */
+interface PdGateSide {
+  return: number
+  max_drawdown: number
+}
+
+/**
+ * A paper Book's override scorecard (issue 40; ash_new's `pipeline.scorecard`): each Override scored
+ * against the Rule plan's order, held until its strategy's track sold the name or the session its
+ * Decision record named; their tallies by Lever, analyst and Lesson; the Levers that lost over the last
+ * 3 months; their sum beside the gap to the rules-only paper Book; and the gate for Playbook mode.
+ */
+export interface PdScorecard {
+  status: 'scored' | 'not_started' | 'no_prices'
+  why: string | null
+  currency: string
+  /** The last session of the data it is scored on. */
+  last: string | null
+  /** Each Override open, or judged in the last 3 months. */
+  overrides: {
+    id: number
+    kind: PdChangeKind | 'exposure' | 'early_exit'
+    lever: PdLever | 'early_exit'
+    session: string
+    security_id: string | null
+    name: string | null
+    analysts: ('events' | 'chart' | 'risk')[]
+    lessons: string[]
+    expected: string | null
+    judged_on: string | null
+    status: 'judged' | 'open'
+    valued_to: string
+    /** What it made against the Rule plan, in the Book's currency: more than nothing when it beat it. */
+    value: number
+    bps: number | null
+    /** Whether it beat the Rule plan by the session it is judged on; null while open. */
+    came_true: boolean | null
+  }[]
+  tallies: { lever: PdTally[]; analyst: PdTally[]; lesson: PdTally[] }
+  /** Each Lever's Overrides judged over the last 3 months; one that `lost` is proposed for a narrower range. */
+  lost_levers: { start: string; end: string; levers: (PdTally & { lost: boolean })[] } | null
+  /** The sum of the scores of the Overrides made over the last 3 months beside the paper Book's gap to its rules-only paper Book. */
+  sum_and_gap: { start: string; from_start: boolean; end: string; overrides: number; sum_bps: number; gap_bps: number; note: string } | null
+  /** Whether the paper Book matched its rules-only paper Book over the last 3 months: the gate for its real Book's Playbook mode. */
+  gate: {
+    status: 'judged' | 'too_soon' | 'no_bar'
+    why: string | null
+    start?: string
+    end?: string
+    bar?: { fixed_on: string; return_gap: number; drawdown_gap: number }
+    paper?: PdGateSide
+    rules_only?: PdGateSide
+    gap?: PdGateSide
+    matched?: { return: boolean; drawdown: boolean }
+    passed?: boolean
+  } | null
 }
 
 /** Where a paper Book's return over a month came from: each source's part, adding up to its return. */
@@ -904,6 +978,21 @@ export interface PdJudgementProposal {
   at: string
   decision: 'approved' | 'rejected' | null
 }
+
+/** What `pd judgement propose` prints (contract/judgement-propose.schema.json): the proposal, or why it can't be made (exit 1). */
+export type PdJudgementProposed = { proposal: PdJudgementProposal } | { error: string }
+
+/** The Playbook's ranges a proposal may change, by name, each with the Lever it is of. */
+export const rangeLevers = {
+  'exposure_floor.uptrend': 'exposure',
+  'exposure_floor.under_pressure': 'exposure',
+  'exposure_floor.correction': 'exposure',
+  size_min: 'size',
+  size_max: 'size',
+  timing_sessions: 'timing',
+  rebalance_under: 'rebalance',
+} as const satisfies Record<string, PdLever>
+export const playbookRanges = Object.keys(rangeLevers) as (keyof typeof rangeLevers)[]
 
 /** A Book's Judgement mode on one side: as the Brief writes it, and the change that set it (null: its first). */
 interface PdJudgementSide {

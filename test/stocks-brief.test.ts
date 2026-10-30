@@ -735,6 +735,31 @@ test("on Saturdays the weekly review shows the Portfolio Manager's commentary an
   assert.doesNotMatch(page, /US Book .* Paper Book/, 'a Book with no record and no Sleeve is left out')
 })
 
+test("on Saturdays the weekly review shows each paper Book's override scorecard, the Levers that lost with the narrower range proposed, the sum beside the gap and the gate", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.saturday.json')))
+  const narrower = { book: 'IN', lever: 'timing', ranges: [{ name: 'timing_sessions', value: 3 }], why: 'Waits lost', proposed: JSON.parse(example('judgement-propose.narrower.json')) }
+  ws.writeRunFile(runId, 'narrower.json', { narrower: [narrower] })
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(page, /Override scorecard The gate for Playbook mode: The two paper Books have closes together only from 2026-08-03: the gate needs the 3 months from 2026-07-31\./)
+  assert.match(page, /The scores of the 3 Overrides made since the two paper Books started on 2026-08-03 add up to \+9\.0 bp; the paper Book's gap to its rules-only paper Book over the same closes is \+14\.6 bp\. The Overrides interact/)
+  assert.match(page, /2026-08-04 Veto of Rategain Travel Technologies Selection Events It lags the Sleeve into its results 2026-09-01 ₹3,121, \+31\.2 bp Yes/)
+  assert.match(page, /2026-09-15 Wait of Stove Kraft Timing Chart .* 2026-10-13 -₹1,840, -18\.1 bp No/)
+  assert.match(page, /2026-10-20 Wait of KPI Green Energy Timing — A cheaper entry after the gap Open: judged on 2026-11-17, valued to 2026-10-30 -₹420, -4\.1 bp —/)
+  assert.match(page, /Every Override so far, tallied: Judged Open Hit rate Against the Rule plan Lever: selection 1 0 100% ₹3,121, \+31\.2 bp Lever: timing 1 1 0% -₹1,840, -18\.1 bp Analyst: Events 1 0 100%/)
+  assert.match(page, /Analyst: none, the Portfolio Manager alone 0 1 — —/)
+  assert.match(page, /The timing Lever lost to the Rule plan over the 3 months from 2026-07-31: -₹1,840, -18\.1 bp, over 1 Override\. The Portfolio Manager proposes a narrower range: proposal 5, waiting for your Answer\./)
+  // The narrower range waits for an Answer with the other judgement proposals.
+  assert.match(page, /Judgement proposals waiting for your Answer: 1 .* 5 Set the India Book's Playbook's timing_sessions to 3/)
+  assert.match(html, /data-item="judgement:5">/)
+  // Its Answer is saved with the rest, though the Check Step read no proposals in this Run.
+  assert.match(html, /<script type="application\/json" id="answer-items">[^<]*judgement:5/)
+  assert.doesNotMatch(page, /US Book Override scorecard/, "a paper Book that hasn't started has none")
+})
+
 test("on a month's first Saturday the monthly review attributes each Book's return to its sources, with the correlation between its Sleeves, its drawdown against its limits and the promotions due", async () => {
   prepare()
   ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.monthly.json')))

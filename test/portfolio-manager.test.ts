@@ -19,6 +19,7 @@ const answer = {
   review: null,
   monthly: null,
   promotions: [],
+  narrower: [],
   journal: { entries: ['Dropped Rategain: the weakest RS Rating of the plan in a Correction; judge on 2026-12-24'], open: ['Is Rategain still lagging on 2026-12-24?'] },
 }
 
@@ -219,7 +220,7 @@ test('a Journal Saransh changed after the Portfolio Manager read it is queued fo
   assert.match(ws.readRunFile(runId, 'logs', 'save-state.log'), /Queued the Journal for Saransh/)
 })
 
-test("on Saturdays the Portfolio Manager gets the review's figures, writes its commentary and proposes the promotions due, which Save state records for Saransh's Answer", async () => {
+test("on Saturdays the Portfolio Manager gets the review's figures, writes its commentary and proposes the promotions due and a narrower range for a Lever that lost, which Save state records for Saransh's Answer", async () => {
   prepare()
   ws.writeRunFile(runId, 'review.json', example('review.saturday.json'))
   const proposing = {
@@ -229,9 +230,17 @@ test("on Saturdays the Portfolio Manager gets the review's figures, writes its c
       { sleeve: 2, why: 'Three months of Paper inside its tested range' },
       { sleeve: 7, why: 'Not due' },
     ],
+    narrower: [
+      { book: 'IN', lever: 'timing', ranges: [{ name: 'timing_sessions', value: 3 }], why: 'Waits lost 18.1 bp to the Rule plan over 3 months' },
+      { book: 'IN', lever: 'size', ranges: [{ name: 'size_min', value: 0.4 }, { name: 'size_max', value: 1.25 }], why: 'Sizes' },
+      { book: 'IN', lever: 'timing', ranges: [{ name: 'rebalance_under', value: 0.01 }], why: 'Not its range' },
+    ],
   }
   ws.setWorkerCli('claude', claudeCodeAnswering(proposing))
-  ws.setPd({ stages: [{ example: 'stages-propose.proposed.json' }, { example: 'stages-propose.not-due.json' }] })
+  ws.setPd({
+    stages: [{ example: 'stages-propose.proposed.json' }, { example: 'stages-propose.not-due.json' }],
+    judgement: [{ example: 'judgement-propose.narrower.json' }, { example: 'judgement-propose.refused.json', exitCode: 1 }],
+  })
 
   assert.equal((await step('portfolio-manager')).status, 0)
   const saved = await step('save-state')
@@ -246,6 +255,8 @@ test("on Saturdays the Portfolio Manager gets the review's figures, writes its c
     [
       ['stages', 'propose', '2', '--why', 'Three months of Paper inside its tested range', '--by', 'the Portfolio Manager'],
       ['stages', 'propose', '7', '--why', 'Not due', '--by', 'the Portfolio Manager'],
+      ['judgement', 'propose', 'IN', '--playbook', 'timing_sessions=3', '--why', 'Waits lost 18.1 bp to the Rule plan over 3 months', '--by', 'the Portfolio Manager'],
+      ['judgement', 'propose', 'IN', '--playbook', 'size_min=0.4', '--playbook', 'size_max=1.25', '--why', 'Sizes', '--by', 'the Portfolio Manager'],
     ],
   )
   const recorded = JSON.parse(ws.readRunFile(runId, 'promotions.json'))
@@ -253,6 +264,13 @@ test("on Saturdays the Portfolio Manager gets the review's figures, writes its c
   const log = ws.readRunFile(runId, 'logs', 'save-state.log')
   assert.match(log, /Proposed promoting Sleeve 2 into Real-small, as promotion 4, for Saransh's Answer/)
   assert.match(log, /Didn't propose promoting Sleeve 7: Its promotion isn't due: Its record is outside its tested range/)
+  // A narrower range waits for Saransh's Answer; ash_new refuses one that widens a range without the scorecard's support.
+  const narrowed = JSON.parse(ws.readRunFile(runId, 'narrower.json')).narrower
+  assert.deepEqual(narrowed.map((n: { lever: string; proposed: object }) => [n.lever, 'proposal' in n.proposed]), [['timing', true], ['size', false], ['timing', false]])
+  assert.match(log, /Proposed narrowing the timing Lever in the India Book, as proposal 5, for Saransh's Answer/)
+  assert.match(log, /Didn't propose narrowing the timing Lever in the India Book: It changes rebalance_under, which isn't the timing Lever's range/)
+  assert.match(log, /Didn't propose narrowing the size Lever in the India Book: It widens the size Lever's range, which needs the override scorecard's support/)
+  assert.match(ws.readRunFile(runId, 'logs', 'portfolio-manager.log'), /Proposes narrowing the timing Lever in the India Book: Waits lost 18\.1 bp/)
 })
 
 test("on a month's first Saturday the Portfolio Manager gets the monthly review's figures with the weekly ones, and writes its commentary", async () => {

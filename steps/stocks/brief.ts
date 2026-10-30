@@ -5,11 +5,14 @@
 // for approval with what it would change; each Quarantine with its flag; each Candidate waiting for
 // approval into Paper; each promotion the Portfolio Manager proposed, waiting for approval; each
 // early exit the Desk proposed, waiting for approval, and each approved one not yet sold; each
-// proposal to move a Judgement mode or change a Playbook's ranges; each market's latest session in
+// proposal to move a Judgement mode or change a Playbook's ranges, the narrower ranges the Portfolio
+// Manager proposed in this Run among them; each market's latest session in
 // the Lake against its last finished one; the To-dos the Steps raised; each Book's Sleeves with their
 // Stages and how long each has been in its Stage; on Saturdays, the weekly review (the Portfolio
 // Manager's commentary, each demotion the demotion rule made, each paper Book and Sleeve against its
-// backtest's range and its benchmark, the promotions due and Reconciliation's differences); on a
+// backtest's range and its benchmark, the promotions due, Reconciliation's differences and each paper
+// Book's override scorecard: its Overrides scored and tallied, the Levers that lost, the sum of the
+// scores beside the gap to its rules-only paper Book, and the gate for Playbook mode); on a
 // month's first Saturday, the monthly review (the Portfolio Manager's commentary, each paper Book's
 // return over the month attributed to its sources, the correlation between its Sleeves, its drawdown
 // against its limits and the promotions due); each
@@ -42,8 +45,8 @@ import { comingDays, comingEvents, kindName } from '../../src/feeds.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
-import { changeText, decisionText, modeName, proposalText } from '../../src/judgement.ts'
-import type { PdBook, PdBookState, PdEarlyExit, PdFeeds, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import { changeText, decisionText, modeName, proposalText, sentence } from '../../src/judgement.ts'
+import type { PdBook, PdBookState, PdEarlyExit, PdFeeds, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally } from '../../src/pd.ts'
 import { analystName, breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -56,7 +59,7 @@ import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 import type { BookStates } from './plan.ts'
 import type { PortfolioManagerResult } from './portfolio-manager.ts'
-import type { PromotionsResult } from './save-state.ts'
+import type { NarrowerResult, PromotionsResult } from './save-state.ts'
 
 /** Escapes text for HTML, so nothing from the Lake or a log is read as markup. */
 const esc = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
@@ -293,16 +296,24 @@ function candidatesSection(stages: PdStagesCheck | null): string {
   ].join('\n')
 }
 
+/** The proposals waiting on Saransh: those the Check Step read, then the narrower ranges Save state recorded in this Run. */
+function waitingProposals(modes: PdJudgementShow | null, narrower: NarrowerResult | null): PdJudgementProposal[] {
+  const proposed = (narrower?.narrower ?? []).flatMap(({ proposed }) => ('proposal' in proposed ? [proposed.proposal] : []))
+  const found = [...(modes?.proposals ?? []), ...proposed]
+  return found.filter((p, i) => found.findIndex((q) => q.id === p.id) === i)
+}
+
 /** Each proposal to move a Book's Judgement mode or change its Playbook's ranges, with its Answer buttons; nothing when none waits. */
-function proposalsSection(modes: PdJudgementShow | null): string {
-  if (!modes?.proposals.length) return ''
-  const books = new Map(modes.books.map((b) => [b.book, b.name]))
-  const rows = modes.proposals.map((p) => {
-    const book = books.get(p.book) ?? p.book
+function proposalsSection(waiting: PdJudgementProposal[], modes: PdJudgementShow | null): string {
+  if (!waiting.length) return ''
+  const books = new Map((modes?.books ?? []).map((b) => [b.book, b.name]))
+  const rows = waiting.map((p) => {
+    // A proposal made in this Run may be of a Book the Check Step's read didn't have.
+    const book = books.get(p.book) ?? bookNames[p.book]?.replace(/^the /, '') ?? p.book
     return [String(p.id), esc(proposalText(p, book)), esc(`${p.at.slice(0, 10)}, ${p.by}`), esc(p.why), answerButtons(answerItem('judgement', p.id))]
   })
   return [
-    `<section><h2>Judgement proposals waiting for your Answer: ${modes.proposals.length}</h2>`,
+    `<section><h2>Judgement proposals waiting for your Answer: ${waiting.length}</h2>`,
     "<p>A Book's Judgement mode and its Playbook's ranges change only by your Answer. Approve or reject each, then Save answers: the next Run records your Answers in ash_new, and an approved range is in force from then on, under a new Playbook version.</p>",
     table(['Id', 'Proposal', 'Proposed', 'Why', 'Your Answer'], rows),
     '</section>',
@@ -517,6 +528,84 @@ function reviewCells(judged: Judged): string[] {
   ]
 }
 
+/** Each kind of Override as the scorecard names it. */
+const overrideKind: Record<PdScorecard['overrides'][number]['kind'], string> = {
+  drop: 'Veto',
+  resize: 'Size change',
+  swap: 'Swap',
+  wait: 'Wait',
+  release: 'Release',
+  trim: 'Trim',
+  skip: 'Rebalance skipped',
+  exposure: 'Exposure cut',
+  early_exit: 'Early exit',
+}
+
+/** Basis points of a Book: +12.5 bp. */
+const bp = (bps: number) => `${bps > 0 ? '+' : ''}${bps.toFixed(1)} bp`
+
+/** A tally's row: what it counts, then those judged and open, its hit rate and what those judged made. */
+function tallyRow(label: string, row: PdTally, currency: string): string[] {
+  const rate = row.hit_rate === null ? '—' : percent(row.hit_rate)
+  return [esc(label), String(row.count), String(row.open), esc(rate), esc(row.count ? `${money(row.value, currency)}, ${bp(row.bps)}` : '—')]
+}
+
+/** The gate for moving a paper Book's real Book to Playbook mode, in a sentence. */
+function gateText(gate: NonNullable<PdScorecard['gate']>): string {
+  if (gate.status !== 'judged' || !gate.paper || !gate.rules_only || !gate.bar || !gate.matched) return `The gate for Playbook mode: ${sentence(gate.why ?? 'not judged yet')}`
+  const misses = [!gate.matched.return && 'on return', !gate.matched.drawdown && 'on max drawdown'].filter(Boolean).join(' or ')
+  const verdict = gate.passed ? 'It matched it: its real Book may move to Playbook mode by your Answer.' : `It didn't match it ${misses}.`
+  return `The gate for Playbook mode, over the 3 months from ${gate.start} to ${gate.end}: the paper Book made ${percent(gate.paper.return)} at a max drawdown of ${percent(gate.paper.max_drawdown)}, its rules-only paper Book ${percent(gate.rules_only.return)} at ${percent(gate.rules_only.max_drawdown)}, by the bar fixed on ${gate.bar.fixed_on}. ${verdict}`
+}
+
+/**
+ * A paper Book's override scorecard: the gate for moving its real Book to Playbook mode, the sum of
+ * its Overrides' scores beside its gap to its rules-only paper Book, each Override open or judged in
+ * the last 3 months, the tallies by Lever, analyst and Lesson, and each Lever that lost over the last
+ * 3 months with the narrower range proposed for it.
+ */
+function scorecardPart(card: PdScorecard, narrower: NarrowerResult['narrower']): string {
+  if (card.status !== 'scored') return ''
+  const at = (amount: number) => money(amount, card.currency)
+  const out = ['<h4>Override scorecard</h4>']
+  if (card.gate) out.push(`<p>${esc(gateText(card.gate))}</p>`)
+  const sum = card.sum_and_gap
+  if (sum) {
+    const since = sum.from_start ? `since the two paper Books started on ${sum.start}` : `since ${sum.start}`
+    out.push(`<p>${esc(`The scores of the ${plural(sum.overrides, 'Override')} made ${since} add up to ${bp(sum.sum_bps)}; the paper Book's gap to its rules-only paper Book over the same closes is ${bp(sum.gap_bps)}. ${sentence(sum.note)}`)}</p>`)
+  }
+  if (card.overrides.length) {
+    const rows = card.overrides.map((o) => [
+      esc(o.session),
+      esc(`${overrideKind[o.kind]}${o.security_id ? ` of ${o.name ?? o.security_id}` : ''}`),
+      esc(o.lever === 'early_exit' ? 'None: your Answer' : capitalised(o.lever)),
+      esc(o.analysts.length ? o.analysts.map((a) => analystName[a]).join(', ') : '—'),
+      esc(o.expected ?? ''),
+      esc(o.status === 'judged' ? (o.judged_on ?? '') : `Open: judged on ${o.judged_on ?? "the track's sale"}, valued to ${o.valued_to}`),
+      esc(`${at(o.value)}${o.bps === null ? '' : `, ${bp(o.bps)}`}`),
+      o.came_true === null ? '—' : o.came_true ? 'Yes' : 'No',
+    ])
+    out.push(table(['Session', 'Override', 'Lever', 'Views', 'Expected', 'Judged on', 'Against the Rule plan', 'Beat it'], rows))
+  } else out.push('<p>No Override is open or was judged in the last 3 months.</p>')
+  const { lever, analyst, lesson } = card.tallies
+  const tallies = [
+    ...lever.map((row) => tallyRow(`Lever: ${row.key === 'early_exit' ? 'early exits' : row.key}`, row, card.currency)),
+    ...analyst.map((row) => tallyRow(`Analyst: ${row.key === 'none' ? 'none, the Portfolio Manager alone' : analystName[row.key as DeskView['analyst']]}`, row, card.currency)),
+    ...lesson.map((row) => tallyRow(`Lesson: ${row.key}`, row, card.currency)),
+  ]
+  if (tallies.length) out.push('<p>Every Override so far, tallied:</p>', table(['', 'Judged', 'Open', 'Hit rate', 'Against the Rule plan'], tallies))
+  for (const row of (card.lost_levers?.levers ?? []).filter((r) => r.lost)) {
+    const proposed = narrower.find((n) => n.lever === row.key)
+    const outcome = !proposed
+      ? 'The Portfolio Manager proposed no narrower range for it.'
+      : 'proposal' in proposed.proposed
+        ? `The Portfolio Manager proposes a narrower range: proposal ${proposed.proposed.proposal.id}, waiting for your Answer.`
+        : `The Portfolio Manager's narrower range couldn't be proposed: ${sentence(proposed.proposed.error)}`
+    out.push(`<p>${esc(`The ${row.key} Lever lost to the Rule plan over the 3 months from ${card.lost_levers!.start}: ${at(row.value)}, ${bp(row.bps)}, over ${plural(row.count, 'Override')}. ${outcome}`)}</p>`)
+  }
+  return out.join('\n')
+}
+
 /** A demotion in a sentence: what the demotion rule did, or would have, and why. */
 function demotionText(d: PdReview['demotions'][number], books: Map<string, ReviewedBook>): string {
   const book = books.get(d.book)
@@ -531,7 +620,7 @@ function demotionText(d: PdReview['demotions'][number], books: Map<string, Revie
  * promotions due and each real Book's Reconciliation differences; that it couldn't be had when the
  * Review Step failed, and nothing on other days.
  */
-function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioManagerResult | null): string {
+function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioManagerResult | null, narrower: NarrowerResult | null): string {
   const step = run.steps.find((s) => s.name === 'review')
   if (!review)
     return step?.status === 'failed' ? `<section><h2>Weekly review</h2><p>The weekly review's figures couldn't be had in this Run. See the Review Step's log: ${logLink(step.log ?? 'logs/review.log')}</p></section>` : ''
@@ -539,7 +628,7 @@ function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioMan
   const books = new Map(review.books.map((b) => [b.book, b]))
   const head = ['', 'Stage', 'Live return', 'Drawdown', 'Benchmark', "Backtest's worst", 'Return against its range', 'Its tested range']
   const sections = review.books
-    .filter((b) => b.paper.status !== 'not_started' || b.sleeves.length || b.reconciliation?.differences.length)
+    .filter((b) => b.paper.status !== 'not_started' || b.sleeves.length || b.reconciliation?.differences.length || b.scorecard.status === 'scored')
     .map((book) => {
       const rows = [
         ['Paper Book', '', ...reviewCells(book.paper)],
@@ -550,6 +639,7 @@ function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioMan
         `<h3>${esc(book.name)}</h3>`,
         table(head, rows),
         ...(differences.length ? [`<p>Reconciliation, as of ${esc(book.reconciliation!.as_of)}:</p>`, list(differences.map((d) => esc(differenceText(d, book))))] : []),
+        scorecardPart(book.scorecard, (narrower?.narrower ?? []).filter((n) => n.book === book.book)),
       ].join('\n')
     })
   const due = review.promotions_due.map((p) => {
@@ -563,6 +653,7 @@ function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioMan
     ...(sections.length ? sections : ['<p>No Book has a live record yet.</p>']),
     due.length ? `<h3>Promotions due</h3>\n${list(due)}` : '',
     `<p class="muted">Each live record is measured against its backtest over the ten years before it began, and against its benchmark over the same sessions. A strategy is demoted when its live drawdown passes 1.5 times its backtest's worst, or after 12 months its rolling 12-month return falls under its backtest's 5th percentile.${review.gate.verdict === 'fail' ? ' The Data gate failed, so no demotion was applied.' : ''}</p>`,
+    "<p class=\"muted\">The override scorecard scores each Override against the Rule plan's order, held until its strategy's own track sold the name or the session its Decision record named when it was made, never a later one. A Lever that keeps losing to the Rule plan is proposed for a narrower range, and a range widens only when its Lever's Overrides beat the Rule plan. Whether a real Book moves to Playbook mode is decided by its paper Book's gap to its rules-only paper Book over 3 months, by a bar fixed before they began.</p>",
     '</section>',
   ]
     .filter(Boolean)
@@ -1125,16 +1216,19 @@ interface Inputs {
   modes: PdJudgementShow | null
   /** On Saturdays, the weekly review's figures. */
   review: PdReview | null
+  /** The narrower Playbook ranges Save state proposed in this Run. */
+  narrower: NarrowerResult | null
   /** The promotions Save state recorded in this Run. */
   promotions: PromotionsResult | null
   todos: { step: string; todo: string }[]
 }
 
-function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, todos }: Inputs): string {
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, narrower, todos }: Inputs): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   const promoting = waitingPromotions(stages, promotions)
   const exits = openExits(modes, desk)
+  const proposals = waitingProposals(modes, narrower)
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -1153,11 +1247,11 @@ ${quarantineSection(waiting)}
 ${candidatesSection(stages)}
 ${promotionsSection(promoting, stages)}
 ${exitsSection(exits)}
-${proposalsSection(modes)}
+${proposalsSection(proposals, modes)}
 ${marketsSection(status)}
 ${todosSection(todos)}
 ${stagesSection(run, stages)}
-${reviewSection(run, review, pm)}
+${reviewSection(run, review, pm, narrower)}
 ${monthlySection(review, pm)}
 ${booksSection(run, inbox)}
 ${eventsSection(run, feeds)}
@@ -1170,7 +1264,7 @@ ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
-${saveAnswers(run.id, waitingItems(waiting, stages, modes, promoting, exits))}
+${saveAnswers(run.id, waitingItems(waiting, stages, { books: [], exits: [], ...modes, proposals }, promoting, exits))}
 </body>
 </html>
 `
@@ -1205,6 +1299,7 @@ await runAsStep(({ runId, runFolder, force }) => {
       modes: read<PdJudgementShow>('judgement-show.json'),
       review: read<PdReview>('review.json'),
       promotions: read<PromotionsResult>('promotions.json'),
+      narrower: read<NarrowerResult>('narrower.json'),
       todos: readTodos(runFolder),
     }),
   )
