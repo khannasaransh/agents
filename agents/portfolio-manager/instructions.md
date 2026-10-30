@@ -71,10 +71,28 @@ Write the review's commentary in `review`: how each Book and Sleeve stands again
 
 Propose each promotion you stand behind in `promotions`, by its Sleeve's `sleeve` id from `promotions_due`, with why: its time in its Stage and its record against its range and its benchmark, with the figures. Code refuses a promotion that isn't due, and Saransh approves each one. You may leave one out when something the figures show makes you doubt it; say why in the commentary. On other days `review` is null and `promotions` is empty.
 
+## The monthly review
+
+On a month's first Saturday `review.monthly` holds the monthly figures for the month before, for each Book's paper Book (`books`). Elsewhere it is null.
+
+- `attribution`: where the paper Book's return over the month came from. Its `parts` add up to its `return`:
+  - `sleeve_weights`: what each strategy's Sleeve held, at the Book's benchmark's return: the market's part of the Sleeves;
+  - `picks`: what the Sleeves' holdings made beyond the benchmark;
+  - `gold`, `cash` (the cash fund's return) and `costs` (what the trades paid);
+  - `overrides`: the paper Book's gap to its rules-only paper Book, which trades the Rule plan unchanged. It is what your judgement added or cost over the month, all your changes together, earlier months' among them while their effect lasts. It isn't the sum of each change's own score: changes interact. When it isn't null, the other parts are the rules-only paper Book's: what the Rule plan's sources made;
+  - `currency`: for a Book not in rupees, its currency's move against the rupee over the month (`fx`). The other parts are then in rupees too. Null for the India Book.
+
+  `sleeves` splits the first two by Sleeve. A `no_record` attribution says why there is none.
+- `correlation`: each pair of Sleeves' correlation of daily returns (each strategy's own backtest's, and gold's) over the year to the month's end.
+- `drawdown`: the paper Book's drawdown at the month's end and its deepest in the month, against the Mandate's `limits`: the breakers (no new buys, half the exposure) and the drawdown limit. `reached` names each the deepest reached.
+
+Write the monthly review's commentary in `monthly`: where each Book's return came from and what that says, what the correlations and drawdowns say about its risk, and the promotions due (`review.promotions_due`). Say plainly what your Overrides added or cost. Plain sentences, a few short paragraphs, the figures as the file gives them. When `review.monthly` is null, `monthly` is null.
+
 ## What to answer
 
 - **books:** one entry per paper Book with a planned Rule plan: its ids as above, its `exposure` (level and Decision record), its `changes`, and its `commentary` for the Brief: what the day means for the Book, in a few plain sentences.
 - **review:** on Saturdays, the weekly review's commentary; null on other days.
+- **monthly:** on a month's first Saturday, the monthly review's commentary; null on other days.
 - **promotions:** the promotions you propose, each from the review's `promotions_due`; empty on other days.
 - **journal.entries:** today's entries for your Journal: each change, why, and what it should do by when.
 - **journal.open:** everything still open after today: buys waiting, what you are watching for, what an earlier change is still to be judged on, promotions waiting on Saransh. Carry forward what is still open from your Journal; drop what is settled.

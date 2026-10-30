@@ -17,6 +17,7 @@ const result = () => JSON.parse(ws.readRunFile(runId, 'portfolio-manager.json'))
 const answer = {
   books: example('judgement.answered.json').books,
   review: null,
+  monthly: null,
   promotions: [],
   journal: { entries: ['Dropped Rategain: the weakest RS Rating of the plan in a Correction; judge on 2026-12-24'], open: ['Is Rategain still lagging on 2026-12-24?'] },
 }
@@ -231,6 +232,20 @@ test("on Saturdays the Portfolio Manager gets the review's figures, writes its c
   const log = ws.readRunFile(runId, 'logs', 'save-state.log')
   assert.match(log, /Proposed promoting Sleeve 2 into Real-small, as promotion 4, for Saransh's Answer/)
   assert.match(log, /Didn't propose promoting Sleeve 7: Its promotion isn't due: Its record is outside its tested range/)
+})
+
+test("on a month's first Saturday the Portfolio Manager gets the monthly review's figures with the weekly ones, and writes its commentary", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', example('review.monthly.json'))
+  const monthly = "The India Book made 2.1% in October: 1.1% from the market through its Sleeve's weight, 0.6% from its picks, and 0.1% from my Overrides."
+  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, review: 'Both Books are inside their tested ranges.', monthly }))
+
+  assert.equal((await step('portfolio-manager')).status, 0)
+
+  const [call] = ws.workerCliCalls('claude')
+  assert.deepEqual((promptInput(call.stdin, 'review') as { monthly: unknown }).monthly, example('review.monthly.json').monthly)
+  assert.match(call.stdin, /The monthly review/)
+  assert.equal(result().answer.monthly, monthly)
 })
 
 test('a weekly review is commented on even on a day the Plan Step failed', async () => {

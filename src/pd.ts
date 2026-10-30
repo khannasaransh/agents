@@ -357,6 +357,75 @@ export interface PdReview {
   }[]
   demotions: (PdDemotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string })[]
   promotions_due: (PdPromotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string; from: PdStage })[]
+  /** With --month (the first Saturday of a month, of the month before): the monthly review; else null. */
+  monthly: PdMonthlyReview | null
+}
+
+/** Where a paper Book's return over a month came from: each source's part, adding up to its return. */
+export interface PdAttributionParts {
+  /** Each strategy's Sleeve's holdings after the open's trades, at the Book's benchmark's return. */
+  sleeve_weights: number
+  /** What the Sleeves' holdings made beyond the benchmark. */
+  picks: number
+  gold: number
+  /** What the cash fund earned, the Sleeves' own cash among it. */
+  cash: number
+  /** What the trades paid: less than nothing. */
+  costs: number
+  /** The paper Book's gap to its rules-only paper Book (not the sum of the Overrides' scores); null without it. */
+  overrides: number | null
+  /** For a Book not in rupees, its currency's move against the rupee; null for one in rupees, or without the rates. */
+  currency: number | null
+}
+
+/**
+ * The monthly review (ash_new's `pipeline.attribution`): for each Book's paper Book over the month, its
+ * return attributed to its sources, the correlation between its Sleeves (each strategy's own backtest's
+ * daily returns, and gold's, over the year to the month's end) and its drawdown against its limits.
+ */
+export interface PdMonthlyReview {
+  /** YYYY-MM, and its first and last days. */
+  month: string
+  start: string
+  end: string
+  books: {
+    book: 'IN' | 'US' | 'HK'
+    name: string
+    currency: string
+    attribution: {
+      /** no_record: its paper Book filled no close in the month. */
+      status: 'measured' | 'no_record'
+      why: string | null
+      /** The close before the month's first close filled, and its last. */
+      start: string | null
+      end: string | null
+      sessions: number
+      /** What its return and parts are in: rupees, or the Book's currency without the rates. */
+      currency: string
+      return: number | null
+      local_return: number | null
+      rules_only_return: number | null
+      benchmark_return: number | null
+      parts: PdAttributionParts | null
+      sleeves: { strategy_id: string; weights: number; picks: number }[]
+      overrides_why: string | null
+      /** The Book's currency in rupees at the start and the end, and its move. */
+      fx: { from: number; to: number; move: number } | null
+      currency_why: string | null
+    }
+    correlation: { start: string; end: string; pairs: { a: string; b: string; correlation: number | null }[]; why: string | null }
+    drawdown: {
+      status: 'measured' | 'no_record'
+      why: string | null
+      end: string | null
+      /** At the month's last close filled, and the deepest in the month. */
+      drawdown: number | null
+      max_drawdown: number | null
+      limits: { no_new_buys_at: number; halve_exposure_at: number; drawdown_limit: number }
+      /** Each limit the month's deepest reached. */
+      reached: ('no_new_buys_at' | 'halve_exposure_at' | 'drawdown_limit')[]
+    }
+  }[]
 }
 
 /**

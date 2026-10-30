@@ -7,9 +7,10 @@ import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
 let ws: Workspace
 afterEach(() => ws.cleanup())
 
-// A Saturday's Run, and a Tuesday's.
+// A Saturday's Run, a Tuesday's, and the first Saturday of November's.
 const saturday = '2026-10-31-0930'
 const tuesday = '2026-10-27-0930'
+const firstSaturday = '2026-11-07-0930'
 const stocksSteps = ['lake', 'review', 'stages', 'brief'].map((name) => ({ name, status: 'pending' }))
 
 function prepare(runId: string, { dryRun = false } = {}) {
@@ -47,6 +48,19 @@ test("on a Saturday it gets the weekly figures from pd review and keeps them for
   assert.match(log(saturday), /India Book: paper Book 2\.2% since 2026-07-30; 1 Sleeve reviewed/)
   assert.match(log(saturday), /US Book: paper Book not started; 0 Sleeves reviewed/)
   assert.match(log(saturday), /Due: in-super30-ok-tuned in the IN Book, from Paper to Real-small, since 2026-10-29/)
+})
+
+test("on a month's first Saturday it adds the monthly review of the month before: pd review --month", async () => {
+  prepare(firstSaturday)
+  ws.setPd({ review: { example: 'review.monthly.json' } })
+
+  const result = await ws.agents('step', 'review', '--run', firstSaturday)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.pdCalls().map((call) => call.args), [['review', '--month', '2026-10']])
+  assert.deepEqual(JSON.parse(ws.readRunFile(firstSaturday, 'review.json')), example('review.monthly.json'))
+  assert.match(log(firstSaturday), /India Book in 2026-10: 2\.1% in INR, attributed to its sources/)
+  assert.match(log(firstSaturday), /US Book in 2026-10: 2\.3% in INR, attributed to its sources/)
 })
 
 test('a demotion the demotion rule made is in the log', async () => {

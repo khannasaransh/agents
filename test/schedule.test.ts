@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { agentsRoot } from '../src/paths.ts'
-import { allowsWakeTimers, launchdEntry, loadSchedules, machineSchedules, taskSchedulerEntry, type NamedSchedule } from '../src/schedule.ts'
+import { allowsWakeTimers, launchdEntry, loadSchedules, machineSchedules, monthReviewed, taskSchedulerEntry, type NamedSchedule } from '../src/schedule.ts'
 import { makeWorkspace } from './helpers.ts'
 
 const install = { node: '/opt/homebrew/bin/node', shellPath: '/opt/homebrew/bin:/usr/bin:/bin', dataDir: '/Users/saransh/agents/data' }
@@ -56,6 +56,14 @@ test('the weekly Schedule runs the weekly Pipeline on the Mac, on Sunday at 05:3
     ['/opt/homebrew/bin/node', join(agentsRoot, 'src', 'cli.ts'), 'run', 'weekly', '--scheduled'],
   )
   assert.deepEqual(calendarTimes(plist), [[0, 5, 30]])
+})
+
+test("a Run on a month's first Saturday reviews the month before; any other Run, no month", () => {
+  assert.equal(monthReviewed('2026-11-07-0930'), '2026-10')
+  assert.equal(monthReviewed('2027-01-02-0930'), '2026-12')
+  // The second Saturday, and the first Friday.
+  assert.equal(monthReviewed('2026-11-14-0930'), null)
+  assert.equal(monthReviewed('2026-11-06-0930'), null)
 })
 
 test('each machine installs only its own Schedules', async () => {

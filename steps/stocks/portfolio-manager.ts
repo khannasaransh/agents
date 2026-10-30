@@ -1,7 +1,8 @@
 // Portfolio Manager: the Portfolio Manager Agent judges each paper Book's Rule plan within its
 // Playbook: its exposure level for the day and its changes from the Rule plan, each with a Decision
 // record, the Brief's commentary on each Book, and its Journal's new entries. On Saturdays it also
-// writes the weekly review's commentary and proposes the promotions the review lists as due. It runs
+// writes the weekly review's commentary and proposes the promotions the review lists as due, and on
+// a month's first Saturday the monthly review's commentary. It runs
 // read-only in the Run folder, on Claude Code with Codex as fallback, given the Rule plans, the Book
 // states, the Stages, the Health Agent's diagnosis, the review's figures (null on other days) and its
 // Journal (the dossiers are null until issue 37). Its answer is kept as portfolio-manager.json, with
@@ -27,6 +28,8 @@ export interface PortfolioManagerAnswer {
   books: PdJudgedBook[]
   /** On Saturdays, the weekly review's commentary; null on other days. */
   review: string | null
+  /** On a month's first Saturday, the monthly review's commentary; null on other days. */
+  monthly: string | null
   /** The promotions it proposes, each by its Sleeve's id. */
   promotions: { sleeve: number; why: string }[]
   journal: { entries: string[]; open: string[] }

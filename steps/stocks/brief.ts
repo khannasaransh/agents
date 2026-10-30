@@ -8,7 +8,10 @@
 // the Lake against its last finished one; the To-dos the Steps raised; each Book's Sleeves with their
 // Stages and how long each has been in its Stage; on Saturdays, the weekly review (the Portfolio
 // Manager's commentary, each demotion the demotion rule made, each paper Book and Sleeve against its
-// backtest's range and its benchmark, the promotions due and Reconciliation's differences); each
+// backtest's range and its benchmark, the promotions due and Reconciliation's differences); on a
+// month's first Saturday, the monthly review (the Portfolio Manager's commentary, each paper Book's
+// return over the month attributed to its sources, the correlation between its Sleeves, its drawdown
+// against its limits and the promotions due); each
 // Book's real holdings and value, its latest Reconciliation's differences and this Run's Broker inbox
 // files; each market's Market condition with MarketSmith's outlook beside it and each Book's exposure
 // level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's state
@@ -328,6 +331,84 @@ function promotionsSection(waiting: PdStageProposal[], stages: PdStagesCheck | n
     table(['Id', 'Book', 'Strategy', 'Promotion', 'Proposed', 'Why', 'Your Answer'], rows),
     '</section>',
   ].join('\n')
+}
+
+type MonthlyBook = NonNullable<PdReview['monthly']>['books'][number]
+
+/** A part of a month's return, to the hundredth of a point: a part of a month is often under a tenth. */
+const part = (share: number) => `${(Math.round(share * 10_000) / 100).toFixed(2)}%`
+
+/** The month YYYY-MM in words: October 2026. */
+const monthName = (month: string) => {
+  const [year, number] = month.split('-').map(Number)
+  return new Date(year, number - 1, 1).toLocaleString('en-GB', { month: 'long', year: 'numeric' })
+}
+
+/** A currency against the rupee, as the attribution's row names it. */
+const currencyName: Record<string, string> = { USD: 'The dollar against the rupee', HKD: 'The Hong Kong dollar against the rupee' }
+
+/** The Mandate's drawdown limits in words. */
+const limitName = { no_new_buys_at: 'no new buys', halve_exposure_at: 'half the exposure level', drawdown_limit: 'the drawdown limit' } as const
+
+/** A Book's month: its return attributed to its sources, the correlation between its Sleeves and its drawdown against its limits. */
+function monthlyBookPart(book: MonthlyBook, names: Map<string, string>): string {
+  const { attribution: a, correlation: c, drawdown: d } = book
+  const name = (id: string) => (id === 'gold' ? 'Gold' : (names.get(id) ?? id))
+  const out = [`<h3>${esc(book.name)}</h3>`]
+  if (a.parts && a.return !== null) {
+    const p = a.parts
+    const rows = [
+      ['Sleeve weights', esc(part(p.sleeve_weights)), "Each Sleeve's holdings at the benchmark's return"],
+      ['Picks within Sleeves', esc(part(p.picks)), "What the Sleeves' holdings made beyond the benchmark"],
+      ['Gold', esc(part(p.gold)), ''],
+      ['Cash', esc(part(p.cash)), "The cash fund's return"],
+      ['Costs', esc(part(p.costs)), ''],
+      ['Overrides', p.overrides === null ? '—' : esc(part(p.overrides)), p.overrides === null ? esc(a.overrides_why ?? '') : 'The paper Book against its rules-only paper Book'],
+      ...(p.currency !== null && a.fx ? [[esc(currencyName[book.currency] ?? book.currency), esc(part(p.currency)), esc(`${a.fx.from.toFixed(2)} to ${a.fx.to.toFixed(2)} rupees`)]] : []),
+      ['<strong>Its return</strong>', `<strong>${esc(part(a.return))}</strong>`, esc(`In ${a.currency === 'INR' ? 'rupees' : a.currency}, ${plural(a.sessions, 'session')} from ${a.start}'s close to ${a.end}'s`)],
+    ]
+    out.push(table(['Source', 'Part of its return', ''], rows))
+    if (a.sleeves.length > 1) out.push(list(a.sleeves.map((s) => esc(`${name(s.strategy_id)}: ${part(s.weights)} from its weight, ${part(s.picks)} from its picks`))))
+    const versus = [a.benchmark_return !== null ? `its benchmark made ${part(a.benchmark_return)}` : null, a.rules_only_return !== null ? `its rules-only paper Book ${part(a.rules_only_return)}` : null].filter(Boolean)
+    if (versus.length) out.push(`<p>Over the month ${esc(versus.join(' and '))}${a.currency === book.currency ? '' : esc(` in ${book.currency}`)}.</p>`)
+    if (a.currency_why) out.push(`<p class="muted">${esc(a.currency_why)}.</p>`)
+  } else out.push(`<p class="muted">${esc(a.why ?? 'Nothing to attribute')}.</p>`)
+  if (c.pairs.length)
+    out.push(
+      `<p>The correlation of the Sleeves' daily returns from ${esc(c.start)} to ${esc(c.end)}:</p>`,
+      table(['Sleeves', 'Correlation'], c.pairs.map((pair) => [esc(`${name(pair.a)} and ${name(pair.b)}`), pair.correlation === null ? '—' : esc(pair.correlation.toFixed(2))])),
+    )
+  if (d.status === 'measured' && d.drawdown !== null && d.max_drawdown !== null) {
+    const limits = (Object.keys(limitName) as (keyof typeof limitName)[]).map((key) => `${percent(d.limits[key])} for ${limitName[key]}`).join(', ')
+    const reached = d.reached.length ? ` Its deepest reached ${d.reached.map((key) => limitName[key]).join(' and ')}.` : ' It reached none of them.'
+    out.push(`<p>${esc(`Its drawdown: ${percent(d.drawdown)} at the month's end, ${percent(d.max_drawdown)} at its deepest; its limits ${limits}.${reached}`)}</p>`)
+  }
+  return out.join('\n')
+}
+
+/**
+ * On a month's first Saturday, the monthly review of the month before: the Portfolio Manager's
+ * commentary, each Book's return over the month attributed to its sources, the correlation between its
+ * Sleeves, its drawdown against its limits, and the promotions due. Nothing on other days.
+ */
+function monthlySection(review: PdReview | null, pm: PortfolioManagerResult | null): string {
+  const monthly = review?.monthly
+  if (!review || !monthly) return ''
+  const commentary = pm?.status === 'answered' ? pm.answer.monthly : null
+  const names = new Map(review.books.flatMap((b) => b.sleeves.map((s) => [s.strategy_id, s.name ?? s.strategy_id] as const)))
+  const books = monthly.books.filter((b) => b.attribution.status === 'measured' || b.drawdown.status === 'measured')
+  const reviewed = new Map(review.books.map((b) => [b.book, b]))
+  const due = review.promotions_due.map((p) => esc(`${names.get(p.strategy_id) ?? p.strategy_id} in the ${reviewed.get(p.book)?.name ?? p.book}: from ${stageName(p.from)} to ${p.to_name}`))
+  return [
+    `<section><h2>Monthly review: ${esc(monthName(monthly.month))}</h2>`,
+    commentary ? `<p class="text">${esc(commentary)}</p>` : pm?.status === 'failed' ? '<p class="muted">The Portfolio Manager failed, so the monthly review has no commentary.</p>' : '',
+    ...(books.length ? books.map((b) => monthlyBookPart(b, names)) : [`<p>No paper Book filled a close in ${esc(monthName(monthly.month))}.</p>`]),
+    `<h3>Promotions due</h3>\n${due.length ? list(due) : '<p>None.</p>'}`,
+    "<p class=\"muted\">Each paper Book's return is attributed close by close, so the parts add up to it. A Sleeve's weight is what it held at its Book's benchmark's return; its picks, what its holdings made beyond that. The Overrides' part is the paper Book's gap to its rules-only paper Book, which trades the Rule plan unchanged: what the Portfolio Manager's changes did together, not the sum of their own scores, and it lasts as long as their effect does, past the month they were made. The other parts are then the rules-only paper Book's: what the Rule plan's sources made. A Book not in rupees is in rupees here, its currency's move a part of its own.</p>",
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 type ReviewedBook = PdReview['books'][number]
@@ -949,6 +1030,7 @@ ${marketsSection(status)}
 ${todosSection(todos)}
 ${stagesSection(run, stages)}
 ${reviewSection(run, review, pm)}
+${monthlySection(review, pm)}
 ${booksSection(run, inbox)}
 ${plansSection(run, plan, states)}
 ${judgementSection(run, pm, check, modes)}

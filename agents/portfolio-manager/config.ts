@@ -98,23 +98,28 @@ const portfolioManager: AgentConfig = {
     bookStates: `The state each plan was made from (${inputFiles.bookStates}): holdings, cash, open orders and Disaster stops`,
     stages: `Each Book's Sleeves and their Stages (${inputFiles.stages}); null when they couldn't be read`,
     health: `The Health Agent's diagnosis of the Lake in this Run (${inputFiles.health}); null when the Lake was healthy and it didn't run`,
-    review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, and each real Book's Reconciliation differences; null on other days`,
+    review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, and each real Book's Reconciliation differences; on a month's first Saturday also the monthly review of the month before (monthly): each paper Book's return attributed to its sources, the correlation between its Sleeves and its drawdown against its limits; null on other days`,
     dossiers: "The dossiers of the Rule plan's names: null until the Feeds and dossiers are built",
     journal: 'Your Journal: the Decision records behind your earlier changes, what each was expected to do, and what is still open. Empty when you have none yet',
   },
   outputs: {
     books: "Your judgement of each paper Book's Rule plan: its exposure level for the day and your changes, each with its Decision record, and the Brief's commentary on it",
     review: "On Saturdays, the weekly review's commentary for the Brief; null on other days",
+    monthly: "On a month's first Saturday, the monthly review's commentary for the Brief; null on other days",
     promotions: "The promotions you propose for Saransh's Answer: only those the review lists as due",
     journal: "The Journal's new entries, and the whole list of what is still open",
   },
   outputSchema: {
     type: 'object',
     additionalProperties: false,
-    required: ['books', 'review', 'promotions', 'journal'],
+    required: ['books', 'review', 'monthly', 'promotions', 'journal'],
     properties: {
       books: { type: 'array', items: book },
       review: nullable('string', "The weekly review's commentary for the Brief, in a few short paragraphs: how each Book and Sleeve stands against its tested range and its benchmark, the demotions and why, the promotions due, and Reconciliation's differences. Null when there is no review"),
+      monthly: nullable(
+        'string',
+        "The monthly review's commentary for the Brief, in a few short paragraphs: where each Book's return over the month came from, what the correlation between its Sleeves and its drawdown against its limits say about its risk, and the promotions due. Null when the review has no monthly figures",
+      ),
       promotions: {
         type: 'array',
         description: "Each promotion you propose, from the review's promotions_due. Empty on other days",

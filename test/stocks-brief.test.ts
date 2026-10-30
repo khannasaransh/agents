@@ -654,6 +654,38 @@ test("on Saturdays the weekly review shows the Portfolio Manager's commentary an
   assert.doesNotMatch(page, /US Book .* Paper Book/, 'a Book with no record and no Sleeve is left out')
 })
 
+test("on a month's first Saturday the monthly review attributes each Book's return to its sources, with the correlation between its Sleeves, its drawdown against its limits and the promotions due", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.monthly.json')))
+  const monthly = 'The India Book made 2.1% in October, most of it from the market through its Sleeve.'
+  ws.writeRunFile(runId, 'portfolio-manager.json', { status: 'answered', answer: { books: [], review: null, monthly, promotions: [], journal: { entries: [], open: [] } }, journalRead: '', inputs: [] })
+
+  const page = text(await brief())
+
+  assert.match(page, new RegExp(`Monthly review: October 2026 ${monthly}`))
+  assert.match(
+    page,
+    /India Book Source Part of its return Sleeve weights 1\.05% .* Picks within Sleeves 0\.62% .* Gold 0\.31% Cash 0\.11% .* Costs -0\.09% Overrides 0\.13% The paper Book against its rules-only paper Book Its return 2\.13% In rupees, 21 sessions from 2026-09-30's close to 2026-10-30's/,
+  )
+  assert.match(page, /Over the month its benchmark made 1\.18% and its rules-only paper Book 2\.00%\./)
+  assert.match(page, /India Super 30 OK, tuned and Gold 0\.08/)
+  assert.match(page, /Its drawdown: -1\.1% at the month's end, -3\.5% at its deepest; its limits -10% for no new buys, -18% for half the exposure level, -25% for the drawdown limit\. It reached none of them\./)
+  // The US Book, in dollars, is reviewed in rupees: the dollar's move against the rupee is a part of its return.
+  assert.match(page, /The dollar against the rupee 0\.80% 87\.92 to 88\.62 rupees Its return 2\.31% In rupees, 22 sessions/)
+  assert.match(page, /Over the month its benchmark made 1\.41% and its rules-only paper Book 1\.47% in USD\./)
+  assert.match(page, /Its deepest reached no new buys\./)
+  assert.doesNotMatch(page, /Hong Kong Book Source/, 'a Book with nothing to attribute is left out')
+  assert.match(page, /Monthly review: October 2026 .* Promotions due India Super 30 OK, tuned in the India Book: from Paper to Real-small/)
+  assert.ok(page.indexOf('Weekly review') < page.indexOf('Monthly review'), 'the monthly review comes after the weekly')
+})
+
+test('on other Saturdays there is no monthly review', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.saturday.json')))
+
+  assert.doesNotMatch(text(await brief()), /Monthly review/)
+})
+
 test('a demotion the demotion rule made is said, with why, and the Sleeve is shown outside its range', async () => {
   prepare()
   ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.demotion.json')))

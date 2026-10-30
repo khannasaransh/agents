@@ -19,6 +19,14 @@ export function runWeekday(runId: string): Weekday {
   return weekdays[new Date(year, month - 1, day).getDay()]
 }
 
+/** The month a Run's monthly review is of, YYYY-MM: the month before, when the Run started on the first Saturday of a month; else null. */
+export function monthReviewed(runId: string): string | null {
+  const [year, month, day] = runId.split('-').map(Number)
+  if (runWeekday(runId) !== 'saturday' || day > 7) return null
+  const before = new Date(year, month - 2, 1)
+  return `${before.getFullYear()}-${String(before.getMonth() + 1).padStart(2, '0')}`
+}
+
 /** The machines Schedules run on: the Mac, which installs them into launchd, and the Windows machine, into Task Scheduler. */
 const machines = { mac: 'darwin', windows: 'win32' } as const
 export type Machine = keyof typeof machines

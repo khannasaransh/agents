@@ -8,7 +8,10 @@
 // down a Stage, unless the Data gate fails (it says so, and demotes nothing). It runs after the Lake
 // Step, so it measures the refreshed Lake, and before the Stages Step and the Plan Step, so a demotion
 // is in this Run's Stages and Rule plans. It skips itself on other days. A dry run demotes nothing
-// (`--dry-run`).
+// (`--dry-run`). On the first Saturday of a month it adds the monthly review of the month before
+// (`--month`): each paper Book's return over the month attributed to Sleeve weights, picks within
+// Sleeves, gold, cash, costs, Overrides and (for a Book not in rupees) the currency, the correlation
+// between its Sleeves and its drawdown against its limits.
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { capitalised } from '../../src/answers.ts'
@@ -16,11 +19,11 @@ import { writeJson } from '../../src/files.ts'
 import { pdJson, type PdReview } from '../../src/pd.ts'
 import { percent } from '../../src/plans.ts'
 import { readRun } from '../../src/run.ts'
-import { runWeekday } from '../../src/schedule.ts'
+import { monthReviewed, runWeekday } from '../../src/schedule.ts'
 import { stageName } from '../../src/stages.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
 
-/** How long pd review may take: each Sleeve's backtest and each paper Book's Book backtest, read back once stored. */
+/** How long pd review may take: each Sleeve's backtest and each paper Book's Book backtest, read back once stored, and a month's Sleeve backtests for their correlation. */
 const reviewMs = 30 * 60_000
 
 await runAsStep(async ({ runId, runFolder }) => {
@@ -30,7 +33,9 @@ await runAsStep(async ({ runId, runFolder }) => {
   const day = runWeekday(runId)
   if (day !== 'saturday') throw new StepSkipped(`The weekly review is on Saturdays, and this Run started on a ${capitalised(day)}`)
   const { dryRun = false } = readRun(runId)
-  const review = await pdJson<PdReview>(['review', ...(dryRun ? ['--dry-run'] : [])], { cwd: runFolder, timeoutMs: reviewMs })
+  const month = monthReviewed(runId)
+  const args = ['review', ...(dryRun ? ['--dry-run'] : []), ...(month ? ['--month', month] : [])]
+  const review = await pdJson<PdReview>(args, { cwd: runFolder, timeoutMs: reviewMs })
   writeJson(out, review)
   for (const book of review.books) {
     const paper = book.paper.record ? `paper Book ${percent(book.paper.record.return)} since ${book.paper.record.start}` : 'paper Book not started'
@@ -41,4 +46,8 @@ await runAsStep(async ({ runId, runFolder }) => {
     console.log(`${done} ${d.strategy_id} in the ${d.book} Book from ${stageName(d.from)} to ${stageName(d.to)}: ${d.why}${d.held_why ? ` (${d.held_why})` : ''}`)
   }
   for (const p of review.promotions_due) console.log(`Due: ${p.strategy_id} in the ${p.book} Book, from ${stageName(p.from)} to ${p.to_name}, since ${p.due}`)
+  for (const book of review.monthly?.books ?? []) {
+    const a = book.attribution
+    if (a.return !== null) console.log(`${book.name} in ${review.monthly!.month}: ${percent(a.return)} in ${a.currency}, attributed to its sources`)
+  }
 })
