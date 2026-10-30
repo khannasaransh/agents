@@ -1,0 +1,126 @@
+{
+  "security_id": "IN:RATEGAIN",
+  "name": "Rategain Travel Technologies Ltd",
+  "market": "IN",
+  "currency": "INR",
+  "sector": "Information Technology",
+  "industry": "Computer Sftwr-Enterprse",
+  "made_at": "2026-10-27T01:38:02+00:00",
+  "as_of": "2026-10-23",
+  "data_version": "2026-10-23.70c27d24c7a7",
+  "bars": [
+    {
+      "date": "2026-10-21",
+      "open": 742.1,
+      "high": 755.0,
+      "low": 738.25,
+      "close": 751.4,
+      "volume": 412305.0,
+      "rs_rating": 91.0,
+      "from_high": -0.0412
+    },
+    {
+      "date": "2026-10-22",
+      "open": 752.0,
+      "high": 768.9,
+      "low": 749.5,
+      "close": 766.85,
+      "volume": 655120.0,
+      "rs_rating": 93.0,
+      "from_high": -0.0215
+    },
+    {
+      "date": "2026-10-23",
+      "open": 768.0,
+      "high": 784.0,
+      "low": 761.2,
+      "close": 781.6,
+      "volume": 803944.0,
+      "rs_rating": 94.0,
+      "from_high": -0.0026
+    }
+  ],
+  "marketsmith": {
+    "snapshot": "IN:2026-10-24",
+    "fetched_at": "2026-10-24T02:11:40+00:00",
+    "ratings": {
+      "composite": 96,
+      "eps": 88,
+      "rs": 94,
+      "smr": "A",
+      "acc_dis": "B+"
+    },
+    "flags": [],
+    "estimates": null
+  },
+  "fundamentals": {
+    "key_stats": {
+      "price": 781.6,
+      "price_date": "2026-10-23",
+      "eps_ttm": 18.42,
+      "ttm_period_end": "2026-06-30",
+      "pe_ttm": 42.43,
+      "year_end": "2026-03-31",
+      "pb": 6.1,
+      "roe": 0.152,
+      "debt_equity": 0.02,
+      "bank": false,
+      "market_cap": 92150000000.0,
+      "basis": "consolidated"
+    },
+    "periods": [
+      {
+        "period_type": "Q",
+        "period_end": "2026-06-30",
+        "available": "2026-07-29",
+        "sales": 3412000000.0,
+        "sales_yoy": 0.214,
+        "net_income": 612000000.0,
+        "net_income_yoy": 0.287,
+        "eps_adj": 5.19,
+        "eps_yoy": 0.281,
+        "roe": null
+      }
+    ]
+  },
+  "events_as_of": "2026-10-27T01:42:10+00:00",
+  "events": [
+    {
+      "id": "nse_board_meetings:IN:RATEGAIN:2026-10-29",
+      "security_id": "IN:RATEGAIN",
+      "source": "nse_board_meetings",
+      "kind": "results",
+      "date": "2026-10-29",
+      "title": "Financial Results",
+      "link": "https://nsearchives.nseindia.com/corporate/RATEGAIN_22102026_SE.pdf",
+      "published_at": "2026-10-22T18:04:11+05:30",
+      "fetched_at": "2026-10-24T01:40:55+00:00",
+      "detail": {
+        "description": "To consider and approve the unaudited financial results for the quarter ended September 30, 2026"
+      }
+    }
+  ],
+  "orders": [
+    {
+      "id": "IN-paper-2026-10-26-001",
+      "book": "IN",
+      "sleeve": "in-super30-ok-tuned",
+      "side": "BUY",
+      "shares": 865,
+      "price": 173.3845,
+      "limit": 178.5861,
+      "reason": "first_allocation",
+      "signal": {
+        "kind": "holding",
+        "weight": 0.125
+      },
+      "cuts": [
+        {
+          "rule": "position_cap",
+          "wanted": 2684.0,
+          "allowed": 865.1292358890212
+        }
+      ]
+    }
+  ]
+}

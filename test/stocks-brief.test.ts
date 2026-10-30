@@ -719,3 +719,37 @@ test('a promotion the Portfolio Manager proposed waits for an Approve or Reject,
   assert.match(page, /4 India Book India Super 30 OK, tuned in-super30-ok-tuned Paper to Real-small 2026-10-31, the Portfolio Manager Three months of Paper inside its tested range/)
   assert.match(html, /data-item="promotion:4"><button type="button" data-answer="approve" aria-pressed="false">Approve<\/button><button type="button" data-answer="reject" aria-pressed="false">Reject<\/button>/)
 })
+
+test("the Brief shows the events coming for the holdings in the next 30 days, soonest first, each with its source's link", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+  ws.writeRunFile(runId, 'feeds.json', JSON.parse(example('feeds.failed.json')))
+
+  const html = await brief()
+  const page = text(html)
+
+  // Asian Paints' announcement and IDFC First Bank's pledges are past; Rategain's results aren't a holding's.
+  assert.match(page, /Coming events for the holdings The next 30 days' results and board meetings, from the Feeds as fetched at 2026-10-27 01:42 UTC\. Day Holding Held by Kind Event 2026-11-03 Apple US:AAPL US Book Results Results expected \(Yahoo's earnings date\) 2026-11-05 Asian Paints Ltd IN:ASIANPAINT India Book Results Financial Results\/Dividend/)
+  assert.doesNotMatch(page, /Rategain/)
+  assert.match(html, /<a href="https:\/\/nsearchives\.nseindia\.com\/corporate\/ASIANPAINT_20102026_SE\.pdf">Financial Results\/Dividend<\/a>/)
+  assert.match(page, /Not fetched this Run: BSE's announcements \(failed\), SEC EDGAR's filings \(skipped\)\. Their events are as last fetched; see the To-dos\./)
+})
+
+test('with no event coming the Brief says so', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+  const feeds = JSON.parse(example('feeds.fetched.json'))
+  ws.writeRunFile(runId, 'feeds.json', { ...feeds, on: '2026-12-15' })
+
+  assert.match(text(await brief()), /Coming events for the holdings .* No event is known for the holdings in the next 30 days\./)
+})
+
+test('a Feeds Step that failed is shown with its log', async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'feeds', status: 'failed' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+
+  const page = text(await brief())
+
+  assert.match(page, /Coming events for the holdings The Feeds weren't fetched in this Run\. See the Feeds Step's log: logs\/feeds\.log/)
+})

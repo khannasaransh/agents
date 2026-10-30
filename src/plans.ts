@@ -1,6 +1,6 @@
 // Rule plans, as the Stocks Brief words them: why each order was placed, the signal behind it, and
 // each cut a rule made to it.
-import type { PdBookState, PdCondition, PdCut, PdPlanKind, PdPlanOrder, PdRulePlan } from './pd.ts'
+import type { PdAnalyst, PdBookState, PdCondition, PdCut, PdPlanKind, PdPlanOrder, PdRulePlan } from './pd.ts'
 
 const rules: Record<string, string> = {
   position_cap: 'the position cap',
@@ -72,3 +72,9 @@ export const stateOf = (states: PdBookState[], plan: Pick<PdRulePlan, 'book' | '
 
 /** The `pd book-state` command that prints the state a plan of `kind` starts from. */
 export const stateArgs = (book: string, kind: PdPlanKind) => ['book-state', book, ...{ shadow: [], paper: ['--paper'], rules_only: ['--rules-only'] }[kind]]
+
+/** The folder in the Run folder `pd plan` writes the dossiers into, one per name the Desk reviews (issue 37). */
+export const dossiersFolder = 'dossiers'
+
+/** The Desk's analysts, as the log and the Brief name them. */
+export const analystName: Record<PdAnalyst, string> = { events: 'Events', chart: 'Chart', risk: 'Risk' }

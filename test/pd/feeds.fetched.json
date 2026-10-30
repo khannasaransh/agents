@@ -1,0 +1,181 @@
+{
+  "on": "2026-10-27",
+  "fetched_at": "2026-10-27T01:42:10+00:00",
+  "cached_only": false,
+  "sources": [
+    {
+      "source": "nse_announcements",
+      "label": "NSE's corporate announcements",
+      "market": "IN",
+      "status": "fetched",
+      "why": null,
+      "names": 4,
+      "fetched": 4,
+      "cached": 0,
+      "new": 0
+    },
+    {
+      "source": "nse_board_meetings",
+      "label": "NSE's board meetings",
+      "market": "IN",
+      "status": "fetched",
+      "why": null,
+      "names": 4,
+      "fetched": 4,
+      "cached": 0,
+      "new": 0
+    },
+    {
+      "source": "nse_pledges",
+      "label": "NSE's pledges",
+      "market": "IN",
+      "status": "fetched",
+      "why": null,
+      "names": 4,
+      "fetched": 4,
+      "cached": 0,
+      "new": 1
+    },
+    {
+      "source": "bse_announcements",
+      "label": "BSE's announcements",
+      "market": "IN",
+      "status": "fetched",
+      "why": null,
+      "names": 4,
+      "fetched": 4,
+      "cached": 0,
+      "new": 0
+    },
+    {
+      "source": "edgar",
+      "label": "SEC EDGAR's filings",
+      "market": "US",
+      "status": "fetched",
+      "why": null,
+      "names": 0,
+      "fetched": 0,
+      "cached": 0,
+      "new": 0
+    },
+    {
+      "source": "yahoo_earnings",
+      "label": "Yahoo's earnings dates",
+      "market": "US",
+      "status": "fetched",
+      "why": null,
+      "names": 0,
+      "fetched": 0,
+      "cached": 0,
+      "new": 0
+    }
+  ],
+  "names": [
+    {
+      "security_id": "IN:ASIANPAINT",
+      "name": "Asian Paints Ltd",
+      "market": "IN",
+      "held_by": [
+        {
+          "book": "IN",
+          "kind": "real",
+          "name": "India Book"
+        }
+      ],
+      "reviewed": false,
+      "events": [
+        {
+          "id": "nse_announcements:106721455",
+          "security_id": "IN:ASIANPAINT",
+          "source": "nse_announcements",
+          "kind": "announcement",
+          "date": "2026-10-23",
+          "title": "Analysts/Institutional Investor Meet/Con. Call Updates",
+          "link": "https://nsearchives.nseindia.com/corporate/ASIANPAINT_23102026_SE.pdf",
+          "published_at": "2026-10-23T17:31:02+05:30",
+          "fetched_at": "2026-10-24T01:40:55+00:00",
+          "detail": {
+            "text": "Schedule of the earnings call on the results for the quarter ended September 30, 2026"
+          }
+        },
+        {
+          "id": "nse_board_meetings:IN:ASIANPAINT:2026-11-05",
+          "security_id": "IN:ASIANPAINT",
+          "source": "nse_board_meetings",
+          "kind": "results",
+          "date": "2026-11-05",
+          "title": "Financial Results/Dividend",
+          "link": "https://nsearchives.nseindia.com/corporate/ASIANPAINT_20102026_SE.pdf",
+          "published_at": "2026-10-20T19:12:44+05:30",
+          "fetched_at": "2026-10-24T01:40:55+00:00",
+          "detail": {
+            "description": "To consider and approve the unaudited financial results for the quarter ended September 30, 2026, and an interim dividend"
+          }
+        }
+      ]
+    },
+    {
+      "security_id": "IN:IDFCFIRSTB",
+      "name": "IDFC First Bank Ltd",
+      "market": "IN",
+      "held_by": [
+        {
+          "book": "IN",
+          "kind": "real",
+          "name": "India Book"
+        }
+      ],
+      "reviewed": false,
+      "events": [
+        {
+          "id": "nse_pledges:IN:IDFCFIRSTB:2026-09-30:20261021163020",
+          "security_id": "IN:IDFCFIRSTB",
+          "source": "nse_pledges",
+          "kind": "pledge",
+          "date": "2026-10-21",
+          "title": "Promoters' pledges at 30 Sep 2026: 0% of their shares pledged",
+          "link": "https://www.nseindia.com/api/corporate-pledgedata?index=equities&symbol=IDFCFIRSTB",
+          "published_at": "2026-10-21T16:30:20+05:30",
+          "fetched_at": "2026-10-27T01:42:10+00:00",
+          "detail": {
+            "quarter": "2026-09-30",
+            "promoter_holding": 0.0,
+            "promoter_shares_pledged": 0.0,
+            "shares_pledged": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "security_id": "IN:RATEGAIN",
+      "name": "Rategain Travel Technologies Ltd",
+      "market": "IN",
+      "held_by": [],
+      "reviewed": true,
+      "events": [
+        {
+          "id": "nse_board_meetings:IN:RATEGAIN:2026-10-29",
+          "security_id": "IN:RATEGAIN",
+          "source": "nse_board_meetings",
+          "kind": "results",
+          "date": "2026-10-29",
+          "title": "Financial Results",
+          "link": "https://nsearchives.nseindia.com/corporate/RATEGAIN_22102026_SE.pdf",
+          "published_at": "2026-10-22T18:04:11+05:30",
+          "fetched_at": "2026-10-24T01:40:55+00:00",
+          "detail": {
+            "description": "To consider and approve the unaudited financial results for the quarter ended September 30, 2026"
+          }
+        }
+      ]
+    },
+    {
+      "security_id": "IN:STOVEKRAFT",
+      "name": "Stove Kraft Ltd",
+      "market": "IN",
+      "held_by": [],
+      "reviewed": true,
+      "events": []
+    }
+  ]
+}

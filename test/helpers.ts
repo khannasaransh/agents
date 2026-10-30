@@ -159,10 +159,11 @@ export interface PdAnswer {
   exitCode?: number
 }
 
-/** A call the stand-in `pd` received. */
+/** A call the stand-in `pd` received, with the PDASH_ settings in its environment. */
 export interface PdCall {
   args: string[]
   cwd: string
+  env: Record<string, string>
 }
 
 export interface Workspace {
@@ -644,7 +645,8 @@ const args = process.argv.slice(2)
 const earlier = existsSync(${callsFile})
   ? readFileSync(${callsFile}, 'utf8').split('\\n').filter(Boolean).filter((line) => JSON.parse(line).args[0] === args[0]).length
   : 0
-appendFileSync(${callsFile}, JSON.stringify({ args, cwd: process.cwd() }) + '\\n')
+const env = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.startsWith('PDASH_')))
+appendFileSync(${callsFile}, JSON.stringify({ args, cwd: process.cwd(), env }) + '\\n')
 const answers = existsSync(${answersFile}) ? JSON.parse(readFileSync(${answersFile}, 'utf8')) : {}
 const given = answers[args[0]]
 const answer = given === undefined

@@ -13,7 +13,8 @@
 // return over the month attributed to its sources, the correlation between its Sleeves, its drawdown
 // against its limits and the promotions due); each
 // Book's real holdings and value, its latest Reconciliation's differences and this Run's Broker inbox
-// files; each market's Market condition with MarketSmith's outlook beside it and each Book's exposure
+// files; the results and board meetings coming for the Books' holdings in the next 30 days, from the
+// Feeds; each market's Market condition with MarketSmith's outlook beside it and each Book's exposure
 // level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's state
 // beside its shadow Rule plan and each paper Book's beside its Rule plan, every order marked not for
 // placing, with its rules-only paper Book's plan after it; the Portfolio Manager's judgement of each paper Book (its Judgement
@@ -32,11 +33,12 @@ import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingCandidates, waitingItems, type AnswerItem } from '../../src/answers.ts'
 import { brokerFiles, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
+import { comingDays, comingEvents, kindName } from '../../src/feeds.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { changeText, decisionText, modeName, proposalText } from '../../src/judgement.ts'
-import type { PdBook, PdBookState, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import type { PdBook, PdBookState, PdFeeds, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from '../../src/pd.ts'
 import { breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -582,6 +584,28 @@ function booksSection(run: RunRecord, inbox: BrokerInboxResult | null): string {
 /** A security in a table cell: its name over its id. */
 const securityCell = (id: string, name: string | null) => (name ? `${esc(name)}<br><span class="muted">${esc(id)}</span>` : esc(id))
 
+/** The events coming for the Books' holdings (issue 37), from the Feeds Step: each with its day, kind and link. */
+function eventsSection(run: RunRecord, feeds: PdFeeds | null): string {
+  const step = run.steps.find((s) => s.name === 'feeds')
+  if (!feeds) return step?.status === 'failed' ? `<section><h2>Coming events for the holdings</h2><p>The Feeds weren't fetched in this Run. See the Feeds Step's log: ${logLink(step.log ?? 'logs/feeds.log')}</p></section>` : ''
+  const coming = comingEvents(feeds)
+  const rows = coming.map(({ name, event }) => [
+    esc(event.date),
+    securityCell(name.security_id, name.name),
+    esc(name.held_by.map((b) => b.name).join(', ')),
+    esc(kindName(event.kind)),
+    event.link ? `<a href="${esc(event.link)}">${esc(event.title)}</a>` : esc(event.title),
+  ])
+  const missed = feeds.sources.filter((s) => s.status === 'failed' || s.status === 'skipped')
+  const notes = [
+    feeds.cached_only ? `<p class="note">Dry run: the Feeds weren't fetched; these are the events fetched before.</p>` : '',
+    missed.length ? `<p class="muted">Not fetched this Run: ${missed.map((s) => `${esc(s.label)} (${s.status})`).join(', ')}. Their events are as last fetched; see the To-dos.</p>` : '',
+  ]
+  const body = rows.length ? table(['Day', 'Holding', 'Held by', 'Kind', 'Event'], rows) : `<p>No event is known for the holdings in the next ${comingDays} days.</p>`
+  const about = `<p>The next ${comingDays} days' results and board meetings, from the Feeds as fetched at ${esc(minutes(feeds.fetched_at))}.</p>`
+  return ['<section><h2>Coming events for the holdings</h2>', about, body, ...notes.filter(Boolean), '</section>'].join('\n')
+}
+
 /** A Book state, as its Rule plan starts from it: its cash, its holdings, what is unsettled. */
 function statePart(state: PdBookState | undefined): string {
   if (!state) return "<p>Its state couldn't be read in this Run.</p>"
@@ -992,6 +1016,8 @@ interface Inputs {
   health: HealthResult | null
   plan: PdPlan | null
   states: BookStates | null
+  /** The Feeds the Feeds Step fetched. */
+  feeds: PdFeeds | null
   pm: PortfolioManagerResult | null
   check: CheckResult | null
   paperBooks: PdPaperBooks | null
@@ -1004,7 +1030,7 @@ interface Inputs {
   todos: { step: string; todo: string }[]
 }
 
-function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, pm, check, paperBooks, modes, review, promotions, todos }: Inputs): string {
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, pm, check, paperBooks, modes, review, promotions, todos }: Inputs): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   const promoting = waitingPromotions(stages, promotions)
@@ -1032,6 +1058,7 @@ ${stagesSection(run, stages)}
 ${reviewSection(run, review, pm)}
 ${monthlySection(review, pm)}
 ${booksSection(run, inbox)}
+${eventsSection(run, feeds)}
 ${plansSection(run, plan, states)}
 ${judgementSection(run, pm, check, modes)}
 ${checkSection(run, check)}
@@ -1067,6 +1094,7 @@ await runAsStep(({ runId, runFolder, force }) => {
       health: read<HealthResult>('health.json'),
       plan: read<PdPlan>('plan.json'),
       states: read<BookStates>('book-states.json'),
+      feeds: read<PdFeeds>('feeds.json'),
       pm: read<PortfolioManagerResult>('portfolio-manager.json'),
       check: read<CheckResult>('check.json'),
       paperBooks: read<PdPaperBooks>('paper-books.json'),

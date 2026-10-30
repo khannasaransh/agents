@@ -33,6 +33,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
+    feeds: { example: 'feeds.fetched.json' },
     check: { example: 'check.recorded.json' },
     'paper-books': { example: 'paper-books.json' },
     judgement: { example: 'judgement-show.books.json' },
@@ -58,6 +59,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['stages', 'succeeded'],
       ['health', 'skipped'],
       ['plan', 'succeeded'],
+      ['feeds', 'succeeded'],
       // The fake Worker stands in for the Portfolio Manager, so its Journal is never saved.
       ['portfolio-manager', 'succeeded'],
       ['check', 'succeeded'],
@@ -74,9 +76,11 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['status'],
       ...(saturday ? [['review', '--dry-run']] : []),
       ['stages', 'check', '--dry-run'],
-      ['plan', '--on', id.slice(0, 10)],
+      ['plan', '--on', id.slice(0, 10), '--dossiers', 'dossiers'],
       ['book-state', 'IN'],
       ...states,
+      // A dry run fetches no Feeds: it reads the cache.
+      ['feeds', '--plan', 'plan.json', '--dossiers', 'dossiers', '--cached'],
       ['check', '--plan', 'plan.json', '--judgement', 'judgement.json', '--run', id, '--dry-run'],
       ['paper-books'],
       ['judgement', 'show'],
@@ -100,6 +104,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
+    feeds: { example: 'feeds.fetched.json' },
     check: { example: 'check.recorded.json' },
     'paper-books': { example: 'paper-books.json' },
     judgement: { example: 'judgement-show.books.json' },
@@ -124,6 +129,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['stages', 'succeeded'],
       ['health', 'failed'],
       ['plan', 'succeeded'],
+      ['feeds', 'succeeded'],
       ['portfolio-manager', 'failed'],
       ['check', 'succeeded'],
       ['save-state', 'skipped'],
@@ -139,6 +145,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   assert.match(brief, /The Health Agent failed, so there is no diagnosis: claude-code failed/)
   assert.match(brief, /The Portfolio Manager failed, so each paper Book's Rule plan went out instead/)
   assert.match(brief, /lake: failed\. Log: <a href="logs\/lake\.log">/)
+  assert.match(brief, /<h2>Coming events for the holdings<\/h2>/)
 })
 
 const ashNewContract = join(ashNewFolder(), 'contract')

@@ -155,8 +155,12 @@ The stop each holding keeps at the broker, wider than its strategy's own exit, f
 _Avoid_: stop-loss (ash_new's Stop-loss is end-of-day), GTT (a broker's order type), trailing stop
 
 **Feed**:
-A fixed outside source of company events that the stocks Pipeline fetches only for the securities held and those the rules want to buy: NSE and BSE announcements, SEC EDGAR filings, the earnings calendar.
+A fixed outside source of company events that the stocks Pipeline fetches only for the names the Desk reviews and the Books' holdings: NSE's announcements, board meetings and pledges, BSE's announcements, SEC EDGAR filings, and the earnings calendar (NSE's board meetings, Yahoo's earnings dates). Each event keeps its link and the time it was first fetched, and what was fetched before is kept, so a Decision record may cite only events fetched before its Run.
 _Avoid_: news feed, data source
+
+**Dossier**:
+Everything the Desk may read of one name it reviews, which `pd plan` writes into the Run folder: about a year of daily bars with volume, RS and the distance from the 52-week high, MarketSmith's snapshot, fundamentals, its events from the Feeds, and the strategy and signal behind its order. It holds a copy of what it read, not a pointer to the latest fetch, so a Decision record can be checked against it later.
+_Avoid_: profile, factsheet
 
 **Order list**:
 What the Portfolio Manager advises Saransh to do at the next session: each buy and sale, and each Disaster stop to place or raise. A buy carries a limit price, and a buy that needs a sale's cash is listed under that sale. An order is valid only for its own session. It is **proposed** until Saransh marks it **placed** or **skipped**, a placed order is **filled** once a tradebook shows it, and an order its session passes unfilled is **expired**.

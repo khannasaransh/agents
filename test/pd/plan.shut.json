@@ -126,5 +126,36 @@
       "status": "market_shut",
       "why": "Its market was shut on 2026-11-24, the session before the Run's day: no order for it"
     }
-  ]
+  ],
+  "review": {
+    "names": [],
+    "risk": [],
+    "analysts": [],
+    "holdings": [
+      {
+        "security_id": "IN:ASIANPAINT",
+        "name": "Asian Paints Ltd",
+        "market": "IN",
+        "held_by": [
+          {
+            "book": "IN",
+            "kind": "real",
+            "name": "India Book"
+          }
+        ]
+      },
+      {
+        "security_id": "IN:IDFCFIRSTB",
+        "name": "IDFC First Bank Ltd",
+        "market": "IN",
+        "held_by": [
+          {
+            "book": "IN",
+            "kind": "real",
+            "name": "India Book"
+          }
+        ]
+      }
+    ]
+  }
 }

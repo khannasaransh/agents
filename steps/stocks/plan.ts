@@ -6,17 +6,21 @@
 // Book's (issue 32: each strategy from Paper up at its full share) and each rules-only paper Book's
 // (issue 33); the Check Step records the paper and rules-only ones as Order lists. On a day the Data
 // gate fails, every plan is in Hold mode; a Book whose market was shut the session before gets no
-// order. Neither command records anything in ash_new, so a dry run runs them as they are. A plan
-// ash_new couldn't make says why in the Brief; a state whose id isn't the one its plan was made from
-// (the ledger changed between the two commands) is said in the log.
+// order. `pd plan` also lists the names the Desk reviews (issue 37: each paper Book's buys and sales,
+// and its holdings with results or another event in the next 5 sessions), each with the analysts it
+// needs and why, and writes a dossier for each into the Run's dossiers folder: everything the Desk
+// may read of it, copied, so a Decision record can be checked against it later. Neither command
+// records anything in ash_new, so a dry run runs them as they are. A plan ash_new couldn't make says
+// why in the Brief; a state whose id isn't the one its plan was made from (the ledger changed between
+// the two commands) is said in the log.
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeJson } from '../../src/files.ts'
 import { pdJson, type PdBookState, type PdPlan } from '../../src/pd.ts'
-import { stateArgs, stateOf } from '../../src/plans.ts'
+import { analystName, dossiersFolder, stateArgs, stateOf } from '../../src/plans.ts'
 import { runAsStep } from '../../src/step.ts'
 
-/** How long pd plan may take: each Book's strategies run on its market's panels, from a year back. */
+/** How long pd plan may take: each Book's strategies run on its market's panels, from a year back, and a dossier for each name the Desk reviews. */
 const planMs = 15 * 60_000
 /** How long pd book-state may take: a ledger replayed. */
 const stateMs = 2 * 60_000
@@ -32,9 +36,10 @@ await runAsStep(async ({ runId, runFolder }) => {
   // Plans an earlier run of this Step made would say nothing true about this Run's data.
   rmSync(planFile, { force: true })
   rmSync(statesFile, { force: true })
+  rmSync(join(runFolder, dossiersFolder), { recursive: true, force: true })
   // The Run's id is its local start date and time: its day is what the plan is for.
   const on = runId.slice(0, 10)
-  const plan = await pdJson<PdPlan>(['plan', '--on', on], { cwd: runFolder, timeoutMs: planMs })
+  const plan = await pdJson<PdPlan>(['plan', '--on', on, '--dossiers', dossiersFolder], { cwd: runFolder, timeoutMs: planMs })
   const states: PdBookState[] = []
   for (const p of plan.plans) {
     if (stateOf(states, p)) continue
@@ -51,4 +56,12 @@ await runAsStep(async ({ runId, runFolder }) => {
     const state = stateOf(states, p)
     if (state && state.id !== p.state_id) console.log(`${p.name}: its state is now ${state.id}, not ${p.state_id}, which the plan was made from: the ledger changed between the two`)
   }
+  const { names, risk, analysts } = plan.review
+  if (!names.length) console.log('The Desk has no name to review')
+  for (const n of names) {
+    const needs = n.analysts.map((a) => `${analystName[a.analyst]} (${a.why})`).join(', ')
+    console.log(`Desk: ${n.name ?? n.security_id} in the ${n.plan}, a ${n.role}: ${needs || n.why || 'no analyst'}`)
+  }
+  for (const r of risk) console.log(`Desk: Risk for the ${r.plan} (${r.why})`)
+  if (names.length) console.log(`Desk: ${analysts.length ? analysts.map((a) => analystName[a]).join(', ') : 'no analyst'} needed`)
 })

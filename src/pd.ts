@@ -2,7 +2,7 @@
 // database or Lake files itself (the stocks Pipeline PRD's "Shape"). The JSON it prints is the
 // contract between the two repos, described by the schemas in ash_new's contract folder.
 import { delimiter, join } from 'node:path'
-import { ashNewFolder } from './env.ts'
+import { ashNewFolder, secContact } from './env.ts'
 import { runProcess, type ProcessResult } from './process.ts'
 
 /** What `pd status` prints (ash_new's contract/status.schema.json): how fresh and healthy the Lake is. */
@@ -631,6 +631,90 @@ export interface PdPlan {
   mode: 'normal' | 'hold'
   markets: PdMarketCondition[]
   plans: PdRulePlan[]
+  /** The names the Desk reviews, by the Feeds fetched before the plan, and every Book's holdings for pd feeds (issue 37). */
+  review: PdReviewList
+}
+
+/** The Desk's analysts (the glossary). */
+export type PdAnalyst = 'events' | 'chart' | 'risk'
+
+/** A Book holding a name, real or paper. */
+export interface PdHeldBy {
+  book: 'IN' | 'US' | 'HK'
+  kind: 'real' | 'paper'
+  name: string
+}
+
+/** A name the Desk reviews in a paper Book's plan, with the analysts it needs and why. */
+export interface PdReviewName {
+  book: 'IN' | 'US' | 'HK'
+  /** The plan's name: the paper Book's. */
+  plan: string
+  security_id: string
+  name: string | null
+  market: string
+  /** Bought, sold, or held with results or another event in the next 5 sessions. */
+  role: 'buy' | 'sale' | 'holding'
+  held: boolean
+  orders: string[]
+  /** Events for an event in the next 5 sessions or one new since its last view, Chart for a buy; none for a sale. */
+  analysts: { analyst: Exclude<PdAnalyst, 'risk'>; why: string }[]
+  /** Why it needs none: a sale. */
+  why: string | null
+  /** Its events' ids in the next 5 sessions, and those new since its last view. */
+  coming: string[]
+  new: string[]
+  /** Its dossier's path in the Run folder (contract/dossier.schema.json). */
+  dossier: string | null
+}
+
+/** What `pd plan` prints of the Desk's work (contract/plan.schema.json's review). */
+export interface PdReviewList {
+  names: PdReviewName[]
+  /** The Books with buys, for the Risk analyst over all of them. */
+  risk: { book: 'IN' | 'US' | 'HK'; plan: string; buys: string[]; why: string }[]
+  /** The analysts needed at all. */
+  analysts: PdAnalyst[]
+  /** Every Book's holdings, but its gold ETF and cash fund. */
+  holdings: { security_id: string; name: string | null; market: string; held_by: PdHeldBy[] }[]
+}
+
+/** An event from the Feeds: its day is the one it is about (a meeting's, results'), else the day it was published. */
+export interface PdEvent {
+  id: string
+  security_id: string
+  source: PdFeedSource
+  kind: 'announcement' | 'board_meeting' | 'results' | 'pledge' | 'filing' | 'insider'
+  date: string
+  title: string
+  link: string | null
+  published_at: string | null
+  /** When it was first fetched, in UTC: a Decision record may cite only events fetched before its Run. */
+  fetched_at: string
+  detail: Record<string, unknown>
+}
+
+export type PdFeedSource = 'nse_announcements' | 'nse_board_meetings' | 'nse_pledges' | 'bse_announcements' | 'edgar' | 'yahoo_earnings'
+
+/** What `pd feeds` prints (contract/feeds.schema.json): each source's fetch, and each name's events as fetched by then. */
+export interface PdFeeds {
+  on: string
+  fetched_at: string
+  /** A dry run: nothing fetched, only the cache read. */
+  cached_only: boolean
+  sources: {
+    source: PdFeedSource
+    label: string
+    market: string
+    /** failed: it stopped, keeping what it had; skipped: it can't be fetched at all (EDGAR without its contact). */
+    status: 'fetched' | 'cached' | 'failed' | 'skipped'
+    why: string | null
+    names: number
+    fetched: number
+    cached: number
+    new: number
+  }[]
+  names: { security_id: string; name: string | null; market: string; held_by: PdHeldBy[]; reviewed: boolean; events: PdEvent[] }[]
 }
 
 /** The Levers of a Playbook (the glossary). */
@@ -839,12 +923,13 @@ export interface PdPaperBooks {
 /**
  * Runs `pd` in `cwd` and resolves with how it ended, its output kept whole. It is the first `pd`
  * on PATH, else the one in ash_new's own environment, so a `pd` put first on PATH (the tests'
- * stand-in) wins.
+ * stand-in) wins. The SEC's User-Agent contact from the env file goes with it as PDASH_SEC_CONTACT.
  */
 export function runPd(args: string[], { cwd, timeoutMs }: { cwd: string; timeoutMs: number }): Promise<ProcessResult> {
   const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH'
   const scripts = join(ashNewFolder(), '.venv', process.platform === 'win32' ? 'Scripts' : 'bin')
-  return runProcess('pd', args, { cwd, timeoutMs, env: { [pathKey]: [process.env[pathKey], scripts].filter(Boolean).join(delimiter) } })
+  const contact = secContact()
+  return runProcess('pd', args, { cwd, timeoutMs, env: { [pathKey]: [process.env[pathKey], scripts].filter(Boolean).join(delimiter), ...(contact ? { PDASH_SEC_CONTACT: contact } : {}) } })
 }
 
 /**

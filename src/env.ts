@@ -57,6 +57,14 @@ export function saranshEmails(): string[] {
 }
 
 /**
+ * The contact the SEC's User-Agent names, from SEC_CONTACT in the env file (a name and an email, as
+ * EDGAR's fair-access policy asks), or null when it isn't set: `pd feeds` then skips EDGAR, with a To-do.
+ */
+export function secContact(): string | null {
+  return readEnvFile().SEC_CONTACT?.trim() || null
+}
+
+/**
  * ash_new's folder, from ASH_NEW_FOLDER in the env file (`~` stands for the home folder), else
  * backend/portfolio-dashboard in the folder holding this repo, where setup's layout puts it.
  */

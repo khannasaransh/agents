@@ -572,5 +572,101 @@
       "status": "cant_plan",
       "why": "HK has no panels yet: run `pd build-panels` (or refresh the data)"
     }
-  ]
+  ],
+  "review": {
+    "names": [
+      {
+        "book": "IN",
+        "plan": "India Book's paper Book",
+        "security_id": "IN:RATEGAIN",
+        "name": "Rategain Travel Technologies Ltd",
+        "market": "IN",
+        "role": "buy",
+        "held": false,
+        "orders": [
+          "IN-paper-2026-10-26-001"
+        ],
+        "analysts": [
+          {
+            "analyst": "chart",
+            "why": "A buy of 865 shares"
+          },
+          {
+            "analyst": "events",
+            "why": "Financial Results on 29 Oct 2026"
+          }
+        ],
+        "why": null,
+        "coming": [
+          "nse_board_meetings:IN:RATEGAIN:2026-10-29"
+        ],
+        "new": [],
+        "dossier": "dossiers/IN_RATEGAIN.json"
+      },
+      {
+        "book": "IN",
+        "plan": "India Book's paper Book",
+        "security_id": "IN:STOVEKRAFT",
+        "name": "Stove Kraft Ltd",
+        "market": "IN",
+        "role": "buy",
+        "held": false,
+        "orders": [
+          "IN-paper-2026-10-26-002"
+        ],
+        "analysts": [
+          {
+            "analyst": "chart",
+            "why": "A buy of 2398 shares"
+          }
+        ],
+        "why": null,
+        "coming": [],
+        "new": [],
+        "dossier": "dossiers/IN_STOVEKRAFT.json"
+      }
+    ],
+    "risk": [
+      {
+        "book": "IN",
+        "plan": "India Book's paper Book",
+        "buys": [
+          "IN:RATEGAIN",
+          "IN:STOVEKRAFT"
+        ],
+        "why": "2 buys in the India Book's paper Book"
+      }
+    ],
+    "analysts": [
+      "chart",
+      "events",
+      "risk"
+    ],
+    "holdings": [
+      {
+        "security_id": "IN:ASIANPAINT",
+        "name": "Asian Paints Ltd",
+        "market": "IN",
+        "held_by": [
+          {
+            "book": "IN",
+            "kind": "real",
+            "name": "India Book"
+          }
+        ]
+      },
+      {
+        "security_id": "IN:IDFCFIRSTB",
+        "name": "IDFC First Bank Ltd",
+        "market": "IN",
+        "held_by": [
+          {
+            "book": "IN",
+            "kind": "real",
+            "name": "India Book"
+          }
+        ]
+      }
+    ]
+  }
 }

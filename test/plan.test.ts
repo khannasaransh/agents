@@ -29,7 +29,7 @@ test("the Plan Step records the Rule plans for the Run's day, then reads the sta
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
     [
-      ['plan', '--on', '2026-10-27'],
+      ['plan', '--on', '2026-10-27', '--dossiers', 'dossiers'],
       ['book-state', 'IN'],
       ['book-state', 'IN', '--paper'],
       ['book-state', 'IN', '--rules-only'],
@@ -49,6 +49,20 @@ test("the Plan Step records the Rule plans for the Run's day, then reads the sta
   assert.match(log, /US Book's paper Book: no Rule plan: US has no panels yet/)
   assert.doesNotMatch(log, /the ledger changed/)
   assert.doesNotMatch(log, /Hold mode/)
+  // The names the Desk reviews, each with the analysts it needs and why.
+  assert.match(log, /Desk: Rategain Travel Technologies Ltd in the India Book's paper Book, a buy: Chart \(A buy of 865 shares\), Events \(Financial Results on 29 Oct 2026\)/)
+  assert.match(log, /Desk: Risk for the India Book's paper Book \(2 buys in the India Book's paper Book\)/)
+  assert.match(log, /Desk: Chart, Events, Risk needed/)
+})
+
+test('on a quiet day the log says the Desk has no name to review', async () => {
+  prepare()
+  ws.setPd({ plan: { example: 'plan.hold.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }] })
+
+  const result = await ws.agents('step', 'plan', '--run', runId)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(ws.readRunFile(runId, 'logs', 'plan.log'), /The Desk has no name to review/)
 })
 
 test('on a day the Data gate fails, the log says every plan is in Hold mode', async () => {
@@ -82,7 +96,7 @@ test('a dry run makes the plans as any Run does: neither command records anythin
   const result = await ws.agents('step', 'plan', '--run', runId)
 
   assert.equal(result.status, 0, result.stderr)
-  assert.deepEqual(ws.pdCalls()[0].args, ['plan', '--on', '2026-10-27'])
+  assert.deepEqual(ws.pdCalls()[0].args, ['plan', '--on', '2026-10-27', '--dossiers', 'dossiers'])
 })
 
 test('a pd plan that fails fails the Step, leaving no plan behind', async () => {
