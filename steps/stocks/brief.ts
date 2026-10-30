@@ -4,6 +4,7 @@
 // the Corrections it proposed; what became of the Answers this Run applied; each Correction waiting
 // for approval with what it would change; each Quarantine with its flag; each Candidate waiting for
 // approval into Paper; each promotion the Portfolio Manager proposed, waiting for approval; each
+// early exit the Desk proposed, waiting for approval, and each approved one not yet sold; each
 // proposal to move a Judgement mode or change a Playbook's ranges; each market's latest session in
 // the Lake against its last finished one; the To-dos the Steps raised; each Book's Sleeves with their
 // Stages and how long each has been in its Stage; on Saturdays, the weekly review (the Portfolio
@@ -17,9 +18,12 @@
 // Feeds; each market's Market condition with MarketSmith's outlook beside it and each Book's exposure
 // level; on a day the Data gate fails, that every plan is in Hold mode; the India Book's state
 // beside its shadow Rule plan and each paper Book's beside its Rule plan, every order marked not for
-// placing, with its rules-only paper Book's plan after it; the Portfolio Manager's judgement of each paper Book (its Judgement
-// mode, its commentary, what went out and why, each change with its Decision record in plain
-// sentences, and each change the final check dropped with why) and each Book's Judgement modes; the
+// placing, with its rules-only paper Book's plan after it and each early exit it sells; the Desk's
+// views of each name it reviewed (each analyst's, with its reasons, evidence and date), the reviews
+// missing, the views refused and the web searches; the Portfolio Manager's judgement of each paper
+// Book (its Judgement mode, its commentary, what went out and why, each change with its Decision
+// record in plain sentences and the Desk's views behind it, each change the final check dropped with
+// why, and each buy held back a session, its Desk review missing) and each Book's Judgement modes; the
 // Order lists the Check Step recorded, or why none was; how each paper Book stands (its value and its
 // gap to its rules-only paper Book, its drawdown against its breakers, its Sleeves and Stages, the
 // Disaster stops that would lose more than 1% of it, and the Books together in rupees); on Saturdays,
@@ -32,14 +36,15 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingCandidates, waitingItems, type AnswerItem } from '../../src/answers.ts'
-import { brokerFiles, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
+import { bookNames, brokerFiles, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
+import { analysts, viewText, viewVerdict, type DeskResult, type DeskView } from '../../src/desk.ts'
 import { comingDays, comingEvents, kindName } from '../../src/feeds.ts'
 import { readJson, writeText } from '../../src/files.ts'
 import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { changeText, decisionText, modeName, proposalText } from '../../src/judgement.ts'
-import type { PdBook, PdBookState, PdFeeds, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from '../../src/pd.ts'
-import { breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
+import type { PdBook, PdBookState, PdEarlyExit, PdFeeds, PdJudgementShow, PdMarketSmith, PdOrderList, PdPaperBook, PdPaperBooks, PdPlan, PdReview, PdRulePlan, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from '../../src/pd.ts'
+import { analystName, breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
 import { runAsStep } from '../../src/step.ts'
@@ -331,6 +336,84 @@ function promotionsSection(waiting: PdStageProposal[], stages: PdStagesCheck | n
     `<section><h2>Promotions waiting for your approval: ${waiting.length}</h2>`,
     "<p>A strategy gets more money only by your Answer. The Portfolio Manager proposes a promotion when its time in its Stage is up (3 months of Paper, 6 of Real-small) and its live record is inside its tested range. Approve or reject each, then Save answers: the next Run records your Answers in ash_new, and its Rule plans hold an approved one at its new Stage. One you don't answer waits here while it stays in its Stage.</p>",
     table(['Id', 'Book', 'Strategy', 'Promotion', 'Proposed', 'Why', 'Your Answer'], rows),
+    '</section>',
+  ].join('\n')
+}
+
+/** The early exits open: those `pd judgement show` read, then those the Desk proposed in this Run, waiting first. */
+function openExits(modes: PdJudgementShow | null, desk: DeskResult | null): PdEarlyExit[] {
+  const proposed = (desk?.exits ?? []).flatMap(({ decided }) => (decided.changed && decided.exit ? [decided.exit] : []))
+  const found = [...(modes?.exits ?? []), ...proposed].filter((e, i, all) => all.findIndex((o) => o.id === e.id) === i)
+  return [...found.filter((e) => e.decision === null), ...found.filter((e) => e.decision !== null)]
+}
+
+/** Each early exit waiting for Saransh's Answer, with its buttons, then each approved one its paper Book hasn't sold yet; nothing when none is open. */
+function exitsSection(exits: PdEarlyExit[]): string {
+  if (!exits.length) return ''
+  const waiting = exits.filter((e) => e.decision === null)
+  const rows = exits.map((e) => [
+    String(e.id),
+    esc(`${capitalised(bookNames[e.book])}'s paper Book`),
+    securityCell(e.security_id, e.name),
+    esc(`${e.at.slice(0, 10)}, ${e.by}`),
+    esc(e.why),
+    e.decision === null ? answerButtons(answerItem('exit', e.id)) : 'Approved: it sells on the next Rule plan',
+  ])
+  return [
+    `<section><h2>Early exits ${waiting.length ? `waiting for your approval: ${waiting.length}` : 'approved, not yet sold'}</h2>`,
+    "<p>No position is sold on an analyst's view without you. An analyst of the Desk proposes an early exit when it sees a reason to sell a holding before its strategy does. Approve or reject each, then Save answers: the next Run records your Answers in ash_new, and the paper Book's next Rule plan sells an approved one whole at the open.</p>",
+    table(['Id', 'Book', 'Security', 'Proposed', 'Why', 'Your Answer'], rows),
+    '</section>',
+  ].join('\n')
+}
+
+/** A piece of a view's evidence, a web page's link made a link. */
+function evidenceItem(e: DeskView['evidence'][number]): string {
+  const cite = e.source === 'web' ? `<a href="${esc(e.cite)}">${esc(e.cite)}</a>` : esc(e.cite)
+  return `${cite}: ${esc(e.says)}`
+}
+
+/** When a view was made: this Run, or the earlier Run it is reused from. */
+const madeOn = (view: DeskView) => (view.reused ? `reused from ${view.viewed_at.slice(0, 10)}` : view.viewed_at.slice(0, 10))
+
+/**
+ * The Desk's views of each name it reviewed, with what became of each analyst, the reviews missing,
+ * the views refused and the web searches; or why there are none.
+ */
+function deskSection(run: RunRecord, desk: DeskResult | null): string {
+  const step = run.steps.find((s) => s.name === 'desk')
+  if (!step && !desk) return ''
+  const head = '<section><h2>The Desk</h2>'
+  const log = logLink(step?.log ?? 'logs/desk.log')
+  if (!desk) {
+    if (step?.status === 'skipped') return `${head}<p>No name needed an analyst today, so none was called.</p></section>`
+    return `${head}<p>The Desk didn't review in this Run, so each buy it had to review waits a session. See its log: ${log}</p></section>`
+  }
+  const status = { answered: 'answered', reused: 'every view reused, so it was not called', failed: 'failed' }
+  const outcomes = desk.analysts.map((a) => `${analystName[a.analyst]}: ${status[a.status]}${a.asked ? `, asked of ${plural(a.asked, 'name')}` : ''}${a.reused ? `, ${plural(a.reused, 'view')} reused` : ''}${a.why ? `: ${esc(a.why)}` : ''}`)
+  const order = (v: DeskView) => analysts.indexOf(v.analyst)
+  const rows = [...desk.views]
+    .sort((a, b) => a.book.localeCompare(b.book) || a.security_id.localeCompare(b.security_id) || order(a) - order(b))
+    .map((v) => [
+      securityCell(v.security_id, v.name),
+      esc(`${capitalised(bookNames[v.book])}, a ${v.role}`),
+      esc(analystName[v.analyst]),
+      `<strong>${esc(viewVerdict(v))}</strong>`,
+      esc(v.reasons),
+      v.evidence.length ? list(v.evidence.map(evidenceItem)) : '—',
+      esc(madeOn(v)),
+    ])
+  const missing = desk.missing.map((m) => `${esc(m.security_id)}, by ${esc(analystName[m.analyst])}: ${esc(m.why)}`)
+  const refused = desk.refused.map((r) => `${esc(analystName[r.analyst])} on ${esc(r.security_id)}: ${esc(r.why)}`)
+  const searches = desk.searches.map((q) => `${esc(analystName[q.analyst])} searched for "${esc(q.query)}": ${esc(q.source)}${q.amounts.length ? ` <strong>(it carries ${esc(q.amounts.join(', '))}, an amount from your Books)</strong>` : ''}`)
+  return [
+    head,
+    "<p>Three analysts each write their own view of the names the review list gives them: Events of a name with results or another event coming, Chart of each buy, Risk of each Book's buys together. They can only subtract, and their views are evidence for the Portfolio Manager. A view is reused, with its date, while nothing its analyst reads has changed.</p>",
+    list(outcomes),
+    rows.length ? table(['Security', 'Book', 'Analyst', 'View', 'Reasons', 'Evidence', 'Made'], rows) : '<p>No view was given.</p>',
+    ...(missing.length ? ['<p>Reviews missing, so each buy waits a session:</p>', list(missing)] : []),
+    ...(refused.length ? ['<p>Views refused, as ones the analyst may not give:</p>', list(refused)] : []),
+    ...(searches.length ? ['<p>Web searches:</p>', list(searches)] : []),
     '</section>',
   ].join('\n')
 }
@@ -707,6 +790,7 @@ function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
   const dropped = (plan.dropped ?? []).map((d) => `${esc(d.name ?? d.security_id)} (${esc(d.security_id)}): a ${d.side === 'BUY' ? 'buy' : 'sale'} of ${esc(shares(d.wanted))} shares stopped by ${esc(ruleName(d.rule))}`)
   const stops = (plan.stops ?? []).map((s) => `${esc(s.name ?? s.security_id)} (${esc(s.security_id)}): ${s.was === null ? 'place at' : `raise from ${esc(money(s.was, currency, 2))} to`} ${esc(money(s.price, currency, 2))}`)
   const legacy = (plan.legacy ?? []).map((h) => `${esc(h.name ?? h.security_id)} (${esc(h.security_id)}): ${esc(shares(h.qty))} shares`)
+  const exits = (plan.early_exits ?? []).map((e) => `${esc(e.name ?? e.security_id)} (${esc(e.security_id)}), early exit ${e.id}: ${e.status === 'planned' ? `sold by ${esc(e.orders.join(', '))}` : esc(e.why ?? '')}`)
   return [
     `<section>${head}`,
     planAbout[plan.kind],
@@ -720,6 +804,7 @@ function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
     ordersPart(plan),
     ...(dropped.length ? ['<p>Stopped by a rule, so not in the plan:</p>', list(dropped)] : []),
     ...(stops.length ? ['<p>Disaster stops to place with the buys, or raise:</p>', list(stops)] : []),
+    ...(exits.length ? ['<p>Early exits you approved:</p>', list(exits)] : []),
     ...(legacy.length ? ['<p>Legacy holdings, held, not sold: issue 43 sells them as the Sleeves need the cash.</p>', list(legacy)] : []),
     '</section>',
   ].join('\n')
@@ -779,7 +864,7 @@ const wentOut = {
 }
 
 /** The Portfolio Manager's judgement of a paper Book's plan, as the final check left it. */
-function bookJudgement(listed: PdOrderList, modes: PdJudgementShow | null): string {
+function bookJudgement(listed: PdOrderList, modes: PdJudgementShow | null, desk: DeskResult | null): string {
   const judged = listed.judgement!
   const mode = modes?.books.find((b) => b.book === listed.book)?.paper
   const went = judged.applied === 'judgement' ? wentOut.judgement : `${wentOut[judged.applied]}: ${esc(judged.why ?? '')}.`
@@ -791,26 +876,39 @@ function bookJudgement(listed: PdOrderList, modes: PdJudgementShow | null): stri
     judged.commentary ? `<p class="text">${esc(judged.commentary)}</p>` : '',
     `<p>${went} Its exposure level for the day: ${percent(judged.level)}.</p>`,
     ...(accepted.length
-      ? [`<p>Its changes from the Rule plan${sent}:</p>`, list(accepted.map((c) => `<strong>${esc(changeText(c))}.</strong> ${esc(decisionText(c.decision))}`))]
+      ? [`<p>Its changes from the Rule plan${sent}:</p>`, list(accepted.map((c) => `<strong>${esc(changeText(c))}.</strong> ${esc(decisionText(c.decision))}${viewsBehind(c.decision.views ?? [], listed.book, desk)}`))]
       : ['<p>No change from the Rule plan.</p>']),
     ...(dropped.length ? ['<p>Dropped by the final check:</p>', list(dropped.map((c) => `${esc(changeText(c))}: ${esc(c.why ?? '')}`))] : []),
+    ...(judged.held_back?.length
+      ? ['<p>Held back a session, their Desk review missing; the next Rule plan buys them again:</p>', list(judged.held_back.map((h) => `${esc(h.order.name ?? h.order.security_id)} (${esc(h.order.security_id)}), ${esc(shares(h.order.shares))} shares: ${esc(h.why)}`))]
+      : []),
   ]
     .filter(Boolean)
     .join('\n')
+}
+
+/** The Desk's views a change follows, as its Decision record names them, each in a sentence; nothing when it names none. */
+function viewsBehind(named: { analyst: DeskView['analyst']; security_id: string }[], book: string, desk: DeskResult | null): string {
+  if (!named.length) return ''
+  const found = named.map((n) => {
+    const view = desk?.views.find((v) => v.analyst === n.analyst && v.security_id === n.security_id && v.book === book)
+    return view ? `${esc(viewText(view))} <span class="muted">(${esc(madeOn(view))})</span>` : `${esc(analystName[n.analyst])} on ${esc(n.security_id)}: no such view in this Run`
+  })
+  return `<br>The Desk's views behind it:${list(found)}`
 }
 
 /**
  * The Portfolio Manager's judgement of each paper Book, or that it failed or didn't run, then each
  * Book's Judgement modes; nothing when it isn't in this Run.
  */
-function judgementSection(run: RunRecord, pm: PortfolioManagerResult | null, result: CheckResult | null, modes: PdJudgementShow | null): string {
+function judgementSection(run: RunRecord, pm: PortfolioManagerResult | null, result: CheckResult | null, modes: PdJudgementShow | null, desk: DeskResult | null): string {
   const step = run.steps.find((s) => s.name === 'portfolio-manager')
   if (!step && !pm) return ''
   const log = logLink(step?.log ?? 'logs/portfolio-manager.log')
   let intro = ''
   if (pm?.status === 'failed') intro = `<p>The Portfolio Manager failed, so each paper Book's Rule plan went out instead, once it passed the final check: ${esc(pm.error)}. See its log: ${log}</p>`
   else if (!pm) intro = `<p>The Portfolio Manager didn't judge the plans in this Run, so each paper Book's Rule plan went out, once it passed the final check. See its log: ${log}</p>`
-  const books = (result?.check?.lists ?? []).filter((l) => l.judgement && l.kind === 'paper').map((l) => bookJudgement(l, modes))
+  const books = (result?.check?.lists ?? []).filter((l) => l.judgement && l.kind === 'paper').map((l) => bookJudgement(l, modes, desk))
   const rows = (modes?.books ?? []).map((b) => [
     esc(b.name),
     esc(`${modeName(b.real.mode)}${b.real.change ? `, since ${b.real.change.date}` : ''}`),
@@ -1018,6 +1116,8 @@ interface Inputs {
   states: BookStates | null
   /** The Feeds the Feeds Step fetched. */
   feeds: PdFeeds | null
+  /** The Desk's views, as the Desk Step kept them. */
+  desk: DeskResult | null
   pm: PortfolioManagerResult | null
   check: CheckResult | null
   paperBooks: PdPaperBooks | null
@@ -1030,10 +1130,11 @@ interface Inputs {
   todos: { step: string; todo: string }[]
 }
 
-function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, pm, check, paperBooks, modes, review, promotions, todos }: Inputs): string {
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, todos }: Inputs): string {
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   const promoting = waitingPromotions(stages, promotions)
+  const exits = openExits(modes, desk)
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -1051,6 +1152,7 @@ ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${candidatesSection(stages)}
 ${promotionsSection(promoting, stages)}
+${exitsSection(exits)}
 ${proposalsSection(modes)}
 ${marketsSection(status)}
 ${todosSection(todos)}
@@ -1060,14 +1162,15 @@ ${monthlySection(review, pm)}
 ${booksSection(run, inbox)}
 ${eventsSection(run, feeds)}
 ${plansSection(run, plan, states)}
-${judgementSection(run, pm, check, modes)}
+${deskSection(run, desk)}
+${judgementSection(run, pm, check, modes, desk)}
 ${checkSection(run, check)}
 ${paperBooksSection(run, paperBooks)}
 ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
-${saveAnswers(run.id, waitingItems(waiting, stages, modes, promoting))}
+${saveAnswers(run.id, waitingItems(waiting, stages, modes, promoting, exits))}
 </body>
 </html>
 `
@@ -1095,6 +1198,7 @@ await runAsStep(({ runId, runFolder, force }) => {
       plan: read<PdPlan>('plan.json'),
       states: read<BookStates>('book-states.json'),
       feeds: read<PdFeeds>('feeds.json'),
+      desk: read<DeskResult>('desk.json'),
       pm: read<PortfolioManagerResult>('portfolio-manager.json'),
       check: read<CheckResult>('check.json'),
       paperBooks: read<PdPaperBooks>('paper-books.json'),

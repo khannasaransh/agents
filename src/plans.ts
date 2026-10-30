@@ -43,6 +43,7 @@ const ownReasons: Record<string, string> = {
   breaker: 'The breakers, trading the Sleeve back to its strategy or selling it down',
   disaster_stop: 'Its Disaster stop, which the last close is under',
   exposure: 'The exposure level, trimming the weakest holdings first',
+  early_exit: 'An early exit you approved, selling it before its strategy does',
 }
 
 /**

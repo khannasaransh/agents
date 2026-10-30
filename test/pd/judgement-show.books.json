@@ -99,5 +99,21 @@
       "at": "2026-10-26T14:02:11+00:00",
       "decision": null
     }
+  ],
+  "exits": [
+    {
+      "id": 3,
+      "book": "IN",
+      "security_id": "IN:ASIANPAINT",
+      "name": "Asian Paints Ltd",
+      "why": "Its promoters pledged 12% more of their shares this quarter, and its results on 4 November follow a guidance cut.",
+      "by": "the Desk's Events analyst",
+      "run": "2026-10-26-0930",
+      "at": "2026-10-26T04:12:09+00:00",
+      "decision": null,
+      "decided_at": null,
+      "order_list_id": null,
+      "outcome": null
+    }
   ]
 }

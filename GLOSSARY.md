@@ -134,6 +134,14 @@ _Avoid_: rationale, explanation, reason (a sale's reason is ash_new's)
 The analyst Agents, one each for events, the chart and risk, that read what rules can't (results, news and announcements, pledges and governance, the chart) in the Lake and the Feeds, and argue over the Rule plan. Each name is reviewed only by the analysts it needs, and a view is reused while nothing it read has changed. They search the web only to check one item, and cite what they find. They can only subtract: veto a new position, trim a size, or propose an early exit for Saransh to approve. They never add size or break the Mandate. Their views are evidence in the Portfolio Manager's Decision records.
 _Avoid_: committee, analysts' team (a Team is a Repo's discipline), advisors
 
+**View**:
+One analyst's verdict on one name the Desk reviews: none, a veto, a trim to a given size, or an early exit, with its reasons, the evidence it cites and when it was made. A view reused from an earlier Run keeps its date. A buy whose required view is missing, because the Desk or the Portfolio Manager failed, waits a session.
+_Avoid_: opinion, rating, recommendation
+
+**Early exit**:
+A sale of a holding before its strategy sells it, which an analyst of the Desk proposes and Saransh approves with an Answer. Once approved, the sale goes out on the paper Book's next Rule plan. The rules-only paper Book never takes one.
+_Avoid_: stop-out (that is a Disaster stop), manual sale
+
 **Override**:
 One difference from the Rule plan that the final check accepted, made under a Lever and carried by its Decision record, scored afterwards against what the Rule plan alone would have done. The **override scorecard** is their running tally by Lever, by analyst and by Lesson, which decides whether a Lever's range widens or narrows. The scores interact, so whether a real Book moves to Playbook mode is decided instead by its paper Book's gap to the rules-only paper Book.
 _Avoid_: exception, manual change

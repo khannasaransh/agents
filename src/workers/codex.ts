@@ -43,8 +43,9 @@ export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, model, eff
       '--ignore-user-config',
       '--ignore-rules',
       ...extraToolFeatures.flatMap((feature) => ['--disable', feature]),
+      // Web search only for an Agent whose config allows it.
       '--config',
-      'web_search="disabled"',
+      `web_search="${agent.config.webSearch ? 'live' : 'disabled'}"`,
       '--model',
       model,
       '--config',

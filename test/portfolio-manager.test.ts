@@ -75,6 +75,7 @@ test('the Portfolio Manager runs on Claude Code, read-only in the Run folder, gi
   assert.deepEqual(promptInput(call.stdin, 'stages'), example('stages-check.books.json'))
   assert.equal(promptInput(call.stdin, 'health'), null, 'the Lake was healthy, so there is no diagnosis')
   assert.equal(promptInput(call.stdin, 'dossiers'), null)
+  assert.equal(promptInput(call.stdin, 'desk'), null, "the Desk didn't review in this Run")
   assert.match(promptInput(call.stdin, 'journal') as string, /Watch Stove Kraft/)
   // Its answer is kept with the Journal it read and the files its Decision records may cite.
   assert.deepEqual(result(), {
@@ -84,6 +85,26 @@ test('the Portfolio Manager runs on Claude Code, read-only in the Run folder, gi
     inputs: ['plan.json', 'book-states.json', 'stages.json'],
   })
   assert.match(ws.readRunFile(runId, 'logs', 'portfolio-manager.log'), /India Book's paper Book: exposure level 40%, 2 changes from the Rule plan/)
+})
+
+test("the Portfolio Manager gets the Desk's views and the reviews missing, and each Decision record names the views it follows", async () => {
+  prepare()
+  const veto = {
+    analyst: 'chart', book: 'IN', security_id: 'IN:RATEGAIN', name: 'Rategain Travel Technologies Ltd', role: 'buy', view: 'veto', size: null,
+    reasons: 'It closed 24% above its 50-day average.', evidence: [{ source: 'dossier', cite: 'bars', says: 'Extended.' }],
+    viewed_at: '2026-10-27T01:50:00', run: runId, reused: false,
+  }
+  const missing = { book: 'IN', security_id: 'IN:STOVEKRAFT', analyst: 'risk', why: 'The Risk analyst failed: down' }
+  ws.writeRunFile(runId, 'desk.json', { analysts: [], views: [veto], missing: [missing], refused: [], searches: [], exits: [] })
+  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+
+  assert.equal((await step('portfolio-manager')).status, 0)
+
+  const [call] = ws.workerCliCalls('claude')
+  const { run, ...seen } = veto
+  assert.deepEqual(promptInput(call.stdin, 'desk'), { views: [seen], missing: [missing] })
+  const [drop] = result().answer.books[0].changes.filter((c: { kind: string }) => c.kind === 'drop')
+  assert.deepEqual(drop.decision.views, [{ analyst: 'chart', security_id: 'IN:RATEGAIN' }])
 })
 
 test('the Portfolio Manager falls back to Codex when Claude Code fails', async () => {

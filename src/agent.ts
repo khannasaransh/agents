@@ -32,6 +32,8 @@ export interface AgentConfig {
   tools?: Record<string, string>
   /** When set, the Agent's answer must match it. */
   outputSchema?: JsonSchema
+  /** Whether it may use its Worker's web search; it has no web access unless this is set. */
+  webSearch?: boolean
   /**
    * What Save state does with the Memory the Agent proposes: apply it straight away (the default),
    * or queue it for Saransh to accept or reject with `agents memory`.
@@ -95,6 +97,7 @@ const configSchema: JsonSchema = {
     outputs: { type: 'object', additionalProperties: { type: 'string' } },
     tools: { type: 'object', additionalProperties: { type: 'string' } },
     outputSchema: { type: 'object' },
+    webSearch: { type: 'boolean' },
     memoryChanges: { enum: ['apply', 'review'] },
     timeoutSeconds: { type: 'integer', minimum: 1 },
     maxTurns: { type: 'integer', minimum: 1 },

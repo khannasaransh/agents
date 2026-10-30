@@ -552,6 +552,87 @@ test("the Portfolio Manager's judgement of each paper Book is shown: its mode, c
   assert.match(page, /Judgement modes and Playbooks Book Real Book Paper Book Playbook India Book subtract only Playbook size 0\.5× to 1×, waits up to 5 sessions/)
 })
 
+/** What the Desk Step keeps: Chart's veto of Rategain, reused from an earlier Run, and Events' view, with Risk's review of Stove Kraft missing. */
+const deskResult = {
+  analysts: [
+    { analyst: 'chart', status: 'reused', asked: 0, reused: 2, why: null },
+    { analyst: 'events', status: 'answered', asked: 1, reused: 0, why: null },
+    { analyst: 'risk', status: 'failed', asked: 2, reused: 0, why: 'claude-code failed: down; then codex failed: down' },
+  ],
+  views: [
+    {
+      analyst: 'chart', book: 'IN', security_id: 'IN:RATEGAIN', name: 'Rategain Travel Technologies Ltd', role: 'buy', view: 'veto', size: null,
+      reasons: 'It closed 24% above its 50-day average after a run without a pause.', evidence: [{ source: 'dossier', cite: 'bars', says: 'Its close on 2026-10-23 was 24% above its 50-day average.' }],
+      viewed_at: '2026-10-26T01:50:00', run: '2026-10-26-0930', reused: true,
+    },
+    {
+      analyst: 'events', book: 'IN', security_id: 'IN:RATEGAIN', name: 'Rategain Travel Technologies Ltd', role: 'buy', view: 'none', size: null,
+      reasons: 'Results on 29 October, after a strong quarter.', evidence: [{ source: 'web', cite: 'https://www.nseindia.com/companies-listing/corporate-filings-board-meetings', says: 'The meeting is still on 29 October.' }],
+      viewed_at: '2026-10-27T01:50:00', run: runId, reused: false,
+    },
+  ],
+  missing: [
+    { book: 'IN', security_id: 'IN:RATEGAIN', analyst: 'risk', why: 'The Risk analyst failed: claude-code failed: down; then codex failed: down' },
+    { book: 'IN', security_id: 'IN:STOVEKRAFT', analyst: 'risk', why: 'The Risk analyst failed: claude-code failed: down; then codex failed: down' },
+  ],
+  refused: [],
+  searches: [{ analyst: 'events', query: 'Rategain board meeting results date', source: 'https://www.nseindia.com/companies-listing/corporate-filings-board-meetings', amounts: [] }],
+  exits: [],
+}
+
+test("the Brief shows the Desk's views of each name, with their dates, the reviews missing and the web searches, then the views behind each change and the buys held back", async () => {
+  prepare()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: ['desk', 'portfolio-manager', 'check', 'brief'].map((name) => ({ name, status: name === 'brief' ? 'pending' : 'succeeded' })) })
+  ws.writeRunFile(runId, 'desk.json', deskResult)
+  ws.writeRunFile(runId, 'portfolio-manager.json', { status: 'answered', answer: { books: [], journal: { entries: [], open: [] } }, journalRead: '', inputs: [] })
+  const recorded = JSON.parse(example('check.recorded.json'))
+  const stovekraft = JSON.parse(example('plan.normal.json')).plans.find((p: { kind: string }) => p.kind === 'paper').orders[1]
+  recorded.lists[0].judgement.held_back = [{ order: stovekraft, why: deskResult.missing[1].why }]
+  ws.writeRunFile(runId, 'check.json', { check: recorded, why: null })
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(page, /The Desk Three analysts each write their own view/)
+  assert.match(page, /Chart: every view reused, so it was not called, 2 views reused Events: answered, asked of 1 name Risk: failed, asked of 2 names: claude-code failed/)
+  assert.match(page, /Rategain Travel Technologies Ltd IN:RATEGAIN The India Book, a buy Chart veto the buy It closed 24% above its 50-day average after a run without a pause\. bars: Its close on 2026-10-23 was 24% above its 50-day average\. reused from 2026-10-26/)
+  assert.match(html, /<a href="https:\/\/www\.nseindia\.com\/companies-listing\/corporate-filings-board-meetings">/)
+  assert.match(page, /Reviews missing, so each buy waits a session: IN:RATEGAIN, by Risk: The Risk analyst failed/)
+  assert.match(page, /Web searches: Events searched for "Rategain board meeting results date"/)
+  // The Portfolio Manager's drop of Rategain follows Chart's veto.
+  assert.match(page, /Judged on 2026-12-24\. The Desk's views behind it: Chart on Rategain Travel Technologies Ltd: veto the buy\. It closed 24% above its 50-day average after a run without a pause\. \(reused from 2026-10-26\)/)
+  assert.match(page, /Held back a session, their Desk review missing; the next Rule plan buys them again: Stove Kraft Ltd \(IN:STOVEKRAFT\), 2398 shares: The Risk analyst failed/)
+})
+
+test("a Desk that didn't review says so, and one that needed no analyst says that", async () => {
+  prepare()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'desk', status: 'failed', log: 'logs/desk.log' }, { name: 'brief', status: 'pending' }] as never })
+  assert.match(text(await brief()), /The Desk The Desk didn't review in this Run, so each buy it had to review waits a session\. See its log: logs\/desk\.log/)
+  ws.cleanup()
+
+  prepare()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'desk', status: 'skipped' }, { name: 'brief', status: 'pending' }] })
+  assert.match(text(await brief()), /The Desk No name needed an analyst today, so none was called\./)
+})
+
+test('an early exit the Desk proposed waits for an Approve or Reject, and one approved shows until its paper Book sells it', async () => {
+  prepare()
+  ws.prepareRun(runId, { pipeline: 'stocks', steps: [{ name: 'check', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  const modes = JSON.parse(example('judgement-show.books.json'))
+  const approved = { ...JSON.parse(example('exits-decide.approved.json')).exit, id: 2, decision: 'approved' }
+  modes.exits.push(approved)
+  ws.writeRunFile(runId, 'judgement-show.json', modes)
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(page, /Early exits waiting for your approval: 1/)
+  assert.match(page, /3 The India Book's paper Book Asian Paints Ltd IN:ASIANPAINT 2026-10-26, the Desk's Events analyst Its promoters pledged 12% more/)
+  assert.match(page, /2 The India Book's paper Book IDFC First Bank Ltd IN:IDFCFIRSTB .* Approved: it sells on the next Rule plan/)
+  assert.match(html, /data-item="exit:3"/)
+  assert.doesNotMatch(html, /data-item="exit:2"/)
+})
+
 test('a proposal to move a Judgement mode or change a Playbook range waits for an Approve or Reject', async () => {
   prepare()
   ws.writeRunFile(runId, 'judgement-show.json', JSON.parse(example('judgement-show.books.json')))

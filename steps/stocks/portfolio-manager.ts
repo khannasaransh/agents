@@ -2,11 +2,12 @@
 // Playbook: its exposure level for the day and its changes from the Rule plan, each with a Decision
 // record, the Brief's commentary on each Book, and its Journal's new entries. On Saturdays it also
 // writes the weekly review's commentary and proposes the promotions the review lists as due, and on
-// a month's first Saturday the monthly review's commentary. It runs
-// read-only in the Run folder, on Claude Code with Codex as fallback, given the Rule plans, the Book
-// states, the Stages, the Health Agent's diagnosis, the review's figures (null on other days) and its
-// Journal (the dossiers are null until issue 37). Its answer is kept as portfolio-manager.json, with
-// the Journal it read, for the Check Step (which holds each change to the final check in ash_new) and
+// a month's first Saturday the monthly review's commentary. It runs read-only in the Run folder, on
+// Claude Code with Codex as fallback, given the Rule plans, the Book states, the Stages, the Health
+// Agent's diagnosis, the review's figures (null on other days), the Desk's views (issue 39; null when
+// the Desk didn't review) and its Journal; not the dossiers, which the Desk reads. Each Decision
+// record names the Desk's views it follows. Its answer is kept as portfolio-manager.json, with the
+// Journal it read, for the Check Step (which holds each change to the final check in ash_new) and
 // Save state (which applies the Journal and records the promotions). It skips itself unless this
 // Run's Plan Step succeeded with a paper Book's plan to judge, or there is a review to comment on. An
 // Agent that fails on both Workers is recorded as failed, and fails the Step: the Rule plans go out
@@ -15,6 +16,7 @@ import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { inputFiles, journalMemory } from '../../agents/portfolio-manager/config.ts'
 import { loadAgent } from '../../src/agent.ts'
+import type { DeskResult } from '../../src/desk.ts'
 import { readJson, writeJson } from '../../src/files.ts'
 import { readMemory } from '../../src/memory.ts'
 import { percent } from '../../src/plans.ts'
@@ -40,6 +42,11 @@ export type PortfolioManagerResult =
   | { status: 'answered'; answer: PortfolioManagerAnswer; journalRead: string; inputs: string[] }
   | { status: 'failed'; error: string }
 
+/** The Desk's views and the reviews missing, as the Portfolio Manager reads them; null when the Desk didn't review. */
+function deskOf(desk: DeskResult | null) {
+  return desk && { views: desk.views.map(({ run, ...view }) => view), missing: desk.missing }
+}
+
 await runAsStep(async ({ runId, runFolder }) => {
   const out = join(runFolder, 'portfolio-manager.json')
   // What an earlier run of this Step judged was another Run of the Plan Step's plans.
@@ -64,6 +71,7 @@ await runAsStep(async ({ runId, runFolder }) => {
     health: read(inputFiles.health),
     review,
     dossiers: null,
+    desk: deskOf(read<DeskResult>('desk.json')),
     journal,
   }
   let answer: PortfolioManagerAnswer

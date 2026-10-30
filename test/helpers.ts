@@ -111,6 +111,8 @@ export interface WorkerCliBehavior {
   answerAfterMs?: number
   /** Write these files, by path within the folder it runs in, before answering, as an Agent that edits files would. */
   writeFiles?: Record<string, string>
+  /** How it answers a call whose prompt holds this text instead, the first that matches: for Agents that share a Worker. */
+  byPrompt?: Record<string, WorkerCliBehavior>
 }
 
 /** A wiki repo standing in for Saransh's, with his checkout on main and stand-ins for the wiki's tools. */
@@ -585,10 +587,11 @@ const filesIn = (folder) => readdirSync(folder).flatMap((entry) => {
   const path = join(folder, entry)
   return statSync(path).isDirectory() ? filesIn(path) : [path]
 })
-const behavior = existsSync(${behaviorFile})
+const given = existsSync(${behaviorFile})
   ? JSON.parse(readFileSync(${behaviorFile}, 'utf8'))
   : { stderr: '${command} stand-in: this test expects no ${command} call', exitCode: 1 }
 const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid, home: process.env.HOME }
+const behavior = Object.entries(given.byPrompt ?? {}).find(([text]) => call.stdin.includes(text))?.[1] ?? given
 try {
   call.cwdChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8', windowsHide: true })
 } catch {}

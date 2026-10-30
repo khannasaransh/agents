@@ -1,4 +1,5 @@
 import type { AgentConfig } from '../../src/agent.ts'
+import { analysts } from '../../src/desk.ts'
 import { changeKinds, levers } from '../../src/pd.ts'
 import type { JsonSchema } from '../../src/schema.ts'
 
@@ -19,7 +20,7 @@ const nullable = (type: 'string' | 'number' | 'integer', description: string): J
 const decision: JsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['rule_plan', 'instead', 'lever', 'playbook', 'figures', 'expected', 'judged_on'],
+  required: ['rule_plan', 'instead', 'lever', 'playbook', 'figures', 'expected', 'judged_on', 'views'],
   properties: {
     rule_plan: { type: 'string', description: 'What the Rule plan said: its order in words, or its exposure level' },
     instead: { type: 'string', description: 'What goes out instead, in words' },
@@ -42,6 +43,16 @@ const decision: JsonSchema = {
     },
     expected: { type: 'string', description: 'What you expect to happen' },
     judged_on: { type: 'string', description: "The session it is judged on, YYYY-MM-DD, after the plan's session" },
+    views: {
+      type: 'array',
+      description: "The Desk's views it follows, each by its analyst and the security it is of. Empty when it follows none",
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['analyst', 'security_id'],
+        properties: { analyst: { type: 'string', enum: analysts }, security_id: { type: 'string' } },
+      },
+    },
   },
 }
 
@@ -100,6 +111,7 @@ const portfolioManager: AgentConfig = {
     health: `The Health Agent's diagnosis of the Lake in this Run (${inputFiles.health}); null when the Lake was healthy and it didn't run`,
     review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, and each real Book's Reconciliation differences; on a month's first Saturday also the monthly review of the month before (monthly): each paper Book's return attributed to its sources, the correlation between its Sleeves and its drawdown against its limits; null on other days`,
     dossiers: "The dossiers of the Rule plan's names: null until the Feeds and dossiers are built",
+    desk: "The Desk's views of the names it reviewed (desk.json): each analyst's (Events, Chart, Risk) view of each name (none, a veto, a trim to a size, or an early exit proposed for Saransh), its reasons, the evidence it cites and when it was made (a view reused from an earlier Run keeps its date), and each review that is missing, whose buy waits a session whatever you decide. Null when the Desk didn't review, no analyst being needed or its Step failing",
     journal: 'Your Journal: the Decision records behind your earlier changes, what each was expected to do, and what is still open. Empty when you have none yet',
   },
   outputs: {

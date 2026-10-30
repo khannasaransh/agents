@@ -6,6 +6,7 @@
     "book-states.json",
     "stages.json"
   ],
+  "missing_reviews": [],
   "books": [
     {
       "book": "IN",
@@ -29,7 +30,8 @@
             }
           ],
           "expected": "The Book holds no more than 40% in stocks while the Correction lasts",
-          "judged_on": "2026-11-23"
+          "judged_on": "2026-11-23",
+          "views": []
         }
       },
       "changes": [
@@ -62,7 +64,13 @@
               }
             ],
             "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
-            "judged_on": "2026-12-24"
+            "judged_on": "2026-12-24",
+            "views": [
+              {
+                "analyst": "chart",
+                "security_id": "IN:RATEGAIN"
+              }
+            ]
           }
         },
         {
@@ -88,7 +96,8 @@
               }
             ],
             "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
-            "judged_on": "2026-12-24"
+            "judged_on": "2026-12-24",
+            "views": []
           }
         }
       ],

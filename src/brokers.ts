@@ -4,7 +4,7 @@
 import type { PdBook, PdBrokerFile, PdDifference } from './pd.ts'
 
 const brokerNames: Record<string, string> = { icici_direct: 'ICICI Direct', moomoo: 'moomoo' }
-const bookNames: Record<string, string> = { IN: 'the India Book', US: 'the US Book', HK: 'the Hong Kong Book' }
+export const bookNames: Record<string, string> = { IN: 'the India Book', US: 'the US Book', HK: 'the Hong Kong Book' }
 const fileNames: Record<string, { tradebook: string; holdings: string }> = {
   icici_direct: { tradebook: 'tradebook', holdings: 'holdings' },
   moomoo: { tradebook: 'trade history', holdings: 'positions' },

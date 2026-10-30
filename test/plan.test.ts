@@ -65,6 +65,23 @@ test('on a quiet day the log says the Desk has no name to review', async () => {
   assert.match(ws.readRunFile(runId, 'logs', 'plan.log'), /The Desk has no name to review/)
 })
 
+test('the log says what each paper plan made of the early exits Saransh approved', async () => {
+  prepare()
+  const plan = example('plan.normal.json')
+  const paper = plan.plans.find((p: { kind: string }) => p.kind === 'paper')
+  paper.early_exits = [
+    { id: 4, security_id: 'IN:IDFCFIRSTB', name: 'IDFC First Bank Ltd', status: 'planned', why: null, orders: ['IN-paper-2026-10-26-004'] },
+    { id: 5, security_id: 'IN:ASIANPAINT', name: 'Asian Paints Ltd', status: 'not_held', why: 'The paper Book no longer holds it: it lapses', orders: [] },
+  ]
+  ws.setPd({ plan: { stdout: JSON.stringify(plan) }, 'book-state': { example: 'book-state.paper.json' } })
+
+  assert.equal((await ws.agents('step', 'plan', '--run', runId)).status, 0)
+
+  const log = ws.readRunFile(runId, 'logs', 'plan.log')
+  assert.match(log, /India Book's paper Book: early exit 4 of IDFC First Bank Ltd: sold by IN-paper-2026-10-26-004/)
+  assert.match(log, /India Book's paper Book: early exit 5 of Asian Paints Ltd: The paper Book no longer holds it: it lapses/)
+})
+
 test('on a day the Data gate fails, the log says every plan is in Hold mode', async () => {
   prepare()
   ws.setPd({ plan: { example: 'plan.hold.json' }, 'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }] })

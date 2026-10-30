@@ -29,7 +29,8 @@ export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model
   const { outputSchema, maxTurns, timeoutSeconds } = agent.config
   const writable = writeFolders(agent, cwd)
   const hasSkills = agent.skills.length > 0
-  const allowed = [...agent.tools.map((tool) => `Bash(${tool.path}:*)`), ...writable.map((folder) => `Edit(/${rulePath(folder)}/**)`)]
+  const search = agent.config.webSearch ? ['WebSearch'] : []
+  const allowed = [...agent.tools.map((tool) => `Bash(${tool.path}:*)`), ...writable.map((folder) => `Edit(/${rulePath(folder)}/**)`), ...search]
   return {
     command: 'claude',
     args: [
@@ -52,7 +53,8 @@ export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model
       '--permission-mode',
       'dontAsk',
       '--tools',
-      ['Read', 'Grep', 'Glob', 'Bash', ...(writable.length ? ['Edit', 'Write'] : []), ...(hasSkills ? ['Skill'] : [])].join(','),
+      // Web search only for an Agent whose config allows it; never WebFetch, which reads any page.
+      ['Read', 'Grep', 'Glob', 'Bash', ...(writable.length ? ['Edit', 'Write'] : []), ...(hasSkills ? ['Skill'] : []), ...search].join(','),
       // The Agent's skills, as a plugin for this session only. Its folder is added so a skill can read its own files.
       ...(hasSkills ? ['--plugin-dir', pluginDir, '--add-dir', pluginDir] : []),
       ...writable.flatMap((folder) => ['--add-dir', folder]),

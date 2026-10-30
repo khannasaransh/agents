@@ -20,17 +20,26 @@ const answered = {
   inputs: ['plan.json', 'book-states.json', 'stages.json'],
 }
 
-/** A stocks Run whose Plan Step ended as `plan` and left `plan.normal.json` behind if it succeeded, and whose Portfolio Manager ended as `pm`. */
-function prepare({ plan = 'succeeded', pm = 'succeeded', dryRun = false } = {}) {
+/** What the Desk Step keeps when it reviewed every name the review list gave it. */
+const reviewed = { analysts: [], views: [], missing: [], refused: [], searches: [], exits: [] }
+
+/**
+ * A stocks Run whose Plan Step ended as `plan` and left `plan.normal.json` behind if it succeeded,
+ * whose Desk ended as `desk` (leaving `deskResult` behind if it succeeded), and whose Portfolio
+ * Manager ended as `pm`.
+ */
+function prepare({ plan = 'succeeded', desk = 'succeeded', deskResult = reviewed as unknown, pm = 'succeeded', dryRun = false } = {}) {
   ws = makeWorkspace()
   const steps = [
     { name: 'plan', status: plan },
+    { name: 'desk', status: desk },
     { name: 'portfolio-manager', status: pm },
     { name: 'check', status: 'pending' },
     { name: 'brief', status: 'pending' },
   ]
   ws.prepareRun(runId, { pipeline: 'stocks', steps, dryRun })
   if (plan === 'succeeded') ws.writeRunFile(runId, 'plan.json', example('plan.normal.json'))
+  if (desk === 'succeeded' || desk === 'failed') ws.writeRunFile(runId, 'desk.json', deskResult)
   if (pm === 'succeeded') ws.writeRunFile(runId, 'portfolio-manager.json', answered)
 }
 
@@ -74,8 +83,47 @@ test("when the Portfolio Manager didn't run, pd check is told so and sends the R
     status: 'failed',
     why: 'The Portfolio Manager Step skipped, so it judged nothing',
     inputs: [],
+    missing_reviews: [],
     books: [],
   })
+})
+
+test('a buy whose Desk review is missing waits a session: pd check is told which reviews are missing, and the log says what it held back', async () => {
+  const missing = { book: 'IN', security_id: 'IN:STOVEKRAFT', analyst: 'chart', why: 'The Chart analyst failed: codex failed: usage limit' }
+  prepare({ desk: 'failed', deskResult: { ...reviewed, missing: [missing] } })
+  const recorded = example('check.recorded.json')
+  const order = example('plan.normal.json').plans.find((p: { kind: string }) => p.kind === 'paper').orders.find((o: { security_id: string }) => o.security_id === 'IN:STOVEKRAFT')
+  recorded.lists[0].judgement.held_back = [{ order, why: missing.why }]
+  ws.setPd({ check: { stdout: JSON.stringify(recorded) }, ...standing })
+
+  const result = await ws.agents('step', 'check', '--run', runId)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'judgement.json')).missing_reviews, [missing])
+  const log = ws.readRunFile(runId, 'logs', 'check.log')
+  assert.match(log, /IN:STOVEKRAFT's review by Chart is missing, so its buy waits a session: The Chart analyst failed/)
+  assert.match(log, /India Book's paper Book: held back the buy of IN:STOVEKRAFT a session: The Chart analyst failed/)
+})
+
+test("when the Desk didn't review, every review the review list required is missing, and when it needed no analyst, none is", async () => {
+  prepare({ desk: 'pending', pm: 'failed' })
+  ws.setPd({ check: { example: 'check.recorded.json' }, ...standing })
+
+  assert.equal((await ws.agents('step', 'check', '--run', runId)).status, 0)
+
+  const judgement = JSON.parse(ws.readRunFile(runId, 'judgement.json'))
+  assert.equal(judgement.status, 'failed')
+  assert.deepEqual(
+    judgement.missing_reviews.map((m: { security_id: string; analyst: string }) => `${m.security_id} ${m.analyst}`),
+    ['IN:RATEGAIN chart', 'IN:RATEGAIN events', 'IN:STOVEKRAFT chart', 'IN:RATEGAIN risk', 'IN:STOVEKRAFT risk'],
+  )
+  assert.ok(judgement.missing_reviews.every((m: { why: string }) => m.why === 'The Desk Step pending, so it reviewed nothing'))
+  ws.cleanup()
+
+  prepare({ desk: 'skipped' })
+  ws.setPd({ check: { example: 'check.recorded.json' }, ...standing })
+  assert.equal((await ws.agents('step', 'check', '--run', runId)).status, 0)
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'judgement.json')).missing_reviews, [])
 })
 
 test('a list that sends only its exits and stops raises its To-do', async () => {

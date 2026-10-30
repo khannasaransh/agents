@@ -1,0 +1,18 @@
+{
+  "changed": true,
+  "why": null,
+  "exit": {
+    "id": 4,
+    "book": "IN",
+    "security_id": "IN:IDFCFIRSTB",
+    "name": "IDFC First Bank Ltd",
+    "why": "The RBI's order against its lending practices, filed on 26 October, is serious enough to sell before results.",
+    "by": "the Desk's Events analyst",
+    "run": "2026-10-27-0930",
+    "at": "2026-10-27T04:02:51+00:00",
+    "decision": "approved",
+    "decided_at": "2026-10-28T01:30:00+00:00",
+    "order_list_id": null,
+    "outcome": null
+  }
+}

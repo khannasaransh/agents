@@ -258,3 +258,16 @@ test("every Worker gives the Agent its instructions, its Tools with their usage,
     assert.ok(stdin.includes(`- **findings:** ${reviewer.outputs.findings}`), stdin)
   }
 })
+
+test('an Agent whose config allows web search gets its Worker\'s web search, and no other web access', () => {
+  const searcher = agent({ ...reviewer, webSearch: true })
+  const claude = claudeCodeCommandLine(searcher, inputs, claudeCodeOptions).args
+  const codex = codexCommandLine(searcher, inputs, codexOptions).args
+
+  assert.deepEqual(valuesOf(claude, '--tools'), ['Read,Grep,Glob,Bash,WebSearch'])
+  assert.deepEqual(claude.slice(claude.indexOf('--allowedTools') + 1), ['WebSearch'])
+  assert.ok(valuesOf(codex, '--config').includes('web_search="live"'))
+  // Without it, neither Worker searches.
+  assert.ok(!valuesOf(claudeCodeCommandLine(agent(), inputs, claudeCodeOptions).args, '--tools')[0].includes('Web'))
+  assert.ok(valuesOf(codexCommandLine(agent(), inputs, codexOptions).args, '--config').includes('web_search="disabled"'))
+})

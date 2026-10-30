@@ -48,7 +48,13 @@
                 }
               ],
               "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
-              "judged_on": "2026-12-24"
+              "judged_on": "2026-12-24",
+              "views": [
+                {
+                  "analyst": "chart",
+                  "security_id": "IN:RATEGAIN"
+                }
+              ]
             },
             "lever": "selection",
             "accepted": true,
@@ -104,7 +110,8 @@
                 }
               ],
               "expected": "In a Correction its RS Rating of 71 is the weakest of the plan's buys; it lags the Book's other names",
-              "judged_on": "2026-12-24"
+              "judged_on": "2026-12-24",
+              "views": []
             },
             "lever": "selection",
             "accepted": false,
@@ -114,6 +121,7 @@
           }
         ],
         "todo": null,
+        "held_back": [],
         "commentary": "India is in a Correction, so the paper Book starts at its 40% exposure level. Of the Rule plan's two buys, Rategain is the weaker, and I left it out; Stove Kraft goes out as planned."
       }
     },

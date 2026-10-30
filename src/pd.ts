@@ -486,7 +486,7 @@ export interface PdPlanOrder {
   value: number
   /** A buy's limit: the last close plus the Book's tolerance; null for a sale. */
   limit: number | null
-  /** first_allocation, rebalance, stop_loss, target, regime, untradeable, deferred, reweighting, breaker or disaster_stop. */
+  /** first_allocation, rebalance, stop_loss, target, regime, untradeable, deferred, reweighting, breaker, disaster_stop, or early_exit (an early exit Saransh approved, issue 39). */
   reason: string
   /** What of its strategy's track signalled it; null for the Book's own orders and gold's. */
   signal: { kind: 'trade' | 'holding' | 'waiting'; action?: string; weight?: number; signal_date?: string; score?: number; rank?: number } | null
@@ -590,6 +590,11 @@ export interface PdRulePlan {
   reserved?: number
   /** A paper Book's plan's: the buys made to wait that may still be bought on its session, each by its Override's id. */
   waits?: (PdBuyable & { id: number; sleeve: string; shares: number; until: string })[]
+  /**
+   * A paper Book's plan's (issue 39): each early exit Saransh approved that it sells (its sale's
+   * orders), or why not: hold and not_sellable wait for a later plan; not_held lapses.
+   */
+  early_exits?: { id: number; security_id: string; name: string | null; status: 'planned' | 'hold' | 'not_sellable' | 'not_held'; why: string | null; orders: string[] }[]
 }
 
 /** A market's Market condition, as ash_new reads it from the Lake (issue 46). */
@@ -679,6 +684,30 @@ export interface PdReviewList {
   holdings: { security_id: string; name: string | null; market: string; held_by: PdHeldBy[] }[]
 }
 
+/** What `pd plan --dossiers` writes for each name the Desk reviews (contract/dossier.schema.json), as far as the Desk reads it. */
+export interface PdDossier {
+  security_id: string
+  name: string | null
+  market: string
+  currency: string
+  sector: string | null
+  industry: string | null
+  made_at: string
+  /** Its last session. */
+  as_of: string
+  data_version: string
+  /** About a year of daily bars: the RS Rating that day and the close's distance from the 52-week high. */
+  bars: { date: string; open: number | null; high: number | null; low: number | null; close: number; volume: number | null; rs_rating: number | null; from_high: number | null }[]
+  /** MarketSmith's snapshot entry, naming the snapshot. */
+  marketsmith: Record<string, unknown> | null
+  fundamentals: Record<string, unknown> | null
+  /** When its events were last brought up to date, by pd plan or pd feeds. */
+  events_as_of: string | null
+  events: PdEvent[]
+  /** Its orders in the plan, with the strategy and signal behind each. */
+  orders: Pick<PdPlanOrder, 'id' | 'book' | 'sleeve' | 'side' | 'shares' | 'price' | 'limit' | 'reason' | 'signal' | 'cuts'>[]
+}
+
 /** An event from the Feeds: its day is the one it is about (a meeting's, results'), else the day it was published. */
 export interface PdEvent {
   id: string
@@ -735,6 +764,8 @@ export interface PdDecisionRecord {
   expected: string
   /** The session it is judged on, after the plan's. */
   judged_on: string
+  /** The Desk's views it follows (issue 39), each by its analyst and the security it is of. */
+  views: { analyst: PdAnalyst; security_id: string }[]
 }
 
 /** The kinds of change from the Rule plan the Portfolio Manager may make (issue 34). */
@@ -784,7 +815,17 @@ export interface PdJudgement {
   status: 'answered' | 'failed'
   why: string | null
   inputs: string[]
+  /** Each review the review list required that the Desk didn't give (issue 39): its buy waits a session. */
+  missing_reviews: PdMissingReview[]
   books: PdJudgedBook[]
+}
+
+/** A review of a buy the review list required that the Desk didn't give, and why. */
+export interface PdMissingReview {
+  book: 'IN' | 'US' | 'HK'
+  security_id: string
+  analyst: PdAnalyst
+  why: string
 }
 
 /** A change as the final check judged it: whether it was accepted and why not, the Rule plan's order it changed and the orders it made. */
@@ -812,6 +853,8 @@ export interface PdListJudgement {
   changes: PdJudgedChange[]
   /** When only the exits and stops went out: what Saransh should look into. */
   todo: string | null
+  /** The buys held back a session, their Desk review missing (issue 39), each with why. */
+  held_back: { order: PdPlanOrder; why: string }[]
   commentary: string | null
 }
 
@@ -874,6 +917,36 @@ export interface PdJudgementShow {
   books: { book: string; name: string; real: PdJudgementSide; paper: PdJudgementSide; playbook: PdPlaybook; playbook_changes: Record<string, number>[]; history: unknown[] }[]
   /** The proposals waiting on Saransh, oldest first. */
   proposals: PdJudgementProposal[]
+  /** The early exits waiting on Saransh, then those approved whose sale hasn't gone out on an Order list, oldest first. */
+  exits: PdEarlyExit[]
+}
+
+/**
+ * An early exit (issue 39): a sale of a name a paper Book holds, before its strategy sells it, which
+ * an analyst of the Desk proposed. Approved, its sale goes out on the paper Book's next Rule plan.
+ */
+export interface PdEarlyExit {
+  id: number
+  book: 'IN' | 'US' | 'HK'
+  security_id: string
+  name: string | null
+  why: string
+  by: string
+  run: string | null
+  at: string
+  decision: 'approved' | 'rejected' | null
+  decided_at: string | null
+  /** The Order list that carried its sale. */
+  order_list_id: number | null
+  /** listed: a list carried its sale; lapsed: its paper Book no longer held the name. */
+  outcome: 'listed' | 'lapsed' | null
+}
+
+/** What `pd exits propose|approve|reject` prints (contract/exits-decide.schema.json). */
+export interface PdExitDecided {
+  changed: boolean
+  why: string | null
+  exit: PdEarlyExit | null
 }
 
 /** A paper Book on its last close filled, or its capital before its first Order list fills. */

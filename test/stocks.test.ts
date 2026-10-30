@@ -60,7 +60,8 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['health', 'skipped'],
       ['plan', 'succeeded'],
       ['feeds', 'succeeded'],
-      // The fake Worker stands in for the Portfolio Manager, so its Journal is never saved.
+      // The fake Worker stands in for the Desk's analysts and the Portfolio Manager, so no view is kept and its Journal is never saved.
+      ['desk', 'succeeded'],
       ['portfolio-manager', 'succeeded'],
       ['check', 'succeeded'],
       ['save-state', 'skipped'],
@@ -130,16 +131,20 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['health', 'failed'],
       ['plan', 'succeeded'],
       ['feeds', 'succeeded'],
+      ['desk', 'failed'],
       ['portfolio-manager', 'failed'],
       ['check', 'succeeded'],
       ['save-state', 'skipped'],
       ['brief', 'succeeded'],
     ],
   )
-  // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent and the Portfolio Manager fail on both.
-  assert.equal(ws.workerCliCalls('codex').length, 2)
-  assert.equal(ws.workerCliCalls('claude').length, 2)
-  assert.equal(JSON.parse(ws.readRunFile(id, 'judgement.json')).status, 'failed')
+  // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent, the Desk's three analysts and the Portfolio Manager fail on both.
+  assert.equal(ws.workerCliCalls('codex').length, 5)
+  assert.equal(ws.workerCliCalls('claude').length, 5)
+  const judgement = JSON.parse(ws.readRunFile(id, 'judgement.json'))
+  assert.equal(judgement.status, 'failed')
+  // So the buys the Desk had to review are missing their reviews, and wait a session.
+  assert.deepEqual([...new Set(judgement.missing_reviews.map((m: { analyst: string }) => m.analyst))].sort(), ['chart', 'events', 'risk'])
   const brief = ws.readRunFile(id, 'brief.html')
   assert.match(brief, /Data gate: fail/)
   assert.match(brief, /The Health Agent failed, so there is no diagnosis: claude-code failed/)

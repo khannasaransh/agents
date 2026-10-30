@@ -291,7 +291,10 @@ test("an Answer on a Judgement proposal approves or rejects it through pd judgem
   ws.writeRunFile(briefRun, 'judgement-show.json', JSON.parse(readFileSync(join(pdExamples, 'judgement-show.books.json'), 'utf8')))
   assert.equal((await ws.agents('step', 'brief', '--run', briefRun)).status, 0)
   const items: AnswerItem[] = JSON.parse(ws.readRunFile(briefRun, 'brief.html').match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
-  assert.deepEqual(items, [{ item: 'judgement:3', answers: ['approve', 'reject'] }])
+  assert.deepEqual(items, [
+    { item: 'exit:3', answers: ['approve', 'reject'] },
+    { item: 'judgement:3', answers: ['approve', 'reject'] },
+  ])
   save(answersFile(briefRun, items, { 'judgement:3': { answer: 'reject', note: 'Not yet' } }, '2026-10-27T03:10:00.000Z'))
   prepareRun(nextRun)
   ws.setPd({ judgement: { example: 'judgement-decide.approved.json' } })
@@ -300,6 +303,22 @@ test("an Answer on a Judgement proposal approves or rejects it through pd judgem
 
   assert.deepEqual(pdCallArgs(), [['judgement', 'reject', '3']])
   assert.deepEqual(outcomes(nextRun), [['judgement:3', 'reject', 'applied']])
+})
+
+test('an Answer on an early exit the Desk proposed approves it through pd exits, so the next Rule plan sells the holding', async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(briefRun, { pipeline: 'stocks', steps: [{ name: 'check', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(briefRun, 'judgement-show.json', JSON.parse(readFileSync(join(pdExamples, 'judgement-show.books.json'), 'utf8')))
+  assert.equal((await ws.agents('step', 'brief', '--run', briefRun)).status, 0)
+  const items: AnswerItem[] = JSON.parse(ws.readRunFile(briefRun, 'brief.html').match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
+  save(answersFile(briefRun, items, { 'exit:3': { answer: 'approve' } }, '2026-10-27T03:10:00.000Z'))
+  prepareRun(nextRun)
+  ws.setPd({ exits: { example: 'exits-decide.approved.json' } })
+
+  assert.equal((await step(nextRun)).status, 0)
+
+  assert.deepEqual(pdCallArgs(), [['exits', 'approve', '3']])
+  assert.deepEqual(outcomes(nextRun), [['exit:3', 'approve', 'applied']])
 })
 
 test('an Answer on a promotion approves it through pd stages promote, or rejects it through pd stages reject', async () => {

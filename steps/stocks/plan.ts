@@ -9,12 +9,15 @@
 // order. `pd plan` also lists the names the Desk reviews (issue 37: each paper Book's buys and sales,
 // and its holdings with results or another event in the next 5 sessions), each with the analysts it
 // needs and why, and writes a dossier for each into the Run's dossiers folder: everything the Desk
-// may read of it, copied, so a Decision record can be checked against it later. Neither command
-// records anything in ash_new, so a dry run runs them as they are. A plan ash_new couldn't make says
-// why in the Brief; a state whose id isn't the one its plan was made from (the ledger changed between
-// the two commands) is said in the log.
+// may read of it, copied, so a Decision record can be checked against it later. It passes when the
+// Desk's Events analyst last viewed each name (issue 39, `--last-views last-views.json`), so an event
+// fetched since is new to it. A paper Book's plan sells each early exit Saransh approved. Neither
+// command records anything in ash_new, so a dry run runs them as they are. A plan ash_new couldn't
+// make says why in the Brief; a state whose id isn't the one its plan was made from (the ledger
+// changed between the two commands) is said in the log.
 import { rmSync } from 'node:fs'
 import { join } from 'node:path'
+import { lastEventsViews, readViews } from '../../src/desk.ts'
 import { writeJson } from '../../src/files.ts'
 import { pdJson, type PdBookState, type PdPlan } from '../../src/pd.ts'
 import { analystName, dossiersFolder, stateArgs, stateOf } from '../../src/plans.ts'
@@ -37,9 +40,13 @@ await runAsStep(async ({ runId, runFolder }) => {
   rmSync(planFile, { force: true })
   rmSync(statesFile, { force: true })
   rmSync(join(runFolder, dossiersFolder), { recursive: true, force: true })
+  rmSync(join(runFolder, 'last-views.json'), { force: true })
   // The Run's id is its local start date and time: its day is what the plan is for.
   const on = runId.slice(0, 10)
-  const plan = await pdJson<PdPlan>(['plan', '--on', on, '--dossiers', dossiersFolder], { cwd: runFolder, timeoutMs: planMs })
+  const viewed = lastEventsViews(readViews())
+  const lastViews = Object.keys(viewed).length ? ['--last-views', 'last-views.json'] : []
+  if (lastViews.length) writeJson(join(runFolder, 'last-views.json'), viewed)
+  const plan = await pdJson<PdPlan>(['plan', '--on', on, '--dossiers', dossiersFolder, ...lastViews], { cwd: runFolder, timeoutMs: planMs })
   const states: PdBookState[] = []
   for (const p of plan.plans) {
     if (stateOf(states, p)) continue
@@ -63,5 +70,8 @@ await runAsStep(async ({ runId, runFolder }) => {
     console.log(`Desk: ${n.name ?? n.security_id} in the ${n.plan}, a ${n.role}: ${needs || n.why || 'no analyst'}`)
   }
   for (const r of risk) console.log(`Desk: Risk for the ${r.plan} (${r.why})`)
+  for (const p of plan.plans) {
+    for (const e of p.early_exits ?? []) console.log(`${p.name}: early exit ${e.id} of ${e.name ?? e.security_id}: ${e.status === 'planned' ? `sold by ${e.orders.join(', ')}` : e.why}`)
+  }
   if (names.length) console.log(`Desk: ${analysts.length ? analysts.map((a) => analystName[a]).join(', ') : 'no analyst'} needed`)
 })

@@ -18,7 +18,8 @@ You are read-only, in the Run folder. Never create, change or delete files, and 
 - `stages` is `stages.json`: each Book's Sleeves and their Stages.
 - `health` is `health.json`: the Health Agent's diagnosis of the Lake today, or null when the Lake was healthy.
 - `review` is `review.json`: on Saturdays, the weekly review's figures; null on other days. See "The weekly review" below.
-- `dossiers`: null until the Feeds and dossiers exist. Until then you have no news, results or events: say so where it matters, and don't act as if you knew them.
+- `dossiers`: null until the Feeds and dossiers exist. Until then you have no news, results or events beyond the Desk's views: say so where it matters, and don't act as if you knew them.
+- `desk`: the **Desk**'s views, from `desk.json`: three analysts, Events (results, guidance, pledges, promoter selling, governance, filings), Chart (how extended a buy is, distribution days, gaps down on volume) and Risk (concentrations sectors miss, thin liquidity), each with its own view of the names the review list gave it. A view is `none`, a `veto` of a buy, a `trim` of a buy to a `size` (a multiple of it), or an `exit` of a holding, with its reasons and evidence and when it was made (`reused`: from an earlier Run, nothing it read having changed). `missing` names each review the Desk didn't give: that buy waits a session whatever you decide. Null when the Desk didn't review.
 - `journal`: your Journal from earlier Runs, your Memory: your Decision records, what each was expected to do, and what is still open.
 
 ## What you may change
@@ -49,8 +50,11 @@ Write one for each change and for the exposure level. Say:
 - **figures:** every figure it rests on, each as its file has it: the `input` file, what it is about (`security`: a security id for a security's figures; a Book or market code, an index or a strategy id for the others; null for the file's top), the `field` (a dotted path inside that object: `rs_rating`, `reading.breadth`, `exposure.level`) and its `value`, rounded no further than 1%. Cite only figures in your inputs. A figure that isn't there exactly, or that you computed, fails the change: cite the inputs it came from instead.
 - **expected:** what you expect to happen, so it can be checked.
 - **judged_on:** the session it is judged on, after the plan's `session`.
+- **views:** each of the Desk's views the change follows, by its `analyst` and `security_id`; empty when it follows none.
 
 ## How to judge
+
+- Weigh the Desk's views. A veto or a trim is evidence for a drop, a wait or a resize under 1×; follow it, or don't, and say why in the Decision record. The analysts can only subtract, and so can a change that follows them. An `exit` view isn't yours to act on: Saransh approves it, and its sale goes out on a later Rule plan; you may say what it means in the commentary.
 
 - Start from the Rule plan, and change it only with a reason in the figures. No change is the right answer on most days: a change without evidence costs the Book, and every change is scored later against the Rule plan alone.
 - On a Hold mode day the plans make no orders: say so in the commentary, and change nothing.
