@@ -9,7 +9,7 @@ import { cli, git, gitEnvWithoutPath, type CliResult, type RepoEntry } from './h
 // The workspace in helpers.ts can't run on Windows yet (issue 16), and setup must, so its tests
 // make their own machine.
 
-const standIns = ['node', 'claude', 'codex', 'agy']
+const standIns = ['node', 'claude', 'codex', 'agy', 'agent']
 
 /**
  * This machine's PATH without the folders holding a command the tests stand in for, so git is the
@@ -55,7 +55,7 @@ function makeMachine(): Machine {
   let path = [binDir, ...realPath]
   for (const folder of [binDir, homeDir, workerConfig]) mkdirSync(folder)
   // Every tool present and current, unless a test says otherwise.
-  const tools: Record<(typeof standIns)[number], string | null> = { node: 'v26.12.1', claude: '2.1.310 (Claude Code)', codex: 'codex-cli 0.163.0', agy: '1.4.5' }
+  const tools: Record<(typeof standIns)[number], string | null> = { node: 'v26.12.1', claude: '2.1.310 (Claude Code)', codex: 'codex-cli 0.163.0', agy: '1.4.5', agent: '2026.09.02' }
 
   const machine: Machine = {
     root,
@@ -278,6 +278,7 @@ test('setup reports the version of each tool the Pipeline needs', async () => {
     assert.match(toolLine(result.stdout, 'claude') ?? '', /claude 2\.1\.310$/)
     assert.match(toolLine(result.stdout, 'codex') ?? '', /codex 0\.163\.0$/)
     assert.match(toolLine(result.stdout, 'agy') ?? '', /agy 1\.4\.5$/)
+    assert.match(toolLine(result.stdout, 'agent') ?? '', /agent 2026\.09\.02$/)
   } finally {
     machine.cleanup()
   }

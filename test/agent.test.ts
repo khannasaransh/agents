@@ -24,8 +24,8 @@ const configModule = (config: unknown) => `export default ${JSON.stringify(confi
 
 test("the Review Step fails with a message naming what is wrong in the Reviewer's config", async () => {
   const cases: [unknown, RegExp][] = [
-    [{ ...reviewer, worker: { ...reviewer.worker, effort: 'max' } }, /config\.worker\.effort must be one of low, medium, high/],
-    [{ ...reviewer, fallbackWorker: { ...reviewer.fallbackWorker, name: 'gemini' } }, /config\.fallbackWorker\.name must be one of codex, claude-code, antigravity/],
+    [{ ...reviewer, worker: { ...reviewer.worker, effort: 'max' } }, /config\.worker\.effort must be one of low, medium, high, xhigh/],
+    [{ ...reviewer, fallbackWorker: { ...reviewer.fallbackWorker, name: 'gemini' } }, /config\.fallbackWorker\.name must be one of codex, claude-code, antigravity, cursor/],
     [{ ...reviewer, fallbackWorker: reviewer.worker }, /config\.fallbackWorker must name a different Worker from config\.worker/],
     [{ ...reviewer, worker: { name: 'antigravity', model: 'gemini-3.8-flash', effort: 'high' } }, /config\.worker can't be antigravity, which runs only as a fallbackWorker until its headless bugs are fixed/],
     [{ ...reviewer, permissions: 'everything' }, /config\.permissions must be "read-only" or \{ write: \[folders\] \}/],

@@ -100,6 +100,7 @@ function requiredCommands(): RequiredCommand[] {
     // The versions current when the PRD was written, when this Mac had older ones.
     { command: 'codex', minimum: { version: '0.163.0', why: 'update it' } },
     { command: 'agy', minimum: { version: '1.4.5', why: 'update it' } },
+    { command: 'agent' },
   ]
 }
 
@@ -159,6 +160,6 @@ function manualSteps(repos: Repo[], secrets: Secret[]): string[] {
     ...(secrets.length ? [`Secrets the Workers' config needs, which this repo doesn't hold: set ${secrets.map(describeSecret).join('; ')}.`] : []),
     `Secrets and env files: fill in ${join(agentsRoot, '.env')} from .env.example, and copy each Repo's own env files and secrets, which git doesn't hold, from the old machine.`,
     "Folders that aren't Repos, which setup doesn't clone: personal repos, repos without a remote, the Flutter SDK clone, autopay-android, and your checkout of the org wiki (WIKI_FOLDER in .env).",
-    `Workers: log in to claude, codex and agy, then log in once to the Pipeline's own Antigravity home by running agy with HOME set to ${antigravityHomeDir()}.`,
+    `Workers: log in to claude, codex, agy and agent, then log in once to the Pipeline's own Antigravity home by running agy with HOME set to ${antigravityHomeDir()}.`,
   ]
 }

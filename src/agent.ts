@@ -4,10 +4,10 @@ import { pathToFileURL } from 'node:url'
 import { agentsDir } from './paths.ts'
 import { schemaErrors, type JsonSchema } from './schema.ts'
 
-export const workerNames = ['codex', 'claude-code', 'antigravity'] as const
+export const workerNames = ['codex', 'claude-code', 'antigravity', 'cursor'] as const
 export type WorkerName = (typeof workerNames)[number]
 
-const efforts = ['low', 'medium', 'high'] as const
+const efforts = ['low', 'medium', 'high', 'xhigh'] as const
 export type Effort = (typeof efforts)[number]
 
 /** A Worker to run an Agent on, with the model and reasoning effort to ask it for. */

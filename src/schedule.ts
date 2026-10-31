@@ -210,7 +210,7 @@ function windowsArg(arg: string): string {
 }
 
 /** The commands a scheduled Run needs to find on its PATH: git and the Worker CLIs. */
-const neededCommands = ['git', 'claude', 'codex', 'agy']
+const neededCommands = ['git', 'claude', 'codex', 'agy', 'agent']
 /** On Windows, ash_new's uv as well, for the stocks Pipeline. */
 const neededOnWindows = [...neededCommands, 'uv']
 

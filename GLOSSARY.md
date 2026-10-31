@@ -11,7 +11,7 @@ A folder that defines one job for a Worker to do: its instructions, its config, 
 _Avoid_: bot, assistant, orchestrator
 
 **Worker**:
-The coding-agent CLI that runs an Agent: Claude Code, Codex or Antigravity.
+The coding-agent CLI that runs an Agent: Claude Code, Codex, Antigravity or the Cursor CLI.
 _Avoid_: engine, provider, harness, model (a Worker runs a model; it is not one)
 
 **Tool**:

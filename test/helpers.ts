@@ -144,7 +144,7 @@ export interface WorkerCliCall {
   pluginFiles?: Record<string, string>
 }
 
-const workerClis = ['codex', 'claude', 'agy'] as const
+const workerClis = ['codex', 'claude', 'agy', 'agent'] as const
 
 /** The folder of example files the stand-in `pd` answers with, each valid against ash_new's schema for its command. */
 export const pdExamples = fileURLToPath(new URL('./pd/', import.meta.url))

@@ -14,7 +14,7 @@ import { captureConfig, defaultRoot, setupMachine } from './setup.ts'
 const usage = `Usage:
   agents run <pipeline> [--dry-run]         Start a Run of a Pipeline, such as daily, weekly or stocks. A dry
              [--worker <name>]              run runs every Agent on the fake Worker and changes
-             [--scheduled]                  nothing in ash_new. --worker (codex or claude-code) runs
+             [--scheduled]                  nothing in ash_new. --worker (codex, claude-code or cursor) runs
              [--env <name>=<value>]         every Agent on that Worker, using the model the Agent
                                             already names for it, and can't be combined with a dry
                                             run. A scheduled Run, as a Schedule starts it, records
