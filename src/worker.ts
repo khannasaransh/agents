@@ -4,6 +4,7 @@ import { schemaErrors } from './schema.ts'
 import { antigravityWorker } from './workers/antigravity.ts'
 import { claudeCodeWorker } from './workers/claude-code.ts'
 import { codexWorker } from './workers/codex.ts'
+import { cursorWorker } from './workers/cursor.ts'
 import { fakeWorker } from './workers/fake.ts'
 
 /** What a Step passes to an Agent call, by the input names the Agent's config declares. */
@@ -25,7 +26,7 @@ export interface Worker {
   call(agent: Agent, inputs: Inputs, options: CallOptions): Promise<unknown>
 }
 
-const workers: Record<WorkerName, Worker> = { codex: codexWorker, 'claude-code': claudeCodeWorker, antigravity: antigravityWorker }
+const workers: Record<WorkerName, Worker> = { codex: codexWorker, 'claude-code': claudeCodeWorker, antigravity: antigravityWorker, cursor: cursorWorker }
 
 /** The Worker a call tries first, then its fallback. `override` swaps in the Agent's other Worker when that is the one named. */
 export function attemptOrder(agent: Agent, override?: WorkerName): [WorkerChoice, WorkerChoice] {

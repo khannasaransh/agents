@@ -9,6 +9,7 @@ import { antigravityCustomAgent, antigravityCommandLine, antigravityPermissions 
 import { claudeCodeCommandLine } from '../src/workers/claude-code.ts'
 import type { CommandLine } from '../src/workers/cli.ts'
 import { codexCommandLine } from '../src/workers/codex.ts'
+import { cursorCommandLine } from '../src/workers/cursor.ts'
 
 // Absolute paths as this platform spells them: on Windows, on the current drive.
 const cwd = resolve('/data/worktrees/crux_flutter-x1Yz')
@@ -55,8 +56,8 @@ const antigravityOptions = { cwd, model: 'gemini-3.8-flash', effort: 'high', hom
 /** The values that follow each use of `flag`. */
 const valuesOf = (args: string[], flag: string) => args.flatMap((arg, i) => (arg === flag ? [args[i + 1]] : []))
 
-/** The prompt a command line gives its CLI: on stdin, or in Antigravity's --print option. */
-const promptOf = ({ args, stdin }: CommandLine) => stdin || args.find((arg) => arg.startsWith('--print='))!.slice('--print='.length)
+/** The prompt a command line gives its CLI: on stdin, in Antigravity's --print option, or as the Cursor CLI's argument. */
+const promptOf = ({ args, stdin }: CommandLine) => stdin || args.find((arg) => arg.startsWith('--print='))?.slice('--print='.length) || args.at(-1)!
 
 /** The permission profile a Codex command line sets up. */
 const profileOf = (args: string[]) => valuesOf(args, '--config').find((value) => value.startsWith('permissions.agent='))
@@ -243,11 +244,62 @@ test("the Antigravity Worker gives the Agent its skills as text in the prompt, w
   assert.match(prompt, /\n## Limits\n\nYour commands run in a sandbox .*never ask to run a command outside the sandbox.*a refusal ends your call\.\n/)
 })
 
+const cursorOptions = { cwd, model: 'grok-4.7', effort: 'xhigh' } as const
+
+test('the Cursor Worker runs a read-only Agent through the Cursor CLI in ask mode, on Grok 4.7 at extra high effort, and asks for only the JSON object', () => {
+  const line = cursorCommandLine(agent(), inputs, cursorOptions)
+
+  assert.equal(line.command, 'agent')
+  assert.equal(line.stdin, '')
+  assert.deepEqual(line.env, {})
+  assert.equal(line.timeoutSeconds, 900)
+  const prompt = promptOf(line)
+  assert.deepEqual(line.args, [
+    '--print',
+    '--output-format',
+    'json',
+    '--model',
+    'grok-4.7[effort=xhigh]',
+    '--trust',
+    '--workspace',
+    cwd,
+    '--sandbox',
+    'enabled',
+    '--mode',
+    'ask',
+    prompt,
+  ])
+  assert.match(prompt, /You are in ask mode/)
+  assert.match(prompt, /Do not search the web/)
+  assert.match(prompt, /Hand back only the JSON object/)
+})
+
+test('the Cursor Worker lets an Agent write by forcing commands through, only in its named folders, and asks for no JSON wrapper when the Agent has no schema', () => {
+  const line = cursorCommandLine(agent(writer), inputs, cursorOptions)
+  const prompt = promptOf(line)
+
+  assert.ok(!line.args.includes('--mode'))
+  assert.ok(line.args.includes('--force'))
+  assert.deepEqual(valuesOf(line.args, '--add-dir'), [wiki, notes])
+  assert.ok(prompt.includes(`Write only in these folders: ${wiki}, ${notes}`))
+  assert.ok(!prompt.includes('Hand back only the JSON object'))
+})
+
+test("the Cursor Worker gives the Agent its skills as text in the prompt, and lets one whose config allows web search search", () => {
+  const prompt = promptOf(cursorCommandLine(agent(reviewer, { skills: [checklist] }), inputs, cursorOptions))
+  const searching = promptOf(cursorCommandLine(agent({ ...reviewer, webSearch: true }), inputs, cursorOptions))
+
+  assert.ok(prompt.includes(`### checklist\n\nIts folder: \`${checklist.folder}\``), prompt)
+  assert.match(prompt, /Do not search the web/)
+  assert.ok(!searching.includes('Do not search the web'))
+})
+
 test("every Worker gives the Agent its instructions, its Tools with their usage, each input with what it holds, and what to hand back", () => {
   const lines = [
     codexCommandLine(agent(reviewer, { tools: [blameTool] }), inputs, { ...codexOptions, undeclaredTools: [commit, secret] }),
     claudeCodeCommandLine(agent(reviewer, { tools: [blameTool] }), inputs, claudeCodeOptions),
     antigravityCommandLine(agent(reviewer, { tools: [blameTool] }), inputs, antigravityOptions),
+    cursorCommandLine(agent(reviewer, { tools: [blameTool] }), inputs, cursorOptions),
   ]
 
   for (const stdin of lines.map(promptOf)) {

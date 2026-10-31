@@ -153,6 +153,8 @@ const capturedFiles: Record<WorkerName, string[]> = {
   'claude-code': ['.claude/settings.json', '.claude/statusline.sh', '.claude.json'],
   codex: ['.codex/config.toml', '.codex/AGENTS.md'],
   antigravity: ['.gemini/antigravity-cli/settings.json', '.gemini/antigravity-cli/keybindings.json', '.gemini/config/mcp_config.json'],
+  // Cursor's login stays in its own store. Nothing from it is copied onto another machine.
+  cursor: [],
 }
 
 /** The name of a setting that holds a secret: an API key, token, password or the like. */

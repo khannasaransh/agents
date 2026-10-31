@@ -106,7 +106,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 59. As Saransh, I want an Agent's config to name its Worker, model, effort, permissions, inputs, outputs and output schema, so that its behavior is declared, not buried in code.
 60. As Saransh, I want each Agent to name a fallback Worker, so that a quota limit or outage on one subscription doesn't cost me the Step.
 61. As Saransh, I want Antigravity used only as a fallback for now, so that its known headless bugs can't break a normal Run.
-62. As Saransh, I want the same instructions to run on any of the three Workers, so that I can move an Agent to another Worker by changing one setting.
+62. As Saransh, I want the same instructions to run on any of the Workers, so that I can move an Agent to another Worker by changing one setting.
 63. As Saransh, I want Agents that return data to have their answers checked against a schema, so that later Steps can rely on the shape.
 64. As Saransh, I want every Agent call capped by a timeout and a maximum number of turns, so that a stuck Worker can't hold up the Run.
 65. As Saransh, I want an Agent to run only the Tools it declares, plus its Worker's built-in reading and searching, so that I know exactly what each Agent can do.
@@ -249,7 +249,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
 ### Workers
 
-- One interface, "call this Agent with these inputs and return its result", with implementations for Claude Code (headless print mode), Codex (non-interactive exec) and Antigravity (print mode), plus a fake Worker for tests and dry runs.
+- One interface, "call this Agent with these inputs and return its result", with implementations for Claude Code (headless print mode), Codex (non-interactive exec), Antigravity (print mode) and the Cursor CLI (`agent --print`), plus a fake Worker for tests and dry runs.
 - Each implementation:
   - builds its CLI's command line;
   - requests JSON output and, where the Agent has a schema, the CLI's schema-checked final answer;
@@ -259,6 +259,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 - If a call fails, times out or hits a quota limit, it is retried once on the fallback Worker. Both attempts are logged.
 - Claude Code runs on Saransh's logged-in subscription, so it is never run in the minimal mode that ignores that login.
 - Codex skips its check that it runs inside a git repo, since an Agent with no Repo, such as the PM, runs in its Run folder.
+- The Cursor CLI runs on Saransh's logged-in Cursor account. Grok 4.7 extra high is the model id `grok-4.7` at effort `xhigh`, which the CLI takes as `grok-4.7[effort=xhigh]`. A read-only Agent runs in ask mode. An Agent that may write is forced through so the CLI does not stop to ask, inside the sandbox, and only in the folders its config names. The CLI checks no output schema, so the Worker parses the JSON from the answer text. It has no switch that turns web search off, and no maximum number of turns; the timeout still ends the call.
 - Antigravity is only a fallback Worker. Config validation rejects it as an Agent's main Worker until its headless bugs are fixed.
   - Its rules and tools can only come from files, so it runs on the Pipeline's own Antigravity home in the data area, which Saransh logs in to once. His own Antigravity config never reaches a call.
   - Each call writes its custom agent into that home, with the rules of every call running at that moment, so calls running at once can read each other's git data. Calls run at once only within one Step, so they are the same Agent's. Two Steps started by hand at the same time would overwrite each other's rules, so a call could lose access it needs or gain the other's.
@@ -300,7 +301,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 ## Testing Decisions
 
 - **One test boundary: the Step command.** A test prepares a Run folder and state as inputs, runs one Step with the fake Worker standing in for the real ones, and checks only the files the Step wrote and its exit code. Tests never reach into a Step's internals.
-- **Real Workers behind stand-in CLIs.** Some behavior only a real Worker has: reading its CLI's output, falling back, and ending a CLI at its timeout. It is tested through the Step on a Run that isn't a dry run, with stand-in `codex`, `claude` and `agy` executables first on PATH. The stand-ins answer the way the real CLIs do and record what they were called with, what the folder they run in and their plugin folder hold, and the settings in their home, since that is the Worker's outer boundary. No test starts a real CLI.
+- **Real Workers behind stand-in CLIs.** Some behavior only a real Worker has: reading its CLI's output, falling back, and ending a CLI at its timeout. It is tested through the Step on a Run that isn't a dry run, with stand-in `codex`, `claude`, `agy` and `agent` executables first on PATH. The stand-ins answer the way the real CLIs do and record what they were called with, what the folder they run in and their plugin folder hold, and the settings in their home, since that is the Worker's outer boundary. No test starts a real CLI.
 - **Using real git, never the network.** Steps that touch git (Fetch, Review's worktree, Docs' branch handling, Save state) run against temporary git repos created by the test, including a local "remote" to fetch from.
 - **Behavior covered:**
   - Fetch: never changes the working tree or the checked-out branch; records baselines on the first Run; reports one failing Repo without failing the others.
