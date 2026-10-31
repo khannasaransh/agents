@@ -1,5 +1,7 @@
 # 26: Gold ETFs and cash funds in the Lake
 
+**Decision, 31 October 2026:** Saransh set constant annual risk-free rates to India 6%, US 3%, HK 3%. Saved and verified in ash_new's Settings API. This supersedes the rates in historical notes below; those results have not been rerun. No date-dependent rate series was requested.
+
 **What to build:** The Lake has what the Books hold besides stocks: a gold ETF in each market, a liquid ETF as India's cash fund and a T-bill ETF as the US's. The daily chain refreshes them, and backtests can hold them. See the stocks Pipeline PRD's "The Book engine".
 
 **Repos:** ash_new · **Mirrored in:** ash_new ticket 53 (keep both in step)

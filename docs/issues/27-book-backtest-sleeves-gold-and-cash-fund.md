@@ -1,5 +1,7 @@
 # 27: Book backtest: Sleeves, gold and the cash fund
 
+**Decision, 31 October 2026:** Saransh set constant annual risk-free rates to India 6%, US 3%, HK 3%. Saved and verified in ash_new's Settings API. Existing backtest reports have not been recalculated; historical rates below describe their original inputs.
+
 **What to build:** `pd book-backtest` backtests a whole Book. Its Sleeves follow their strategies' own tracks at inverse-volatility weights, beside 10% gold and the cash fund, and the result reports the Book's objective. This is the first slice of the Book engine that the Rule plan will later share. See the stocks Pipeline PRD's "The Book engine".
 
 **Repos:** ash_new · **Mirrored in:** ash_new ticket 54 (keep both in step)

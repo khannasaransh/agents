@@ -266,7 +266,7 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
 - Three repos each own one part. They are joined only by commands with files in and out (ADR 0001's Step contract).
   - **The agents repo** owns the stocks Pipeline and its Schedule, the Agents (Portfolio Manager, Health Agent and the Desk's three analysts), the Answers round trip and the Stocks Brief.
   - **ash_new** owns everything about markets: the Lake, the MarketSmith fetch and its dated snapshots, Corrections, Books, the Book engine (both the backtest and the Rule plan), the Market condition, each Book's Playbook and Judgement mode, the final check, paper and real Books, orders, imports, Reconciliation, Feeds, dossiers and review figures. Each is reached through a `pd` command that writes JSON.
-  - **ash_backend** keeps nothing. Its MarketSmith fetch moves into ash_new, and it is archived once Saransh decides on the Sash app (see "ash_backend").
+  - **ash_backend:** its MarketSmith fetch moves into ash_new. Sash remains, with paper portfolios in Supabase watchlists and real portfolios in Supabase portfolios. Archive the backend only after its remaining app dependencies have replacements; the alarm decision remains open (see "ash_backend").
 - The Pipeline reaches ash_new only through `pd` commands. It never reads ash_new's database or Lake files directly. The JSON those commands write is the contract between the two repos.
 - The stocks Pipeline owns the Lake's Schedule, and ash_new's own schedule and Task Scheduler task are off (ADR 0002).
 - The stocks Pipeline is plain TypeScript, like the daily Pipeline, with the same Run folders, lock, Step records, logs and `agents run|step` commands. It runs on Windows.
@@ -499,7 +499,7 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
 
 - Nothing new is built in ash_backend. Its MarketSmith fetch for India and the US moves into ash_new as `pd marketsmith`, writing the raw store that ash_new already reads and a dated snapshot of each fetch. It exits with 78 when MarketSmith rejects a cookie.
 - Its Portfolio Manager agent and Sash's `PM_BUY` alerts are turned off.
-- It is archived once Saransh decides what happens to the Sash app. Until then its own timer keeps the app's data.
+- Sash remains. Paper portfolios go to Supabase `watchlists`, and real portfolios to `portfolios`. This is the agreed destination, not a claim that synchronization is implemented. The alarm decision remains open. Keep the app's data dependencies running until replacements are verified before archiving ash_backend.
 
 ### Secrets and data
 
@@ -636,7 +636,7 @@ There are two seams, and both are a command with files in and files out.
   - exposure above the level code sets;
   - the Desk adding size or opening positions.
 - **Pages for Books in ash_new's web app.** The Brief is the interface for now.
-- **The Sash app's alerts**, which are retired.
+- **The Sash app's alarms:** their future remains undecided. The separate decision to turn off the old Portfolio Manager's `PM_BUY` alerts still stands.
 - **Dagu**, as for the daily Pipeline.
 
 ## Further Notes
@@ -665,22 +665,29 @@ There are two seams, and both are a command with files in and files out.
      The 3-month Paper clock starts here.
   4. **The Desk, on the paper Books** within those 3 months: the Feeds, dossiers, override scorecard and Lessons.
   5. **Real money:** Legacy and Kept holdings, then the first Real-small promotions after 3 months of Paper. Real Books run in subtract only mode until Saransh moves one to Playbook, after 3 months in which the paper Book matched its rules-only paper Book.
+- **Decided by Saransh, 31 October 2026:**
+  - risk-free rates remain constant for now: India 6%, US 3%, Hong Kong 3%. These were saved through ash_new's Settings API; existing stored backtests have not been rerun;
+  - a new version may enter Paper on his approval without first passing the Candidate test (his "9 ok" accepts the current behavior);
+  - a demoted Paper strategy goes to Retired. The upper 95th-percentile promotion check is still under discussion, not confirmed by this acceptance;
+  - a failed Portfolio Manager holds every reviewed buy; the Chart analyst uses Claude Code first;
+  - Sash remains: paper portfolios go to Supabase `watchlists`, real portfolios to `portfolios`; the alarm decision remains open;
+  - the SEC contact is configured locally with his name and the email already recorded in agents' `.env`;
+  - each Book's limit tolerance for buys is 3% above the last close, and a sale's proceeds at ICICI Direct and moomoo pay for a buy at the same open;
+  - each Book's capital: ₹1 crore for India, ₹1 crore for the US ($105,000) and ₹30 lakh for Hong Kong (HK$247,000), at 29 October's rates;
+  - the Mandate's numbers are its first version (f99c88f13b5b);
+  - into Paper, on his word: `in-super30-ok-tuned` (the Candidate test's choice) and CW2's selected variant in all three Books (`in-`, `us-` and `hk-cw2-selected`), which the Candidate test didn't choose.
 - **Waiting on Saransh:**
-  - each Book's capital;
-  - confirming the Mandate's numbers as its first version;
   - which strategy versions the Candidate test may choose from, once the ash ports' audit is out;
   - what counts as a paper Book matching its rules-only paper Book (placeholder: at least its return over the 3 months, with no deeper max drawdown);
-  - each Book's limit tolerance for buys (placeholder: 3% above the last close);
-  - whether ICICI Direct and moomoo let a sale's proceeds pay for a buy at the same open (assumed yes until then);
   - the Market condition's thresholds, the exposure levels and the Playbook's ranges (placeholders until then);
-  - what happens to the Sash app, before ash_backend is archived;
-  - the contact for the SEC's User-Agent;
+  - the Sash alarm decision and the remaining backend dependencies before ash_backend is archived;
   - later, contract notes, if real brokerage is to enter the costs.
 - **Unconfirmed:**
+  - The upper 95th-percentile promotion block, attribution interpretation, analyst input isolation, and Override expectation scoring/manual widening policy still need decisions after explanation. See [the 31 October follow-up](../review/decisions-follow-up-2026-10-31.md).
   - **Codex's read-only sandbox on Windows:** its unelevated sandbox holds, but it can't enforce the deny rules that keep an Agent from Tools it doesn't declare, so Codex refuses those calls (issue 19). The Agent then falls back to Claude Code.
   - **NSE and BSE endpoints** need browser-like headers and cookies, and change without notice. A failing Feed skips itself with a To-do.
   - **Broker charges in exports:** answered. ICICI Direct's tradebook has every charge, and its brokerage isn't ₹0: about 0.24% of each trade in Saransh's sample (issue 23). moomoo's trade history has none: its Fill Amount is the shares times the price, so the reviews can't check the $0 brokerage from it (issue 24).
-  - **Web search permission:** how Claude Code's web search is allowed for the Events and Risk analysts, given that the Worker denies every command that isn't read-only.
+  - **Web search verification:** the Claude Code Worker explicitly allows built-in `WebSearch` when an analyst's `webSearch` flag is enabled, independently of read-only shell permissions. The policy recommendation and an end-to-end live-search check remain open; see the 31 October follow-up.
 - **Defaults chosen while writing this PRD, not discussed:**
   - **Breaker recovery:** new buys resume once a Book recovers above −5%, and full exposure above −9%. Both are tested in the Book backtest.
   - **Drawdown** is measured on the Book's value per unit against its highest close, and "exposure halved" means at most half the exposure level in stocks.

@@ -1,5 +1,7 @@
 # 39: The Desk
 
+**Decision, 31 October 2026:** Saransh accepted holding every reviewed buy when the Portfolio Manager fails, and using Claude Code first for Chart. Analyst input folders and web-search permissions remain proposals pending explanation; see [the follow-up](../review/decisions-follow-up-2026-10-31.md).
+
 **What to build:** Three analysts, Events, Chart and Risk, each write their own view of the names `pd plan` asks them to review. An analyst no name needs isn't called, so a quiet day costs few calls. The analysts can only subtract; their views are evidence in the Portfolio Manager's Decision records. An early exit the Desk proposes waits for Saransh's approval and then lands on the next Rule plan. See the stocks Pipeline PRD's Desk Step and "Agents".
 
 **Repos:** agents, ash_new

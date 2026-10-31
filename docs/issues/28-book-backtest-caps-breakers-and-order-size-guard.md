@@ -8,7 +8,7 @@
 
 **Status:** done in ash_new, but for a run on the real Lake, which still has no prices for the Books' ETFs (see issue 27's "Not run on the real Lake")
 
-**Waiting on Saransh:** each Book's limit tolerance. Until then the placeholder is 3% above the last close.
+**Waiting on Saransh:** nothing. He set each Book's limit tolerance at 3% above the last close on 31 October 2026.
 
 - [x] No position goes above 15% of the Book and no sector above 30%. A buy that would break either is cut to fit, and the part cut waits in the cash fund. The strategy's own track is unchanged.
 - [x] Breakers act on the Book's drawdown, measured on its value per unit against its highest close, so new money neither hides a drawdown nor deepens it:

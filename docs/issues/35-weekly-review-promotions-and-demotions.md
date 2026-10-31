@@ -1,5 +1,7 @@
 # 35: Weekly review, promotions and demotions
 
+**Decision, 31 October 2026:** Saransh accepted Paper demotion to Retired. He requested an explanation of the upper 95th-percentile check; that check remains unchanged and unconfirmed. See [the follow-up](../review/decisions-follow-up-2026-10-31.md).
+
 **What to build:** Every Saturday the Stocks Brief carries the weekly review. Each Sleeve and Book is measured against its backtest's range and its benchmark. A strategy that breaks the demotion rule is demoted. The Portfolio Manager proposes promotions, which Saransh approves with an Answer. See the stocks Pipeline PRD's Review Step and "Reviews".
 
 **Repos:** ash_new, agents
