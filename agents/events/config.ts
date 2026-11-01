@@ -5,6 +5,7 @@ const events: AgentConfig = {
   // Codex first; Claude Code, its fallback, gives the Desk a second model's view.
   worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'medium' },
+  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
   // Only to check one item, citing its source; nothing about Saransh's money is in its inputs to search for.
   webSearch: true,

@@ -48,6 +48,7 @@ import { analystName } from '../../src/plans.ts'
 import { readRun } from '../../src/run.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
 import { writeTodos } from '../../src/todos.ts'
+import type { AdversaryResult } from '../../src/adversary.ts'
 import { callAgent } from '../../src/worker.ts'
 
 /** How long pd exits propose may take: the paper Book's state read. */
@@ -88,6 +89,7 @@ await runAsStep(async ({ runId, runFolder }) => {
   // When the analysts are given what they read: an event fetched after it is new to their next view.
   const viewedAt = new Date().toISOString().slice(0, 19)
 
+  const adversaries: AdversaryResult[] = []
   const called = await Promise.all(
     deskWork(plan, (path) => read<PdDossier>(path), fetched).map(async (work): Promise<AnalystCall> => {
       const prints = fingerprints(work)
@@ -101,7 +103,7 @@ await runAsStep(async ({ runId, runFolder }) => {
       if (!asked.length) return { work, prints, reused, asked, answer: null, error: null }
       try {
         const agent = await loadAgent(work.analyst)
-        const answer = (await callAgent(agent, inputsOf(work, asked, feeds), { cwd: runFolder, dryRun })) as AnalystAnswer
+        const answer = (await callAgent(agent, inputsOf(work, asked, feeds), { cwd: runFolder, dryRun, worker: run.worker, onAdversary: result => { adversaries.push(result) } })) as AnalystAnswer
         return { work, prints, reused, asked, answer, error: null }
       } catch (error) {
         return { work, prints, reused, asked, answer: null, error: error instanceof Error ? error.message : String(error) }
@@ -109,7 +111,7 @@ await runAsStep(async ({ runId, runFolder }) => {
     }),
   )
 
-  const result: DeskResult = { analysts: [], views: [], missing: [], refused: [], searches: [], exits: [] }
+  const result: DeskResult = { ...(adversaries.length && { adversaries: adversaries.sort((a, b) => a.agent.localeCompare(b.agent)) }), analysts: [], views: [], missing: [], refused: [], searches: [], exits: [] }
   const failures: string[] = []
   const amounts = bookAmounts(plan, read<{ states: PdBookState[] }>('book-states.json'))
   const made: { view: DeskView; fingerprint: string }[] = []

@@ -101,7 +101,8 @@ test("the PM Agent runs on Codex with the Run's reviews, commits and health so f
     failedToFetch: [{ repo: 'gone', team: 'android', error: 'fatal: repository not found' }],
   })
   assert.equal(promptInput(call.stdin, 'memory'), '- Still open: the inpix-panel login bug.\n')
-  const { runs, inputs, memoryRead, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
+  const { runs, inputs, memoryRead, adversary, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
+  assert.equal(adversary.status, 'failed', 'the unconfigured adversary CLI must not discard the main answer')
   assert.deepEqual(answered, written)
   assert.deepEqual(runs, [runId])
   assert.match(inputs, /^[0-9a-f]{64}$/)
@@ -136,7 +137,8 @@ test('re-running PM after it answered calls no Worker, unless forced', async () 
 
   assert.equal(forced.status, 0, forced.stderr)
   assert.equal(ws.workerCliCalls('codex').length, 1)
-  const { runs, inputs, memoryRead, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
+  const { runs, inputs, memoryRead, adversary, ...answered } = JSON.parse(ws.readRunFile(runId, 'pm.json'))
+  assert.equal(adversary.status, 'failed', 'the unconfigured adversary CLI must not discard the main answer')
   assert.deepEqual(answered, written)
 })
 

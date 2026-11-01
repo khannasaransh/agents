@@ -7,8 +7,9 @@ export const mainLine = 'main'
 export const docsBranch = 'agents/docs'
 
 const docs: AgentConfig = {
-  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'medium' },
   fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
+  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   // The folder it runs in: its own worktree of the wiki.
   permissions: { write: ['.'] },
   inputs: {

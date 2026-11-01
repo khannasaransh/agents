@@ -4,6 +4,7 @@ import { analystOutputSchema } from '../../src/desk.ts'
 const risk: AgentConfig = {
   worker: { name: 'claude-code', model: 'opus', effort: 'medium' },
   fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
   // Only to check one item, citing its source; nothing about Saransh's money is in its inputs to search for.
   webSearch: true,

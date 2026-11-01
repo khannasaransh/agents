@@ -23,6 +23,7 @@ const reviewer: AgentConfig = {
   // A different model from the one that usually writes the code, for a genuine second opinion.
   worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
+  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
   inputs: {
     repo: 'The Repo name',

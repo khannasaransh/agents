@@ -591,7 +591,7 @@ const given = existsSync(${behaviorFile})
   ? JSON.parse(readFileSync(${behaviorFile}, 'utf8'))
   : { stderr: '${command} stand-in: this test expects no ${command} call', exitCode: 1 }
 const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid, home: process.env.HOME }
-const behavior = Object.entries(given.byPrompt ?? {}).find(([text]) => call.stdin.includes(text))?.[1] ?? given
+const behavior = Object.entries(given.byPrompt ?? {}).find(([text]) => (call.stdin || call.args.at(-1) || '').includes(text))?.[1] ?? given
 try {
   call.cwdChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8', windowsHide: true })
 } catch {}

@@ -12,6 +12,7 @@ import { readMemory } from '../src/memory.ts'
 import { loadRepos } from '../src/repos.ts'
 import { readRun } from '../src/run.ts'
 import { runAsStep } from '../src/step.ts'
+import type { AdversaryResult, WithAdversary } from '../src/adversary.ts'
 import { callAgent } from '../src/worker.ts'
 import type { Severity } from '../agents/reviewer/config.ts'
 import type { Commit, FetchResult } from './fetch.ts'
@@ -44,7 +45,7 @@ interface ReviewedRange {
 
 /** What Review writes for each Repo with new commits, as review/<name>.json in the Run folder. */
 export type ReviewResult =
-  | (ReviewedRange & {
+  | (ReviewedRange & WithAdversary & {
       status: 'reviewed'
       summary: string
       findings: Finding[]
@@ -86,9 +87,10 @@ await runAsStep(async ({ runId, runFolder, force }) => {
       const memory = readMemory(reviewer.name, range.repo)
       const inputs = { repo: range.repo, branch: range.branch, from: range.from, to: range.to, commits: fetched.commits, memory }
       const log = (line: string) => console.log(`${range.repo}: ${line}`)
-      const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun, worker, log }))) as ReviewerAnswer
+      let adversary: AdversaryResult | undefined
+      const answer = (await withWorktree(repo.folder, range.to, (cwd) => callAgent(reviewer, inputs, { cwd, dryRun, worker, log, onAdversary: result => { adversary = result } }))) as ReviewerAnswer
       const findings = answer.findings.map((f) => markAuthor(f, fetched.commits))
-      result = { ...range, status: 'reviewed', summary: answer.summary, findings, memory: answer.memory, memoryRead: memory }
+      result = { ...range, status: 'reviewed', summary: answer.summary, findings, memory: answer.memory, memoryRead: memory, ...(adversary && { adversary }) }
       console.log(`${range.repo}: reviewed, ${result.findings.length} findings`)
     } catch (error) {
       result = { ...range, status: 'failed', error: error instanceof Error ? error.message : String(error) }

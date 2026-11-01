@@ -8,8 +8,9 @@ export type TaskStatus = (typeof taskStatuses)[number]
 export const pmMemory = 'notes'
 
 const pm: AgentConfig = {
-  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  worker: { name: 'codex', model: 'gpt-6.1-sol', effort: 'high' },
   fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'medium' },
+  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
   inputs: {
     reviews:

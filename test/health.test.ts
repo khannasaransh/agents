@@ -101,6 +101,7 @@ test("after a failed Lake Step, the Health Agent runs on Codex in ash_new's fold
   const [call, ...more] = ws.workerCliCalls('codex')
   assert.deepEqual(more, [])
   assert.deepEqual(ws.workerCliCalls('claude'), [])
+  assert.equal(ws.workerCliCalls('agent').length, 1, 'Cursor attempts the independent assessment')
   assert.equal(realpathSync(call.cwd), realpathSync(ashNew))
   const permissions = call.args.find((arg) => arg.startsWith('permissions.agent='))
   assert.ok(permissions?.includes('extends=":read-only"'), 'read-only')
@@ -156,7 +157,7 @@ test('a Health Agent that fails on Codex and then on Claude Code is recorded as 
 
   assert.equal(result.status, 1)
   assert.equal(ws.workerCliCalls('codex').length, 1)
-  assert.equal(ws.workerCliCalls('claude').length, 1)
+  assert.equal(ws.workerCliCalls('claude').length, 1, 'main fallback only; Cursor is the adversary')
   const recorded = health()
   assert.equal(recorded.status, 'failed')
   assert.equal(recorded.why[0], 'The Lake Step failed.')
@@ -259,4 +260,16 @@ test('a dry run records no Correction in ash_new', async () => {
   assert.equal((await step()).status, 0)
   assert.deepEqual(ws.pdCalls(), [])
   assert.deepEqual(health().proposals, { status: 'dry-run' })
+})
+
+test('the Health Step honors --worker without moving its Cursor adversary', async () => {
+  prepare({ lake: 'failed', status: 'status.hold.json' })
+  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'claude-code' })
+  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  assert.equal((await step()).status, 0)
+  assert.deepEqual(ws.workerCliCalls('codex'), [])
+  assert.equal(ws.workerCliCalls('claude').length, 1)
+  assert.equal(ws.workerCliCalls('agent').length, 1)
+  assert.equal(health().adversary.mainWorker.name, 'claude-code')
+  assert.equal(health().adversary.worker.name, 'cursor')
 })

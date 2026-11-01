@@ -22,6 +22,8 @@ export interface AgentConfig {
   worker: WorkerChoice
   /** Used when a call on `worker` fails, times out or hits a quota limit. */
   fallbackWorker: WorkerChoice
+  /** Independently answers and contests differences. Must differ from both main and fallback Workers. */
+  adversaryWorker?: WorkerChoice
   /** Read-only, or the folders the Agent may write. */
   permissions: 'read-only' | { write: string[] }
   /** What the Step passes in, by name, with what each holds. */
@@ -86,6 +88,7 @@ const configSchema: JsonSchema = {
   properties: {
     worker: workerChoiceSchema,
     fallbackWorker: workerChoiceSchema,
+    adversaryWorker: workerChoiceSchema,
     permissions: {
       description: '"read-only" or { write: [folders] }',
       anyOf: [
@@ -117,6 +120,10 @@ export async function loadAgent(name: string): Promise<Agent> {
     errors.push('config.fallbackWorker must name a different Worker from config.worker')
   if (!errors.length && config.worker.name === 'antigravity')
     errors.push("config.worker can't be antigravity, which runs only as a fallbackWorker until its headless bugs are fixed")
+  if (!errors.length && config.adversaryWorker && [config.worker.name, config.fallbackWorker.name].includes(config.adversaryWorker.name))
+    errors.push('config.adversaryWorker must differ from both config.worker and config.fallbackWorker')
+  if (!errors.length && config.adversaryWorker?.name === 'antigravity')
+    errors.push("config.adversaryWorker can't be antigravity, which runs only as a fallbackWorker until its headless bugs are fixed")
   if (errors.length) throw new Error(`Invalid config for the ${name} Agent in ${configFile}: ${errors.join('; ')}`)
 
   return { name, folder, config, instructions: readFileSync(instructionsFile, 'utf8'), tools: declaredTools(name, folder, config), skills: skillsIn(name, folder) }

@@ -15,7 +15,7 @@ import type { ReviewResult } from '../steps/review.ts'
 type Reviewed = Extract<ReviewResult, { status: 'reviewed' }>
 
 /** A review as the PM Agent is given it: without the Memory the Reviewer read and proposed, which is the Reviewer's own. */
-export type PmReview = Exclude<ReviewResult, Reviewed> | Omit<Reviewed, 'memory' | 'memoryRead'>
+export type PmReview = Exclude<ReviewResult, Reviewed> | Omit<Reviewed, 'memory' | 'memoryRead' | 'adversary'>
 
 /** The new commits on one Repo in one Run, as the PM Agent is given them. */
 export interface PmCommits {
@@ -43,7 +43,7 @@ function inputsOf(runId: string): PmRunInputs {
     .filter(covers)
     .map((review): PmReview => {
       if (review.status !== 'reviewed') return review
-      const { memory, memoryRead, ...reviewed } = review
+      const { memory, memoryRead, adversary, ...reviewed } = review
       return reviewed
     })
   const commits = results.flatMap((r) =>

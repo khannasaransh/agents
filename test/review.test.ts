@@ -57,7 +57,10 @@ test('the Review Step reviews a Repo with new commits and records what the Revie
   const result = await review()
 
   assert.equal(result.status, 0, result.stderr)
-  assert.deepEqual(ws.reviewResult(runId, 'crux_flutter'), {
+  const { adversary, ...recorded } = ws.reviewResult(runId, 'crux_flutter')
+  assert.equal(adversary.status, 'compared')
+  assert.deepEqual(adversary.points, [])
+  assert.deepEqual(recorded, {
     repo: 'crux_flutter',
     team: 'flutter',
     branch: 'main',
@@ -284,7 +287,8 @@ test('a Run that is not a dry run reviews each changed Repo on Codex, in its wor
   assert.ok(call.cwd.startsWith(realpathSync(join(ws.dataDir, 'worktrees'))), call.cwd)
   assert.ok(call.stdin.includes(to), call.stdin)
   assert.deepEqual(ws.workerCliCalls('claude'), [])
-  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review')
+  assert.equal(ws.workerCliCalls('agent').length, 1, 'Cursor attempts the independent assessment')
+  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review').filter(attempt => attempt.agent === 'reviewer')
   assert.equal(attempts[0].usage?.totalTokens, 1280)
   assert.equal(attempts[0].target, 'crux_flutter')
 })
@@ -304,7 +308,7 @@ test('a review that fails on Codex, such as on a quota limit, is retried once on
   assert.equal(result.status, 0, result.stderr)
   assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
   assert.equal(ws.workerCliCalls('codex').length, 1)
-  assert.equal(ws.workerCliCalls('claude').length, 1)
+  assert.equal(ws.workerCliCalls('claude').length, 1, 'main fallback only; Cursor is the adversary')
   assert.match(
     ws.readRunFile(runId, 'logs', 'review.log'),
     /crux_flutter: reviewer failed on codex \(gpt-6-astra, high\) after \d+s: You've hit your usage limit\. Try again at 4:12 PM\.; retrying once on claude-code \(opus, high\)\ncrux_flutter: reviewer answered on claude-code \(opus, high\) in \d+s/,
@@ -609,7 +613,7 @@ test('token usage survives schema failure and fallback, and is counted for both 
   }) })
   prepareRun([[repo, from]], { dryRun: false })
   assert.equal((await review()).status, 0)
-  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review')
+  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review').filter(attempt => attempt.agent === 'reviewer')
   assert.equal(attempts.length, 2)
   assert.equal(attempts[0].outcome, 'failed')
   assert.equal(attempts[0].usage?.totalTokens, 1280)
@@ -631,7 +635,7 @@ test('a failed Claude result retains usage even when both workers fail', async (
   }), exitCode: 1 })
   prepareRun([[repo, from]], { dryRun: false })
   assert.notEqual((await review()).status, 0)
-  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review')
+  const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review').filter(attempt => attempt.agent === 'reviewer')
   assert.equal(attempts.length, 2)
   assert.equal(attempts[0].usage, null)
   assert.equal(attempts[1].outcome, 'failed')

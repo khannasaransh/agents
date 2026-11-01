@@ -17,11 +17,12 @@ import { readJson, writeJson } from '../../src/files.ts'
 import { pdJson, type CorrectionChange, type PdCorrectionsPropose, type PdStatus } from '../../src/pd.ts'
 import { readRun, type RunRecord } from '../../src/run.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
+import type { AdversaryResult, WithAdversary } from '../../src/adversary.ts'
 import { callAgent } from '../../src/worker.ts'
 import type { LakeResult } from './lake.ts'
 
 /** The Health Agent's answer, as its output schema shapes it. */
-interface HealthAnswer {
+interface HealthAnswer extends WithAdversary {
   diagnosis: string
   fix: string
   evidence: { source: string; shows: string }[]
@@ -114,7 +115,9 @@ await runAsStep(async ({ runId, runFolder, force }) => {
       const cwd = ashNewFolder()
       if (!existsSync(cwd)) throw new Error(`ash_new isn't at ${cwd}: set ASH_NEW_FOLDER in the env file`)
       const agent = await loadAgent('health')
-      answer = (await callAgent(agent, inputs, { cwd, dryRun })) as HealthAnswer
+      let adversary: AdversaryResult | undefined
+      answer = (await callAgent(agent, inputs, { cwd, dryRun, worker: run.worker, onAdversary: result => { adversary = result } })) as HealthAnswer
+      if (adversary) answer = { ...answer, adversary }
       console.log(`Diagnosis: ${answer.diagnosis}\nProposed fix: ${answer.fix}`)
     } catch (error) {
       const result: HealthResult = { why, inputs: fingerprint, status: 'failed', error: error instanceof Error ? error.message : String(error) }
@@ -123,8 +126,8 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     }
   }
 
-  const { diagnosis, fix, evidence, corrections } = answer
+  const { diagnosis, fix, evidence, corrections, adversary } = answer
   const proposals = corrections.length ? await propose(corrections, { runId, runFolder, dryRun }) : undefined
-  writeJson(out, { why, inputs: fingerprint, status: 'diagnosed', diagnosis, fix, evidence, corrections, ...(proposals && { proposals }) } satisfies HealthResult)
+  writeJson(out, { why, inputs: fingerprint, status: 'diagnosed', diagnosis, fix, evidence, corrections, ...(adversary && { adversary }), ...(proposals && { proposals }) } satisfies HealthResult)
   if (proposals?.status === 'failed') throw new Error(`The Health Agent's Corrections couldn't be recorded in ash_new: ${proposals.error}`)
 })

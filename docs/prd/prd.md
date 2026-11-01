@@ -223,7 +223,7 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
 
   Eve's channels, connections, sandbox, hooks, instrumentation and lib slots are left out.
 - An Agent's config declares:
-  - its Worker and one fallback Worker, plus model and effort;
+  - its Worker, one fallback Worker, and an optional `adversaryWorker`, each with model and effort;
   - its permissions, either read-only or the folders it may write;
   - its Tools, inputs and outputs;
   - an optional output schema;
@@ -257,6 +257,11 @@ The same repo also sets up a new machine, Mac or Windows. It clones the Repos by
   - enforces the timeout by ending the process, and ends whatever the CLI left running once it exits;
   - parses the result.
 - If a call fails, times out or hits a quota limit, it is retried once on the fallback Worker. Both attempts are logged.
+- Each bundled Agent also names an `adversaryWorker`, using Cursor with Grok 4.7 at extra-high effort (`grok-4.7[effort=xhigh]`). Older configs may omit it. It must differ from both main and fallback Workers, so an override or fallback cannot make the main and adversarial answers use the same CLI. Invalid role assignments fail before any call. Antigravity remains fallback-only.
+- Before the main call, the adversary independently performs the task from the same inputs and source evidence. It runs read-only without executable Agent Tools, proposing rather than applying edits and actions. After the main or fallback answer arrives, a fresh call compares both answers and returns material disagreements, with both positions, evidence and a check to resolve them, and items one answer raised that the other left out. Agreement produces empty lists; disagreement is not required.
+- Each enabled call adds an independent assessment and, when that succeeds, a comparison call. Each has the Agent's normal timeout and turn limit, with usage logged separately. A failed assessment or invalid comparison is recorded without discarding a successful main answer. Dry runs use the fake Worker for every call; canned answers are keyed as `<agent>-adversary` and `<agent>-contest`.
+- The independent answer and comparison are saved beside the main result, so cached results retain their assessments and a rerun replaces them. The daily Markdown/HTML Brief and Stocks HTML Brief show a **Contested** section with the positions, evidence, resolution checks, missed items, agreement or assessment failures. Review range checks also apply to its assessment; an out-of-date PM assessment is labelled. Desk assessments cover calls made in this Run; views reused from earlier Runs do not trigger another assessment.
+- Only the main answer flows into normal actions, Memory and Journal updates. An adversarial position is informational and unresolved; it never changes orders or applies edits by itself.
 - Claude Code runs on Saransh's logged-in subscription, so it is never run in the minimal mode that ignores that login.
 - Codex skips its check that it runs inside a git repo, since an Agent with no Repo, such as the PM, runs in its Run folder.
 - The Cursor CLI runs on Saransh's logged-in Cursor account. Grok 4.7 extra high is the model id `grok-4.7` at effort `xhigh`, which the CLI takes as `grok-4.7[effort=xhigh]`. A read-only Agent runs in ask mode. An Agent that may write is forced through so the CLI does not stop to ask, inside the sandbox, and only in the folders its config names. The CLI checks no output schema, so the Worker parses the JSON from the answer text. It has no switch that turns web search off, and no maximum number of turns; the timeout still ends the call.

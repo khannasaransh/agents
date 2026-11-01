@@ -43,6 +43,7 @@
 // status is missing. Each item waiting on Saransh has its id and buttons for its Answers. The Save
 // answers button downloads them as one Answers file, built in the page by answersFile's own source,
 // for the next Run's Answers Step: the page works opened from disk, with nothing running.
+import { contestedHtml, type ContestEntry } from '../../src/adversary.ts'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingCandidates, waitingItems, type AnswerItem } from '../../src/answers.ts'
@@ -1353,6 +1354,10 @@ interface Inputs {
 }
 
 function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, narrower, orders, todos }: Inputs): string {
+  const contested: ContestEntry[] = []
+  if (health?.status === 'diagnosed' && health.adversary) contested.push({ label: 'Health', result: health.adversary })
+  for (const result of desk?.adversaries ?? []) contested.push({ label: result.agent, result })
+  if (pm?.status === 'answered' && pm.adversary) contested.push({ label: 'Portfolio Manager', result: pm.adversary })
   const lakeLog = run.steps.find((s) => s.name === 'lake')?.log ?? 'logs/lake.log'
   const waiting = latest ?? status
   const promoting = waitingPromotions(stages, promotions)
@@ -1375,6 +1380,7 @@ ${diagnosisSection(run, health)}
 ${orderListsSection(run, placing, check)}
 ${unplacedStopsSection(run, placing)}
 ${todosSection(todos)}
+${contestedHtml(contested)}
 ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${candidatesSection(stages)}

@@ -52,7 +52,7 @@ export function agentAttempts(log: string, step: string) {
       try { usage = readTokenUsage(JSON.parse(metadata[1])) } catch { /* Invalid metadata stays unavailable. */ }
       line = line.slice(0, metadata.index)
     }
-    const match = /^(?:(.+?): )?(reviewer|pm|docs|health) (answered|failed) on (\S+) \(([^,]+), ([^)]+)\) (?:in|after) (\d+)s(?:: (.*))?$/.exec(line)
+    const match = /^(?:(.+?): )?((?:reviewer|pm|docs|health|portfolio-manager|events|chart|risk)(?:-adversary|-contest)?) (answered|failed) on (\S+) \(([^,]+), ([^)]+)\) (?:in|after) (\d+)s(?:: (.*))?$/.exec(line)
     if (!match) return []
     const [, target, agent, outcome, worker, model, effort, seconds, error] = match
     return [{ step, target: target ?? 'Whole run', agent, outcome, worker, model, effort, seconds: Number(seconds), error: error ?? null, usage }]

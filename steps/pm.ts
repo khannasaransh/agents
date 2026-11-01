@@ -17,6 +17,7 @@ import { readRun } from '../src/run.ts'
 import type { SprintPost, SprintTask } from '../src/sprint.ts'
 import { readPmBacklog, readWeeklyPmBacklog } from '../src/state.ts'
 import { runAsStep } from '../src/step.ts'
+import type { AdversaryResult, WithAdversary } from '../src/adversary.ts'
 import { callAgent } from '../src/worker.ts'
 import { isWeekly } from '../src/weekly.ts'
 import { pmMemory, type TaskStatus } from '../agents/pm/config.ts'
@@ -57,7 +58,7 @@ interface Covered {
 
 /** What PM writes, as pm.json in the Run folder. */
 export type PmResult =
-  | ({ status: 'answered' } & Omit<PmAnswer, 'taskStatus'> & Partial<Covered> & { /** Null without a sprint post; none in a pm.json from before the report. */ taskReport?: TaskReport | null })
+  | ({ status: 'answered' } & WithAdversary & Omit<PmAnswer, 'taskStatus'> & Partial<Covered> & { /** Null without a sprint post; none in a pm.json from before the report. */ taskReport?: TaskReport | null })
   | { status: 'failed'; error: string }
 
 /** The latest report on the same sprint post by an earlier Run, and that Run. */
@@ -130,10 +131,11 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   const branches = read && read.since === new Date(Date.parse(sprint!.postedAt)).toISOString() ? read.repos : null
   const inputs = { ...fromRuns, runHealth, memory, sprint: forStatus, previousTaskStatus, branches }
   try {
-    const answer = (await callAgent(pm, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false, worker: run.worker })) as PmAnswer
+    let adversary: AdversaryResult | undefined
+    const answer = (await callAgent(pm, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false, worker: run.worker, onAdversary: result => { adversary = result } })) as PmAnswer
     const { taskStatus, ...rest } = answer
     const report = sprint && taskReport(sprint, taskStatus, previous?.report ?? null)
-    writeJson(out, { status: 'answered', ...rest, taskReport: report, runs, inputs: fingerprint(fromRuns), memoryRead: memory } satisfies PmResult)
+    writeJson(out, { status: 'answered', ...rest, taskReport: report, runs, inputs: fingerprint(fromRuns), memoryRead: memory, ...(adversary && { adversary }) } satisfies PmResult)
     console.log(`PM answered: ${answer.repoLines.length} Repo lines, ${answer.todos.length} To-dos${report ? `, the status of ${report.tasks.length} sprint tasks` : ''}`)
   } catch (error) {
     const result: PmResult = { status: 'failed', error: error instanceof Error ? error.message : String(error) }

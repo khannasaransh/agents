@@ -2,6 +2,7 @@
 // Step read from the Run folder, the at-a-glance summary at the top of both, the links to a Repo's
 // commits and files on GitHub, and the HTML page itself, one self-contained file that loads nothing
 // from the internet, where each part opens with a tap.
+import { contestedHtml, type ContestEntry } from './adversary.ts'
 import { relative, sep } from 'node:path'
 import { mainLine } from '../agents/docs/config.ts'
 import { severities, type Severity } from '../agents/reviewer/config.ts'
@@ -30,6 +31,17 @@ export interface BriefInputs {
   proposals: MemoryProposal[]
   /** Each Repo's page on GitHub, by name, for the Repos whose remote is on GitHub. */
   webUrls: Map<string, string>
+}
+
+/** Assessments travel with the result they contest, including its cache and range checks. */
+export function dailyContests(inputs: BriefInputs): ContestEntry[] {
+  const entries: ContestEntry[] = []
+  for (const [repo, review] of inputs.reviews) {
+    if (review.status === 'reviewed' && review.adversary) entries.push({ label: `Review of ${repo}`, result: review.adversary })
+  }
+  if (inputs.pm?.status === 'answered' && inputs.pm.adversary) entries.push({ label: coversItsRuns(inputs.pm) ? 'PM' : 'PM (out of date; re-run pm)', result: inputs.pm.adversary })
+  if (inputs.docs?.adversary) entries.push({ label: 'Docs', result: inputs.docs.adversary })
+  return entries
 }
 
 export const short = (sha: string) => sha.slice(0, 7)
@@ -485,6 +497,7 @@ ${todosHtml(inputs)}
 ${discordHtml(inputs)}
 ${filesHtml(inputs)}
 ${sprintHtml(inputs)}
+${contestedHtml(dailyContests(inputs))}
 ${codeReviewHtml(inputs)}
 ${docsHtml(inputs)}
 ${memoryHtml(inputs)}

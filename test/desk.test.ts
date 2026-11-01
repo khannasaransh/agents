@@ -77,7 +77,7 @@ function workersAnswer({ failOn }: { failOn?: 'claude' | 'codex' } = {}) {
 }
 
 /** The calls a Worker's CLI received for an analyst, by its instructions' title. */
-const callsFor = (cli: 'claude' | 'codex', title: string) => ws.workerCliCalls(cli).filter((c) => c.stdin.includes(title))
+const callsFor = (cli: 'claude' | 'codex', title: string) => ws.workerCliCalls(cli).filter((c) => c.stdin.includes(title) && !c.stdin.includes('Independent assessment:') && !c.stdin.includes('Your only task now is to compare'))
 
 /** The value of one input in an Agent's prompt. */
 function promptInput(call: WorkerCliCall, name: string): any {
@@ -99,6 +99,7 @@ test("each analyst the review list needs is called at once, read-only in the Run
   const [chart] = callsFor('claude', '# Chart analyst')
   assert.equal(ws.workerCliCalls('codex').length, 1)
   assert.equal(ws.workerCliCalls('claude').length, 2)
+  assert.equal(ws.workerCliCalls('agent').length, 3, 'Cursor attempts each independent assessment')
   for (const call of [events, risk, chart]) assert.equal(realpathSync(call.cwd), realpathSync(join(ws.dataDir, 'runs', runId)))
   // Events and Risk may search the web; Chart may not. Events runs on Codex, Chart and Risk on Claude Code.
   assert.ok(events.args.includes('web_search="live"'))
@@ -151,6 +152,7 @@ test("an analyst no name needs isn't called, and the Desk skips itself when no a
   assert.equal((await step('desk')).status, 0)
 
   assert.deepEqual(ws.workerCliCalls('codex'), [])
+  assert.equal(ws.workerCliCalls('agent').length, 1, 'only Chart needs an assessment')
   assert.deepEqual(ws.workerCliCalls('claude').map((c) => c.stdin.split(/\r?\n/)[0]), ['# Chart analyst'])
   assert.deepEqual(desk().analysts.map((a: any) => a.analyst), ['chart'])
   ws.cleanup()
@@ -176,6 +178,7 @@ test("a view is reused, keeping its date, while nothing its analyst reads for th
 
   // Nothing changed, so no analyst is called, and every view keeps the date it was made.
   assert.equal(ws.workerCliCalls('claude').length + ws.workerCliCalls('codex').length, 3)
+  assert.equal(ws.workerCliCalls('agent').length, 3, 'cached views trigger no additional assessments')
   assert.deepEqual(desk(later).analysts.map((a: any) => [a.analyst, a.status]), [['chart', 'reused'], ['events', 'reused'], ['risk', 'reused']])
   assert.deepEqual(desk(later).views.map((v: any) => [v.analyst, v.security_id, v.viewed_at, v.reused]), first.map((v: any) => [v.analyst, v.security_id, v.viewed_at, true]))
 
@@ -267,7 +270,7 @@ test("an analyst's inputs carry none of the Books' shares or amounts, and a web 
   const plan = example('plan.normal.json')
   const amounts = plan.plans.flatMap((p: any) => (p.orders ?? []).flatMap((o: any) => [o.shares, Math.round(o.value)]))
   for (const call of [...ws.workerCliCalls('claude'), ...ws.workerCliCalls('codex')]) {
-    const names = promptInput(call, 'names')
+    const names = call.stdin.includes('### task:') ? promptInput(call, 'task').names : promptInput(call, 'names')
     for (const order of names.flatMap((n: any) => n.dossier.orders)) {
       assert.deepEqual(Object.keys(order), ['side', 'strategy', 'reason', 'signal', 'cut_by'], 'an order without its shares, price, value or limit')
       assert.ok(!('weight' in order.signal), 'a signal without its weight')
@@ -340,4 +343,19 @@ test('a dry run calls the analysts on the fake Worker, and keeps no view and pro
   prepare({ run: '2026-10-28-0930', dryRun: true })
   assert.equal((await step('desk', '2026-10-28-0930')).status, 0)
   assert.ok(desk('2026-10-28-0930').views.every((v: any) => !v.reused))
+})
+
+test('the Desk honors --worker for Chart while keeping Cursor as its adversary', async () => {
+  ws = makeWorkspace()
+  const plan = example('plan.normal.json')
+  plan.review = { ...plan.review, names: plan.review.names.map((n: any) => ({ ...n, analysts: n.analysts.filter((a: any) => a.analyst === 'chart') })), risk: [], analysts: ['chart'] }
+  prepare({ plan })
+  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'codex' })
+  workersAnswer()
+  assert.equal((await step('desk')).status, 0)
+  assert.deepEqual(ws.workerCliCalls('claude'), [])
+  assert.equal(ws.workerCliCalls('codex').length, 1)
+  assert.equal(ws.workerCliCalls('agent').length, 1)
+  assert.equal(desk().adversaries[0].mainWorker.name, 'codex')
+  assert.equal(desk().adversaries[0].worker.name, 'cursor')
 })

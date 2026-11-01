@@ -147,6 +147,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent, the Desk's three analysts and the Portfolio Manager fail on both.
   assert.equal(ws.workerCliCalls('codex').length, 5)
   assert.equal(ws.workerCliCalls('claude').length, 5)
+  assert.equal(ws.workerCliCalls('agent').length, 5, 'Cursor attempts all five independent assessments')
   const judgement = JSON.parse(ws.readRunFile(id, 'judgement.json'))
   assert.equal(judgement.status, 'failed')
   // So the buys the Desk had to review are missing their reviews, and wait a session.

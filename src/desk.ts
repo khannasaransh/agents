@@ -5,6 +5,7 @@
 // with no shares, values or weights in it, so no search it makes can carry Saransh's holdings, sizes
 // or amounts. A view is reused, with its date, while nothing its analyst reads for the name has
 // changed: the views are kept in the state folder, each with a fingerprint of what was read.
+import type { AdversaryResult } from './adversary.ts'
 import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
@@ -73,6 +74,7 @@ export interface AnalystOutcome {
 
 /** What the Desk Step writes as desk.json, for the Portfolio Manager, the Check Step and the Brief. */
 export interface DeskResult {
+  adversaries?: AdversaryResult[]
   analysts: AnalystOutcome[]
   views: DeskView[]
   /** Each review the review list required that the Desk didn't give. */

@@ -69,6 +69,7 @@ test('the Portfolio Manager runs on Claude Code, read-only in the Run folder, gi
   const [call, ...more] = ws.workerCliCalls('claude')
   assert.deepEqual(more, [])
   assert.deepEqual(ws.workerCliCalls('codex'), [])
+  assert.equal(ws.workerCliCalls('agent').length, 1, 'Cursor attempts the independent assessment')
   assert.equal(realpathSync(call.cwd), realpathSync(join(ws.dataDir, 'runs', runId)))
   assert.equal(call.args[call.args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash', 'no tool that writes')
   assert.deepEqual(promptInput(call.stdin, 'plans'), example('plan.normal.json'))
@@ -79,7 +80,9 @@ test('the Portfolio Manager runs on Claude Code, read-only in the Run folder, gi
   assert.equal(promptInput(call.stdin, 'desk'), null, "the Desk didn't review in this Run")
   assert.match(promptInput(call.stdin, 'journal') as string, /Watch Stove Kraft/)
   // Its answer is kept with the Journal it read and the files its Decision records may cite.
-  assert.deepEqual(result(), {
+  const { adversary, ...recorded } = result()
+  assert.equal(adversary.status, 'failed')
+  assert.deepEqual(recorded, {
     status: 'answered',
     answer,
     journalRead: '# Journal\n\n## Open\n\n- Watch Stove Kraft\n',
@@ -116,7 +119,7 @@ test('the Portfolio Manager falls back to Codex when Claude Code fails', async (
   const ran = await step('portfolio-manager')
 
   assert.equal(ran.status, 0, ran.stderr)
-  assert.equal(ws.workerCliCalls('codex').length, 1)
+  assert.equal(ws.workerCliCalls('codex').length, 1, 'main fallback only; Cursor is the adversary')
   assert.equal(result().status, 'answered')
   assert.match(ws.readRunFile(runId, 'logs', 'portfolio-manager.log'), /portfolio-manager failed on claude-code[\s\S]*retrying once on codex[\s\S]*portfolio-manager answered on codex/)
 })
@@ -298,4 +301,43 @@ test('a weekly review is commented on even on a day the Plan Step failed', async
   const [call] = ws.workerCliCalls('claude')
   assert.equal(promptInput(call.stdin, 'plans'), null)
   assert.equal(result().answer.review, 'Nothing to judge today; the India Book is inside its range.')
+})
+
+test('Health adversarial diagnoses and corrections never enter Portfolio Manager inputs, including fallback', async () => {
+  prepare()
+  const health = { status: 'diagnosed', why: ['A gap'], inputs: 'fingerprint', diagnosis: 'Main diagnosis', fix: 'Main fix', evidence: [], corrections: [] }
+  const adversary = { status: 'compared', independentAnswer: { diagnosis: 'UNRESOLVED_DIAGNOSIS', corrections: ['UNRESOLVED_CORRECTION'] }, points: [] }
+  ws.writeRunFile(runId, 'health.json', { ...health, adversary })
+  ws.setWorkerCli('agent', { byPrompt: { 'Your only task now is to compare': { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify({ points: [], missed: [] }) }) } }, stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify(answer) }) })
+  ws.setWorkerCli('claude', { stderr: 'down', exitCode: 1 })
+  ws.setWorkerCli('codex', codexAnswering(answer))
+  assert.equal((await step('portfolio-manager')).status, 0)
+  for (const call of [...ws.workerCliCalls('claude'), ...ws.workerCliCalls('codex'), ...ws.workerCliCalls('agent')]) {
+    const prompt = call.stdin || call.args.at(-1)!
+    const input = prompt.includes('### task:') ? (promptInput(prompt, 'task') as { health: unknown }).health : promptInput(prompt, 'health')
+    assert.deepEqual(input, health)
+    assert.ok(!prompt.includes('UNRESOLVED_'))
+  }
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'health.json')), { ...health, adversary }, 'the Brief keeps the original assessment')
+})
+
+test('the stocks Portfolio Manager honors --worker while keeping Cursor as its adversary', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'codex' })
+  ws.setWorkerCli('codex', codexAnswering(answer))
+  ws.setWorkerCli('agent', {
+    stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify(answer) }),
+    byPrompt: { 'Your only task now is to compare': { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify({ points: [], missed: [] }) }) } },
+  })
+  assert.equal((await step('portfolio-manager')).status, 0)
+  assert.equal(ws.workerCliCalls('codex').length, 1)
+  assert.deepEqual(ws.workerCliCalls('claude'), [])
+  assert.equal(ws.workerCliCalls('agent').length, 2)
+  for (const call of ws.workerCliCalls('agent')) {
+    assert.equal(call.args[call.args.indexOf('--model') + 1], 'grok-4.7[effort=xhigh]')
+    assert.equal(call.args[call.args.indexOf('--mode') + 1], 'ask')
+  }
+  assert.equal(result().adversary.status, 'compared')
+  assert.equal(result().adversary.mainWorker.name, 'codex')
+  assert.equal(result().adversary.worker.name, 'cursor')
 })

@@ -926,3 +926,25 @@ test("on Saturdays the weekly review shows what each broker's fills cost against
   assert.match(page, /Fill costs against the open Broker Fills Cost against the open The presets assume ICICI Direct 2 \+31\.5 bp \+20\.0 bp Costs more than the presets assume: its fill costs should correct them moomoo 0 — — No fill to measure this week/)
   assert.match(page, /From 2026-10-23 to 2026-10-30 its real Book made \+1\.41% and its paper Book \+2\.13%: the real Book trails it by 0\.72%, of which fills \+0\.04%, skips \+0\.11%, expired orders \+0\.09%, Stage scaling and the rest \+0\.48%\./)
 })
+
+test('the Stocks Brief shows both contested positions and evidence from an independent assessment', async () => {
+  prepare({ health: 'succeeded', dryRun: true })
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+  const worker = { name: 'codex', model: 'test', effort: 'high' }
+  ws.writeRunFile(runId, 'health.json', {
+    status: 'diagnosed', why: [], inputs: 'test', diagnosis: 'Inspect the source.', fix: 'Refresh after checking.', evidence: [], corrections: [],
+    adversary: {
+      agent: 'health', mainWorker: worker, worker, status: 'compared', independentAnswer: {},
+      points: [{ topic: 'Stale series', main: 'Refresh is sufficient.', adversary: 'The source may have missing rows.', evidence: ['lake/status.json reports a gap'], resolution: 'Count rows before refreshing.' }],
+      missed: [{ topic: 'Empty session', missedBy: 'adversary', item: 'One market has no bars for the last session.', evidence: ['lake/status.json names the market'] }],
+    },
+  })
+  const page = text(await brief())
+  assert.match(page, /Contested/)
+  assert.match(page, /Main position: Refresh is sufficient/)
+  assert.match(page, /Adversary position: The source may have missing rows/)
+  assert.match(page, /Evidence: lake\/status.json reports a gap/)
+  assert.match(page, /To resolve: Count rows before refreshing/)
+  assert.match(page, /Adversary left this out: One market has no bars for the last session/)
+  assert.ok(page.indexOf('Contested') < page.indexOf('Adversary left this out'))
+})

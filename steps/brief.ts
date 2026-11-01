@@ -10,7 +10,8 @@
 // since an earlier Step was re-run after the PM answered.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { assigneesOf, attachedFiles, byPriority, byStatus, statusLabel, taskReportOf, firstLine, forSaransh, glance, renderHtml, repoLinks, short, webUrl, whereFrom, type BriefInputs } from '../src/brief.ts'
+import { contestedMarkdown } from '../src/adversary.ts'
+import { dailyContests, assigneesOf, attachedFiles, byPriority, byStatus, statusLabel, taskReportOf, firstLine, forSaransh, glance, renderHtml, repoLinks, short, webUrl, whereFrom, type BriefInputs } from '../src/brief.ts'
 import { readJson, readJsonFiles, writeText } from '../src/files.ts'
 import { pendingProposals, type MemoryProposal } from '../src/memory.ts'
 import { apkInboxDir, otherFilesDir } from '../src/paths.ts'
@@ -207,7 +208,7 @@ function render(inputs: BriefInputs): string {
   const lines = [`# Brief ${run.id}`, '']
   if (run.dryRun) lines.push('Dry run: every Agent ran on the fake Worker, so no review in this Brief is real, and none counts as done.', '')
   lines.push('## At a glance', '', ...glance(inputs).map((item) => `- **${item.label}:** ${item.value}, ${item.note}`), '', '# Details', '')
-  lines.push(...pmLines(pm, discord), ...mentionLines(discord), ...fileLines(discord, !!run.dryRun), ...sprintLines(pm))
+  lines.push(...pmLines(pm, discord), ...mentionLines(discord), ...fileLines(discord, !!run.dryRun), ...sprintLines(pm), ...contestedMarkdown(dailyContests(inputs)))
   const repoLines = new Map(pm?.status === 'answered' ? pm.repoLines.map((r) => [r.repo, r.line]) : [])
   lines.push('## Code review', '')
   if (!results.length) lines.push('No Repo was fetched in this Run.', '')

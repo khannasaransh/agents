@@ -20,6 +20,7 @@ import { loadRepos } from '../src/repos.ts'
 import { readRun } from '../src/run.ts'
 import { readDocsState } from '../src/state.ts'
 import { runAsStep, StepSkipped } from '../src/step.ts'
+import type { AdversaryResult, WithAdversary } from '../src/adversary.ts'
 import { callAgent } from '../src/worker.ts'
 import { docsBranch, mainLine } from '../agents/docs/config.ts'
 import type { FetchResult } from './fetch.ts'
@@ -104,7 +105,7 @@ interface Handled {
  * branch moves, so a re-run that finds the commit there finishes moving the inbox files instead of
  * redoing the work.
  */
-export type DocsResult = DocsOutcome & Handled & { ranges: DocsRange[]; waiting: DocsWaiting | null; undocumented: UndocumentedRepo[] }
+export type DocsResult = WithAdversary & DocsOutcome & Handled & { ranges: DocsRange[]; waiting: DocsWaiting | null; undocumented: UndocumentedRepo[] }
 
 type DocsOutcome =
   | { status: 'updated'; branch: string; commit: string; pages: DocsAnswer['pages'] }
@@ -302,6 +303,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   const documented = new Set((await runGit(wiki, ['ls-tree', '-d', '--name-only', '-z', main, 'repos/'])).split('\0').map((path) => path.replace(/^repos\//, '')))
   const undocumented = fetched.flatMap((r) => (r.status === 'new-commits' && !documented.has(r.repo) ? [{ repo: r.repo, team: r.team, commits: r.commits.length }] : []))
 
+  let adversary: AdversaryResult | undefined
   let result: DocsResult
   try {
     result = await updateWiki()
@@ -347,6 +349,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     const base = tip && !merged ? tip : main!
     const notCommitted = async (outcome: DocsOutcome, skipped: SkippedFile[] = []): Promise<DocsResult> => ({
       ...outcome,
+      ...(adversary && { adversary }),
       prds: [],
       skipped: dryRun ? [] : skipped,
       ranges,
@@ -397,7 +400,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
         writeText(prdPinsFile, fetched.flatMap((r) => (repos.has(r.repo) ? [`${r.repo} ${r.branch} ${repos.get(r.repo)!.folder} ${r.head}\n`] : [])).join(''))
       }
       const inputs = { pages, repos: pinned, pinsFile, prds, prdPinsFile: prds.length ? prdPinsFile : null }
-      const answer = (await callAgent(agent, inputs, { cwd: folder, dryRun, worker })) as DocsAnswer
+      const answer = (await callAgent(agent, inputs, { cwd: folder, dryRun, worker, onAdversary: result => { adversary = result } })) as DocsAnswer
       rmSync(join(folder, stagingFolder), { recursive: true, force: true })
 
       const edits = await changesIn(folder)
@@ -470,6 +473,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
       // A dry run's answer came from the fake Worker, so it moves nothing out of the inbox.
       const updated: DocsResult = {
         status: 'updated',
+        ...(adversary && { adversary }),
         branch: docsBranch,
         commit: head,
         pages: answer.pages,

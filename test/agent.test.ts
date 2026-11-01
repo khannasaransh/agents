@@ -24,6 +24,10 @@ const configModule = (config: unknown) => `export default ${JSON.stringify(confi
 
 test("the Review Step fails with a message naming what is wrong in the Reviewer's config", async () => {
   const cases: [unknown, RegExp][] = [
+    [{ ...reviewer, adversaryWorker: { name: 'unknown', model: 'test', effort: 'high' } }, /config\.adversaryWorker\.name must be one of/],
+    [{ ...reviewer, adversaryWorker: reviewer.fallbackWorker }, /config\.adversaryWorker must differ from both/],
+    [{ ...reviewer, adversaryWorker: reviewer.worker }, /config\.adversaryWorker must differ from both/],
+    [{ ...reviewer, adversaryWorker: { name: 'antigravity', model: 'test', effort: 'high' } }, /config\.adversaryWorker can't be antigravity/],
     [{ ...reviewer, worker: { ...reviewer.worker, effort: 'max' } }, /config\.worker\.effort must be one of low, medium, high, xhigh/],
     [{ ...reviewer, fallbackWorker: { ...reviewer.fallbackWorker, name: 'gemini' } }, /config\.fallbackWorker\.name must be one of codex, claude-code, antigravity, cursor/],
     [{ ...reviewer, fallbackWorker: reviewer.worker }, /config\.fallbackWorker must name a different Worker from config\.worker/],

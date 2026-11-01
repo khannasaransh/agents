@@ -272,6 +272,7 @@ test('the Cursor Worker runs a read-only Agent through the Cursor CLI in ask mod
   assert.match(prompt, /You are in ask mode/)
   assert.match(prompt, /Do not search the web/)
   assert.match(prompt, /Hand back only the JSON object/)
+  assert.ok(prompt.includes(JSON.stringify(reviewer.outputSchema, null, 2)), 'Cursor needs the output schema in its prompt')
 })
 
 test('the Cursor Worker lets an Agent write by forcing commands through, only in its named folders, and asks for no JSON wrapper when the Agent has no schema', () => {

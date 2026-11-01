@@ -3,8 +3,9 @@ import type { AgentConfig } from '../../src/agent.ts'
 const health: AgentConfig = {
   // Codex first. On Windows its unelevated sandbox can't enforce a deny-read rule, so a call there
   // falls back to Claude Code.
-  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  worker: { name: 'codex', model: 'gpt-6.1-sol', effort: 'high' },
   fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
+  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
   inputs: {
     why: 'Why you were called: the Lake Step failed, its status couldn\'t be read, the Data gate failed, or the Health report flags something',

@@ -19,6 +19,7 @@ import { join } from 'node:path'
 import { inputFiles, journalMemory } from '../../agents/portfolio-manager/config.ts'
 import { loadAgent } from '../../src/agent.ts'
 import type { DeskResult } from '../../src/desk.ts'
+import type { HealthResult } from './health.ts'
 import { bookNames } from '../../src/brokers.ts'
 import { readJson, writeJson } from '../../src/files.ts'
 import { readMemory } from '../../src/memory.ts'
@@ -26,6 +27,7 @@ import { percent } from '../../src/plans.ts'
 import type { PdJudgedBook, PdLever, PdPlan, PdReview, playbookRanges } from '../../src/pd.ts'
 import { readRun } from '../../src/run.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
+import type { AdversaryResult, WithAdversary } from '../../src/adversary.ts'
 import { callAgent } from '../../src/worker.ts'
 
 /** The Portfolio Manager's answer, as its output schema shapes it. */
@@ -52,12 +54,19 @@ export interface NarrowerRanges {
 
 /** What the Step writes, as portfolio-manager.json: the answer, with the Journal it read and the files its Decision records may cite, or why it failed. */
 export type PortfolioManagerResult =
-  | { status: 'answered'; answer: PortfolioManagerAnswer; journalRead: string; inputs: string[] }
+  | (WithAdversary & { status: 'answered'; answer: PortfolioManagerAnswer; journalRead: string; inputs: string[] })
   | { status: 'failed'; error: string }
 
 /** The Desk's views and the reviews missing, as the Portfolio Manager reads them; null when the Desk didn't review. */
 function deskOf(desk: DeskResult | null) {
   return desk && { views: desk.views.map(({ run, ...view }) => view), missing: desk.missing }
+}
+
+/** Only the main diagnosis is decision evidence; the Brief retains the independent assessment. */
+function healthOf(health: (HealthResult & WithAdversary) | null) {
+  if (!health) return null
+  const { adversary, ...diagnosis } = health
+  return diagnosis
 }
 
 await runAsStep(async ({ runId, runFolder }) => {
@@ -81,23 +90,24 @@ await runAsStep(async ({ runId, runFolder }) => {
     plans,
     bookStates: read(inputFiles.bookStates),
     stages: read(inputFiles.stages),
-    health: read(inputFiles.health),
+    health: healthOf(read<HealthResult>(inputFiles.health)),
     review,
     dossiers: null,
     desk: deskOf(read<DeskResult>('desk.json')),
     journal,
   }
+  let adversary: AdversaryResult | undefined
   let answer: PortfolioManagerAnswer
   try {
     const agent = await loadAgent('portfolio-manager')
-    answer = (await callAgent(agent, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false })) as PortfolioManagerAnswer
+    answer = (await callAgent(agent, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false, worker: run.worker, onAdversary: result => { adversary = result } })) as PortfolioManagerAnswer
   } catch (error) {
     const failed: PortfolioManagerResult = { status: 'failed', error: error instanceof Error ? error.message : String(error) }
     writeJson(out, failed)
     throw new Error(`The Portfolio Manager failed, so the Rule plans go out: ${failed.error}`)
   }
   const cited = Object.entries(inputFiles).flatMap(([name, file]) => (inputs[name as keyof typeof inputFiles] !== null ? [file] : []))
-  writeJson(out, { status: 'answered', answer, journalRead: journal, inputs: cited } satisfies PortfolioManagerResult)
+  writeJson(out, { status: 'answered', ...(adversary && { adversary }), answer, journalRead: journal, inputs: cited } satisfies PortfolioManagerResult)
   for (const book of answer.books) {
     const name = (judged.find((p) => p.id === book.plan_id) ?? judged.find((p) => p.book === book.book))?.name ?? book.book
     console.log(`${name}: exposure level ${percent(book.exposure.level)}, ${book.changes.length} change${book.changes.length === 1 ? '' : 's'} from the Rule plan`)

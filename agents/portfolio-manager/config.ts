@@ -103,6 +103,7 @@ const portfolioManager: AgentConfig = {
   // refuses to start there (see the Health Agent).
   worker: { name: 'claude-code', model: 'opus', effort: 'high' },
   fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
   inputs: {
     plans: `The Run's Rule plans, as pd plan printed them (${inputFiles.plans}): the Data gate's verdict and the mode, each market's Market condition and the exposure level it sets, and each Book's plans. A real or paper Book's plan has its Judgement mode, Playbook, Pool, holdings and the buys waiting. Null on a Saturday whose Plan Step failed: then there is only the review`,

@@ -46,7 +46,7 @@ function cursorLimits(agent: Agent, cwd: string): string {
 function cursorPrompt(agent: Agent, inputs: Inputs, cwd: string): string {
   const prompt = agentPrompt(agent, inputs, { inlineSkills: true, limits: cursorLimits(agent, cwd) })
   if (!agent.config.outputSchema) return prompt
-  return `${prompt}\nHand back only the JSON object, with no markdown around it.\n`
+  return `${prompt}\nHand back only the JSON object, with no markdown around it. It must match this JSON Schema:\n${JSON.stringify(agent.config.outputSchema, null, 2)}\n`
 }
 
 export const cursorWorker: Worker = {
