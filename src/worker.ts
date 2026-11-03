@@ -1,4 +1,5 @@
 import type { Agent, Effort, WorkerChoice, WorkerName } from './agent.ts'
+import { adversaryEnabled } from './env.ts'
 import type { TokenUsage } from './token-usage.ts'
 import { comparisonAgent, independentAgent, type AdversaryResult, type ContestedPoint, type MissedItem } from './adversary.ts'
 import { schemaErrors } from './schema.ts'
@@ -55,7 +56,8 @@ export async function callAgent(
   if (missing.length) throw new Error(`The ${agent.name} Agent was called without its ${missing.join(', ')} input`)
   if (undeclared.length) throw new Error(`The ${agent.name} Agent was given inputs its config doesn't declare: ${undeclared.join(', ')}`)
   const [main, fallback] = attemptOrder(agent, worker)
-  const adversary = agent.config.adversaryWorker
+  const adversary = adversaryEnabled() ? agent.config.adversaryWorker : undefined
+  if (agent.config.adversaryWorker && !adversary) log(`${agent.name}: adversary off (ADVERSARY=false)`)
   // Check the effective order too: callers may construct Agents without loadAgent, and either
   // attempt can provide the main answer. An override must never collapse the two roles.
   if (adversary && [main.name, fallback.name].includes(adversary.name))

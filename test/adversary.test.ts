@@ -10,6 +10,9 @@ import { fakeWorker } from '../src/workers/fake.ts'
 import { contestedHtml, type AdversaryResult, type ContestedPoint, type MissedItem } from '../src/adversary.ts'
 import { makeWorkspace, git } from './helpers.ts'
 
+// This file checks the adversary path. A local .env may set ADVERSARY=false, which the environment overrides.
+process.env.ADVERSARY = 'true'
+
 const point: ContestedPoint = {
   topic: 'Price loading', main: 'The price is safe to display.', adversary: 'The price can be displayed before loading.',
   evidence: ['lib/paywall.dart:42 reads price before awaiting load'], resolution: 'Test a delayed price response.',
@@ -86,6 +89,23 @@ test('independent failure or invalid comparison is recorded without failing the 
     assert.equal(result?.status, 'failed')
     mock.mock.restore()
   }
+})
+
+test('ADVERSARY=false skips both adversary calls and records nothing', async t => {
+  process.env.ADVERSARY = 'false'
+  t.after(() => { process.env.ADVERSARY = 'true' })
+  const agent = await reviewer()
+  const calls: string[] = []
+  let recorded = false
+  t.mock.method(fakeWorker, 'call', async (target: Agent) => {
+    calls.push(target.name)
+    return primary
+  })
+  const lines: string[] = []
+  assert.equal(await callAgent(agent, inputs, { cwd: '.', dryRun: true, log: (line) => lines.push(line), onAdversary: () => { recorded = true } }), primary)
+  assert.deepEqual(calls, ['reviewer'])
+  assert.equal(recorded, false)
+  assert.match(lines.join('\n'), /adversary off \(ADVERSARY=false\)/)
 })
 
 test('unconfigured Agents keep the existing single-answer behavior and dry runs use only fake calls', async t => {

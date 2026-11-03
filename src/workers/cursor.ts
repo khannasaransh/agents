@@ -1,6 +1,6 @@
 // The Cursor Worker: runs an Agent through `agent --print`, the Cursor CLI's headless mode, on
 // Saransh's logged-in Cursor account. Grok 4.7's effort is part of the model id the CLI accepts, as
-// `grok-4.7[effort=xhigh]` for extra high. The CLI has no schema flag and no switch that turns web
+// `grok-4.7-xhigh` for extra high. The CLI has no schema flag and no switch that turns web
 // search off, and ask mode is the read-only mode it does have.
 import type { Agent } from '../agent.ts'
 import type { ProcessResult } from '../process.ts'
@@ -17,7 +17,7 @@ export function cursorCommandLine(agent: Agent, inputs: Inputs, { cwd, model, ef
       '--output-format',
       'json',
       '--model',
-      `${model}[effort=${effort}]`,
+      `${model}-${effort}`,
       // Headless, in this folder, with command execution sandboxed. Ask mode cannot edit. A call
       // that may write has to force commands through, or the CLI stops to ask.
       '--trust',
@@ -76,12 +76,64 @@ function cursorAnswer(agent: Agent, ended: ProcessResult): unknown {
   }
   if (result.result === undefined) throw new Error('agent finished without an answer')
   if (!agent.config.outputSchema) return result.result
-  const text = unfenced(result.result)
   try {
-    return JSON.parse(text)
+    return jsonObjectFromAnswer(result.result)
   } catch {
-    throw new Error(`agent answered with something that isn't JSON: ${text.slice(0, 200)}`)
+    throw new Error(`agent answered with something that isn't JSON: ${result.result.slice(0, 200)}`)
   }
+}
+
+/**
+ * The JSON object in an answer. A whole answer may be that object, a fenced block, or narration
+ * the CLI joined in front of the object.
+ */
+export function jsonObjectFromAnswer(text: string): unknown {
+  const whole = unfenced(text)
+  try {
+    return JSON.parse(whole)
+  } catch {
+    // The CLI joins every assistant message into one string, so the object can follow narration.
+  }
+  // The answer object contains smaller objects, such as one finding. Keep the longest one.
+  let best: { length: number; value: unknown } | null = null
+  for (let start = 0; start < text.length; start++) {
+    if (text[start] !== '{') continue
+    const slice = balancedObject(text, start)
+    if (!slice) continue
+    try {
+      const value = JSON.parse(slice)
+      if (value && typeof value === 'object' && !Array.isArray(value) && (!best || slice.length > best.length)) {
+        best = { length: slice.length, value }
+      }
+    } catch {
+      // A brace inside narration.
+    }
+  }
+  if (best) return best.value
+  throw new Error('no JSON object')
+}
+
+/** The text of one `{...}` starting at `start`, with strings left intact, or null when it never closes. */
+function balancedObject(text: string, start: number): string | null {
+  let depth = 0
+  let inString = false
+  let escaped = false
+  for (let i = start; i < text.length; i++) {
+    const char = text[i]
+    if (inString) {
+      if (escaped) escaped = false
+      else if (char === '\\') escaped = true
+      else if (char === '"') inString = false
+      continue
+    }
+    if (char === '"') inString = true
+    else if (char === '{') depth++
+    else if (char === '}') {
+      depth--
+      if (depth === 0) return text.slice(start, i + 1)
+    }
+  }
+  return null
 }
 
 /** A fenced JSON block, as a model writes one when nothing checks the shape for it, unwrapped. */

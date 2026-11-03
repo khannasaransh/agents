@@ -48,6 +48,15 @@ export function wikiFolder(): string | null {
   return folder ? folder.replace(/^~(?=\/|$)/, homedir()) : null
 }
 
+/**
+ * Whether Agent calls also run their adversary Worker. On unless `ADVERSARY=false`, in the
+ * environment or the env file. The environment wins, so a Run's `--env` overrides the file.
+ */
+export function adversaryEnabled(): boolean {
+  const raw = process.env.ADVERSARY ?? readEnvFile().ADVERSARY
+  return raw?.trim().toLowerCase() !== 'false'
+}
+
 /** Saransh's git author emails, lowercased, from SARANSH_GIT_EMAILS (comma-separated) in the env file. */
 export function saranshEmails(): string[] {
   return (readEnvFile().SARANSH_GIT_EMAILS ?? '')

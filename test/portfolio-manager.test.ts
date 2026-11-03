@@ -334,7 +334,7 @@ test('the stocks Portfolio Manager honors --worker while keeping Cursor as its a
   assert.deepEqual(ws.workerCliCalls('claude'), [])
   assert.equal(ws.workerCliCalls('agent').length, 2)
   for (const call of ws.workerCliCalls('agent')) {
-    assert.equal(call.args[call.args.indexOf('--model') + 1], 'grok-4.7[effort=xhigh]')
+    assert.equal(call.args[call.args.indexOf('--model') + 1], 'grok-4.7-xhigh')
     assert.equal(call.args[call.args.indexOf('--mode') + 1], 'ask')
   }
   assert.equal(result().adversary.status, 'compared')
