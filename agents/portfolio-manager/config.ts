@@ -3,7 +3,7 @@ import { analysts } from '../../src/desk.ts'
 import { changeKinds, levers, playbookRanges } from '../../src/pd.ts'
 import type { JsonSchema } from '../../src/schema.ts'
 
-/** The name of the Portfolio Manager's Journal, its Memory file. */
+/** The name of the Portfolio Manager's Journal, its Memory file (its Lessons file is `lessonsMemory`, src/lessons.ts). */
 export const journalMemory = 'journal'
 
 /** The Run's files the Portfolio Manager's inputs come from, by input: a Decision record cites a figure by its file. */
@@ -17,30 +17,28 @@ export const inputFiles = {
 
 const nullable = (type: 'string' | 'number' | 'integer', description: string): JsonSchema => ({ type: [type, 'null'], description })
 
+const figure: JsonSchema = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['input', 'security', 'field', 'value'],
+  properties: {
+    input: { type: 'string', enum: Object.values(inputFiles), description: 'The file of the input it came from' },
+    security: nullable('string', 'What it is about, as the file names it: a security id (IN:TCS), a Book or market code, an index, a strategy id, a Lever for its scorecard tally; null for the top of the file'),
+    field: { type: 'string', description: 'Its field in that object, a dotted path where it is nested: rs_rating, reading.breadth' },
+    value: { type: ['number', 'string', 'boolean', 'null'], description: 'Its value as the file has it; a number may be rounded' },
+  },
+}
+
 const decision: JsonSchema = {
   type: 'object',
   additionalProperties: false,
-  required: ['rule_plan', 'instead', 'lever', 'playbook', 'figures', 'expected', 'judged_on', 'views'],
+  required: ['rule_plan', 'instead', 'lever', 'playbook', 'figures', 'expected', 'judged_on', 'views', 'lessons'],
   properties: {
     rule_plan: { type: 'string', description: 'What the Rule plan said: its order in words, or its exposure level' },
     instead: { type: 'string', description: 'What goes out instead, in words' },
     lever: { type: 'string', enum: levers },
     playbook: { type: 'string', description: "The Playbook's line the change is within, quoted from the plan's playbook" },
-    figures: {
-      type: 'array',
-      description: 'Each figure the change rests on, as its input file has it. At least one',
-      items: {
-        type: 'object',
-        additionalProperties: false,
-        required: ['input', 'security', 'field', 'value'],
-        properties: {
-          input: { type: 'string', enum: Object.values(inputFiles), description: 'The file of the input it came from' },
-          security: nullable('string', 'What it is about, as the file names it: a security id (IN:TCS), a Book or market code, an index, a strategy id; null for the top of the file'),
-          field: { type: 'string', description: 'Its field in that object, a dotted path where it is nested: rs_rating, reading.breadth' },
-          value: { type: ['number', 'string', 'boolean', 'null'], description: 'Its value as the file has it; a number may be rounded' },
-        },
-      },
-    },
+    figures: { type: 'array', description: 'Each figure the change rests on, as its input file has it. At least one', items: figure },
     expected: { type: 'string', description: 'What you expect to happen' },
     judged_on: { type: 'string', description: "The session it is judged on, YYYY-MM-DD, after the plan's session" },
     views: {
@@ -53,6 +51,7 @@ const decision: JsonSchema = {
         properties: { analyst: { type: 'string', enum: analysts }, security_id: { type: 'string' } },
       },
     },
+    lessons: { type: 'array', items: { type: 'integer' }, description: 'The approved Lessons it follows, by their ids in your Lessons file. Empty when it follows none' },
   },
 }
 
@@ -105,6 +104,8 @@ const portfolioManager: AgentConfig = {
   fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
+  // Save state applies the Journal; each Lesson waits for Saransh's Answer.
+  memoryChanges: { [journalMemory]: 'apply', lessons: 'review' },
   inputs: {
     plans: `The Run's Rule plans, as pd plan printed them (${inputFiles.plans}): the Data gate's verdict and the mode, each market's Market condition and the exposure level it sets, and each Book's plans. A real or paper Book's plan has its Judgement mode, Playbook, Pool, holdings and the buys waiting. Null on a Saturday whose Plan Step failed: then there is only the review`,
     bookStates: `The state each plan was made from (${inputFiles.bookStates}): holdings, cash, open orders and Disaster stops`,
@@ -114,6 +115,7 @@ const portfolioManager: AgentConfig = {
     dossiers: "The dossiers of the Rule plan's names: null until the Feeds and dossiers are built",
     desk: "The Desk's views of the names it reviewed (desk.json): each analyst's (Events, Chart, Risk) view of each name (none, a veto, a trim to a size, or an early exit proposed for Saransh), its reasons, the evidence it cites and when it was made (a view reused from an earlier Run keeps its date), and each review that is missing, whose buy waits a session whatever you decide. Null when the Desk didn't review, no analyst being needed or its Step failing",
     journal: 'Your Journal: the Decision records behind your earlier changes, what each was expected to do, and what is still open. Empty when you have none yet',
+    lessons: "Your Lessons: the Lessons file (Approved: those Saransh approved, which shape your decisions; Rejected: those he rejected, never to propose again), and those still waiting for his Answer, which shape nothing yet. An empty file when there are none yet",
   },
   outputs: {
     books: "Your judgement of each real and paper Book's Rule plan: its exposure level for the day and your changes, each with its Decision record, and the Brief's commentary on it",
@@ -121,12 +123,14 @@ const portfolioManager: AgentConfig = {
     monthly: "On a month's first Saturday, the monthly review's commentary for the Brief; null on other days",
     promotions: "The promotions you propose for Saransh's Answer: only those the review lists as due",
     narrower: "The narrower Playbook ranges you propose for Saransh's Answer: one for each Lever the override scorecard says lost to the Rule plan over the last 3 months",
+    expectations: "Whether what each judged Override's Decision record expected happened, read from its words and the data: apart from whether it beat the Rule plan",
+    lessons: 'The Lessons you propose from your Journal and the scorecard, each for Saransh to approve or reject: never one approved, rejected or waiting already',
     journal: "The Journal's new entries, and the whole list of what is still open",
   },
   outputSchema: {
     type: 'object',
     additionalProperties: false,
-    required: ['books', 'review', 'monthly', 'promotions', 'narrower', 'journal'],
+    required: ['books', 'review', 'monthly', 'promotions', 'narrower', 'expectations', 'lessons', 'journal'],
     properties: {
       books: { type: 'array', items: book },
       review: nullable('string', "The weekly review's commentary for the Brief, in a few short paragraphs: how each Book and Sleeve stands against its tested range and its benchmark, the demotions and why, the promotions due, Reconciliation's differences, and what the override scorecard says of your Overrides and the gate. Null when there is no review"),
@@ -168,6 +172,47 @@ const portfolioManager: AgentConfig = {
               },
             },
             why: { type: 'string', description: "Why: the Lever's tally over the last 3 months, with the figures" },
+          },
+        },
+      },
+      expectations: {
+        type: 'array',
+        description: "On Saturdays, each judged Override of the override scorecard (status judged), whether what its `expected` said happened, judged from the data and the Feeds, not from whether it beat the Rule plan. Empty on other days",
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['book', 'override', 'happened', 'why'],
+          properties: {
+            book: { type: 'string', enum: ['IN', 'US', 'HK'] },
+            override: { type: 'integer', description: "The Override's id, as the scorecard gives it" },
+            happened: { type: 'string', enum: ['yes', 'no', 'unclear'], description: "unclear when the data and the Feeds can't say" },
+            why: { type: 'string', description: 'What happened, with the figures or the event that shows it' },
+          },
+        },
+      },
+      lessons: {
+        type: 'array',
+        description: 'Each Lesson you propose. Empty on most days',
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: ['lesson', 'why', 'book', 'lever', 'ranges', 'figures'],
+          properties: {
+            lesson: { type: 'string', description: 'The Lesson, in a sentence or two: what you will do differently' },
+            why: { type: 'string', description: 'What in your Journal and the scorecard taught it, with the figures' },
+            book: { type: ['string', 'null'], enum: ['IN', 'US', 'HK', null], description: "A range change's Book; null for a Lesson that changes no range" },
+            lever: { type: ['string', 'null'], enum: [...levers, null], description: "A range change's Lever; null for a Lesson that changes no range" },
+            ranges: {
+              type: 'array',
+              description: "Each of the Lever's ranges it changes, by its name in the Playbook, with its new value. Empty for none",
+              items: {
+                type: 'object',
+                additionalProperties: false,
+                required: ['name', 'value'],
+                properties: { name: { type: 'string', enum: playbookRanges }, value: { type: 'number' } },
+              },
+            },
+            figures: { type: 'array', description: "The figures it rests on, cited as a Decision record's are. One that widens a range cites the override scorecard's tally of its Lever (review.json, the Lever as its security)", items: figure },
           },
         },
       },

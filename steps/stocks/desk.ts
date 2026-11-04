@@ -6,8 +6,11 @@
 // no analyst is needed. A view of a name is reused, with its date, while nothing its analyst reads for
 // the name has changed, and an analyst whose views are all reused isn't called. Events runs on Codex
 // with Claude Code as fallback; Chart and Risk run on Claude Code with Codex as fallback, because on
-// Windows Codex's unelevated sandbox can't enforce a deny-read rule (see the Health Agent). Each is
-// read-only in the Run folder. Events and Risk may search the web to check one item; Chart can't.
+// Windows Codex's unelevated sandbox can't enforce a deny-read rule (see the Health Agent). Each runs
+// read-only in an empty folder of its own, and may not read the Pipeline's data folder, whose Run
+// folders and state hold Saransh's holdings and amounts: everything it needs is in its inputs. A Worker
+// that can't enforce that refuses the call (Cursor, so the independent assessment is unavailable for
+// the analysts). Events and Risk may search the web to check one item; Chart can't.
 // Each answer is checked against its schema, and each view against what the analyst may say of its
 // name: none, a veto or a trim of a buy, an early exit of a holding, with its evidence. A view it may
 // not give is refused. A buy without a view it needed (its analyst failed, gave none, or gave one
@@ -19,7 +22,8 @@
 // analyst gives it again. A dry run calls the fake Worker, and keeps no view and proposes nothing. An
 // analyst that fails on both Workers, or an exit that can't be proposed, fails the Step, once the
 // rest is recorded.
-import { existsSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadAgent } from '../../src/agent.ts'
 import {
@@ -42,6 +46,7 @@ import {
   type NameToReview,
 } from '../../src/desk.ts'
 import { readJson, writeJson } from '../../src/files.ts'
+import { dataDir } from '../../src/paths.ts'
 import { pdJson, type PdAnalyst, type PdBookState, type PdDossier, type PdExitDecided, type PdFeeds, type PdPlan } from '../../src/pd.ts'
 import { plural } from '../../src/brief.ts'
 import { analystName } from '../../src/plans.ts'
@@ -103,8 +108,14 @@ await runAsStep(async ({ runId, runFolder }) => {
       if (!asked.length) return { work, prints, reused, asked, answer: null, error: null }
       try {
         const agent = await loadAgent(work.analyst)
-        const answer = (await callAgent(agent, inputsOf(work, asked, feeds), { cwd: runFolder, dryRun, worker: run.worker, onAdversary: result => { adversaries.push(result) } })) as AnalystAnswer
-        return { work, prints, reused, asked, answer, error: null }
+        // Its own empty folder, outside the data folder, which it may not read.
+        const folder = mkdtempSync(join(tmpdir(), `agents-${work.analyst}-`))
+        try {
+          const answer = (await callAgent(agent, inputsOf(work, asked, feeds), { cwd: folder, denyRead: [dataDir()], dryRun, worker: run.worker, onAdversary: result => { adversaries.push(result) } })) as AnalystAnswer
+          return { work, prints, reused, asked, answer, error: null }
+        } finally {
+          rmSync(folder, { recursive: true, force: true })
+        }
       } catch (error) {
         return { work, prints, reused, asked, answer: null, error: error instanceof Error ? error.message : String(error) }
       }

@@ -1,5 +1,7 @@
 // Answers: applies what Saransh answered in a Stocks Brief. It reads every Answers file in Downloads
-// and in the Broker inbox and applies their Answers through `pd`, oldest file first. An Answer
+// and in the Broker inbox and applies their Answers through `pd`, oldest file first; an Answer on a
+// Lesson (issue 41) settles the Portfolio Manager's queued Memory change for it, and the proposal of
+// its range change in ash_new with it. An Answer
 // applies only while its item is still open: one to an item `pd` says is settled, or one saved
 // before an Answer already applied to its item, is ignored and logged, so an old file can't undo a
 // newer Answer. Each file read moves into the Run's answers/ folder, and what became of each Answer
@@ -10,6 +12,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { answersFileError, isAnswersFileName, pdArgs, type Answer, type AnswersFile } from '../../src/answers.ts'
 import { moveInto, readJson, writeJson } from '../../src/files.ts'
+import { decideLesson } from '../../src/lessons.ts'
 import { brokerInboxDir, downloadsDir } from '../../src/paths.ts'
 import { pdJson, type PdDecided } from '../../src/pd.ts'
 import { readRun } from '../../src/run.ts'
@@ -90,8 +93,12 @@ async function apply(answer: Answer, file: AnswersFile, state: Record<string, Ap
   if (applied && Date.parse(applied.savedAt) > Date.parse(file.savedAt)) return { outcome: 'ignored', why: `A newer Answer, saved at ${applied.savedAt}, was applied in Run ${applied.run}` }
   let decided: PdDecided
   try {
-    // It exits 1 when there is no such item, still saying why as JSON.
-    decided = await pdJson<PdDecided>(command.args, { cwd: runFolder, timeoutMs: decideMs, exitCodes: [0, 1] })
+    // A Lesson is settled here, its range change's proposal in ash_new with it; any other item by `pd`,
+    // which exits 1 when there is no such item, still saying why as JSON.
+    decided =
+      'lesson' in command
+        ? await decideLesson(command.lesson, command.decision, { cwd: runFolder })
+        : await pdJson<PdDecided>(command.args, { cwd: runFolder, timeoutMs: decideMs, exitCodes: [0, 1] })
   } catch (error) {
     return { outcome: 'failed', why: error instanceof Error ? error.message : String(error) }
   }

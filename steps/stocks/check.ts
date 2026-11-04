@@ -4,7 +4,8 @@
 // the Book's Judgement mode and Playbook allow, buying only Pool names, whose Decision records cite
 // only figures in the Run's inputs, go out once the whole Book passes the Mandate as the list would
 // leave it; else the Rule plan, once it passes; else only its exits and Disaster stops, with a To-do
-// this Step raises. A Portfolio Manager that failed, or didn't run, sends the Rule plans (its
+// this Step raises. A Decision record keeps only the Lessons Saransh approved among those it follows
+// (issue 41), so the scorecard tallies no other. A Portfolio Manager that failed, or didn't run, sends the Rule plans (its
 // judgement is marked failed, with why). A buy whose Desk review is missing (issue 39) waits a
 // session: the judgement names each review the review list required that the Desk didn't give
 // (desk.json's, or every one when the Desk Step failed or didn't run), and ash_new holds back their
@@ -29,7 +30,8 @@ import { existsSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { requiredReviews, type DeskResult } from '../../src/desk.ts'
 import { readJson, writeJson } from '../../src/files.ts'
-import { pdJson, type PdCheck, type PdJudgement, type PdJudgementShow, type PdMissingReview, type PdOrders, type PdPaperBooks, type PdPlan } from '../../src/pd.ts'
+import { approvedLessons } from '../../src/lessons.ts'
+import { pdJson, type PdCheck, type PdDecisionRecord, type PdJudgement, type PdJudgementShow, type PdMissingReview, type PdOrders, type PdPaperBooks, type PdPlan } from '../../src/pd.ts'
 import { analystName } from '../../src/plans.ts'
 import { readRun, type RunRecord } from '../../src/run.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
@@ -62,9 +64,22 @@ function missingReviews(run: RunRecord, plan: PdPlan, desk: DeskResult | null): 
   return requiredReviews(plan.review).map((r) => ({ ...r, why }))
 }
 
+/** A Decision record with only the Lessons Saransh approved among those it follows: the scorecard tallies no other. */
+function approvedOnly(decision: PdDecisionRecord, approved: Set<number>): PdDecisionRecord {
+  return { ...decision, lessons: (decision.lessons ?? []).filter((id) => approved.has(id)) }
+}
+
 /** The Portfolio Manager's judgement as pd check reads it: its answer, or why there is none, with the reviews the Desk didn't give. */
 function judgementOf(run: RunRecord, result: PortfolioManagerResult | null, missing: PdMissingReview[]): PdJudgement {
-  if (result?.status === 'answered') return { status: 'answered', why: null, inputs: result.inputs, missing_reviews: missing, books: result.answer.books }
+  if (result?.status === 'answered') {
+    const approved = approvedLessons()
+    const books = result.answer.books.map((book) => ({
+      ...book,
+      exposure: { ...book.exposure, decision: approvedOnly(book.exposure.decision, approved) },
+      changes: book.changes.map((change) => ({ ...change, decision: approvedOnly(change.decision, approved) })),
+    }))
+    return { status: 'answered', why: null, inputs: result.inputs, missing_reviews: missing, books }
+  }
   const step = run.steps.find((s) => s.name === 'portfolio-manager')
   let why = "The Portfolio Manager Step isn't in this Run"
   if (result?.status === 'failed') why = `The Portfolio Manager failed: ${result.error}`

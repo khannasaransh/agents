@@ -12,6 +12,7 @@
       "why": "orderBook_Equity_1.csv, the same file, was recorded already",
       "trades": null,
       "fills": null,
+      "legacy": null,
       "reconciliation": null
     },
     {
@@ -25,6 +26,7 @@
       "why": "Its columns aren't any broker's export ash_new reads",
       "trades": null,
       "fills": null,
+      "legacy": null,
       "reconciliation": null
     },
     {
@@ -38,6 +40,7 @@
       "why": "Line 2: No IN security is NOSUCHCO. Nothing in it was recorded",
       "trades": null,
       "fills": null,
+      "legacy": null,
       "reconciliation": null
     }
   ]

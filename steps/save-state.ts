@@ -3,7 +3,8 @@
 // failed review is retried in the next Run. A dry run's reviews came from the fake Worker, so they
 // never count. Memory the Reviewer proposed in a review that counts, and the PM Agent's proposed
 // Memory, are applied and recorded in the Run, or, when the Agent's config sets memoryChanges to
-// 'review', queued for Saransh to accept or reject with `agents memory`. A proposal is queued for
+// 'review' (for all its Memory files, or for that one), queued for Saransh to accept or reject with
+// `agents memory`. A proposal is queued for
 // him too when its Memory changed after the Agent read it, so applying it never undoes that change.
 // It records how far the Docs Step brought the wiki per Repo, once it finished, and keeps a Run
 // whose PM failed in the PM backlog, until a PM answer covers what it held.
@@ -12,7 +13,7 @@
 // and leaves the daily Pipeline's, including how far the wiki was brought.
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { loadAgent, type Agent } from '../src/agent.ts'
+import { loadAgent, memoryChangesFor, type Agent } from '../src/agent.ts'
 import { readJson, readJsonFiles } from '../src/files.ts'
 import { buildsOnCurrent, byRunStart, isSettled, queueProposal, settleProposal, type MemoryProposal } from '../src/memory.ts'
 import { holdsPmInputs } from '../src/pm-inputs.ts'
@@ -46,7 +47,7 @@ const short = (sha: string | null) => sha?.slice(0, 7) ?? 'nothing'
 function handOver(agent: Agent, proposal: MemoryProposal) {
   const what = `the change the ${agent.name} Agent proposed to its Memory ${proposal.name}`
   const changedSince = !buildsOnCurrent(proposal)
-  if (agent.config.memoryChanges === 'review' || changedSince) {
+  if (memoryChangesFor(agent.config, proposal.name) === 'review' || changedSince) {
     const why = changedSince ? ', since that Memory changed after the Agent read it,' : ''
     if (queueProposal(proposal)) console.log(`Queued ${what}${why} waiting for Saransh (agents memory)`)
     else console.log(`Left ${what} out of the queue, since a later Run's proposal waits there`)

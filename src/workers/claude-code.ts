@@ -26,12 +26,13 @@ function rulePath(path: string): string {
  * The `claude --print` command line for one call of `agent`, with the prompt on stdin. It never
  * uses --bare, which ignores Saransh's login.
  */
-export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort, pluginDir }: ClaudeCodeOptions): CommandLine {
+export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, denyRead = [], model, effort, pluginDir }: ClaudeCodeOptions): CommandLine {
   const { outputSchema, maxTurns, timeoutSeconds } = agent.config
   const writable = writeFolders(agent, cwd)
   const hasSkills = agent.skills.length > 0
   const search = agent.config.webSearch ? ['WebSearch'] : []
   const allowed = [...agent.tools.map((tool) => `Bash(${tool.path}:*)`), ...writable.map((folder) => `Edit(/${rulePath(folder)}/**)`), ...search]
+  const denied = denyRead.map((folder) => `Read(/${rulePath(folder)}/**)`)
   return {
     command: 'claude',
     args: [
@@ -61,6 +62,8 @@ export function claudeCodeCommandLine(agent: Agent, inputs: Inputs, { cwd, model
       ...writable.flatMap((folder) => ['--add-dir', folder]),
       // An Edit rule covers every tool that writes files. `//` starts an absolute path.
       ...(allowed.length ? ['--allowedTools', ...allowed] : []),
+      // A Read rule covers every tool that reads files, and outranks any allow rule.
+      ...(denied.length ? ['--disallowedTools', ...denied] : []),
     ],
     stdin: agentPrompt(agent, inputs),
     // A key or token in the environment would take precedence over Saransh's logged-in subscription.

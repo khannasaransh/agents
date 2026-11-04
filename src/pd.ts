@@ -153,6 +153,8 @@ export interface PdBrokerFile {
   trades: { recorded: number; in_ledger: number; set_aside: number } | null
   /** A recorded tradebook's fills in its real Book (issue 42): matched to orders, Saransh's own trades, and the orders it settled; null otherwise, and in a dry run. */
   fills: PdFills | null
+  /** A tradebook recorded before its Book's first Order list (issue 43): the securities it made Legacy holdings; null otherwise. */
+  legacy: string[] | null
   reconciliation: PdReconciliation | null
 }
 
@@ -395,7 +397,7 @@ export interface PdDemotion {
   held_why: string | null
 }
 
-/** A Sleeve's next promotion: due now when its time is up, its record inside its tested range and it breaks no demotion rule. */
+/** A Sleeve's next promotion: due now when its time is up, its record can be measured against its tested range and it breaks no demotion rule. */
 export interface PdPromotion {
   to: PdStage
   to_name: string
@@ -403,6 +405,8 @@ export interface PdPromotion {
   due: string
   due_now: boolean
   why: string | null
+  /** How its record is outside its tested range, under it or above it: none when inside. It doesn't hold the promotion back; the proposal says it, for Saransh to judge. */
+  outside_range: string[]
 }
 
 /** A Sleeve from Paper up, as the weekly review measured it. */
@@ -546,8 +550,8 @@ export interface PdScorecard {
     /** What it made against the Rule plan, in the Book's currency: more than nothing when it beat it. */
     value: number
     bps: number | null
-    /** Whether it beat the Rule plan by the session it is judged on; null while open. */
-    came_true: boolean | null
+    /** Whether it beat the Rule plan by the session it is judged on, in money; null while open. Not whether what it expected happened: the Portfolio Manager judges that. */
+    beat_rule_plan: boolean | null
   }[]
   tallies: { lever: PdTally[]; analyst: PdTally[]; lesson: PdTally[] }
   /** Each Lever's Overrides judged over the last 3 months; one that `lost` is proposed for a narrower range. */
@@ -637,9 +641,30 @@ export interface PdMonthlyReview {
 }
 
 /**
+ * A Book state's holding of a security (a security partly in the Sleeves is two). A Legacy holding
+ * (issue 43) is what a real Book holds beyond its Sleeves, which its Rule plan sells for their buys; a
+ * Kept one, one Saransh keeps, is outside the Book and never sold. Each has its record (`legacy_id`)
+ * when an import before the Book's first Order list made one, and Saransh's Answer on it, null while
+ * the Brief asks.
+ */
+export interface PdHolding {
+  security_id: string
+  name: string | null
+  qty: number
+  avg_cost: number | null
+  legacy: boolean
+  kept: boolean
+  /** A Legacy holding's lots, the oldest first, which its Rule plan sells it by. */
+  lots: { day: string; qty: number; price: number }[]
+  legacy_id: number | null
+  answer: 'keep' | 'sell' | null
+}
+
+/**
  * What `pd book-state <book>` prints (contract/book-state.schema.json): what a real Book's Rule plan
  * starts from, with an id. Its cash is its capital with its ledger's money, since the brokers' files
- * hold none; every holding is Legacy until the Rule plan's orders are recorded. With --paper (or
+ * hold none, and with what its Kept holdings cost put back; every holding is Legacy until the Rule
+ * plan's orders are recorded, but one Saransh keeps (issue 43). With --paper (or
  * --rules-only), its paper Book's (or rules-only paper Book's): the Book engine's state on its last
  * close filled, and the orders of its Order lists not yet filled.
  */
@@ -660,7 +685,7 @@ export interface PdBookState {
   capital: number
   capital_set: boolean
   cash: number
-  holdings: { security_id: string; name: string | null; qty: number; avg_cost: number | null; legacy: boolean }[]
+  holdings: PdHolding[]
   reconciliation: { as_of: string; file: string; matched: number } | null
   /** Reconciliation's open differences: neither bought nor sold on a signal until settled. */
   unsettled: { security_id: string | null; name: string | null; kind: PdReconciliation['differences'][number]['kind']; ledger_qty: number | null; broker_qty: number }[]
@@ -707,9 +732,10 @@ export interface PdPlanOrder {
   /**
    * A paper Book's plan's (issue 34): its role in its Sleeve. entry or add: a buy of a name it doesn't
    * hold, or does; exit: a sale of a name its strategy no longer holds; trim: any other sale; stop: its
-   * Disaster stop. The final check never drops or delays an exit or a stop.
+   * Disaster stop; legacy: a real Book's Legacy holding sold for its Sleeves' buys (issue 43). The
+   * final check never drops or delays an exit, a stop or a Legacy holding's sale.
    */
-  role?: 'entry' | 'add' | 'exit' | 'trim' | 'stop'
+  role?: 'entry' | 'add' | 'exit' | 'trim' | 'stop' | 'legacy'
 }
 
 /** How much of the Portfolio Manager's judgement a Book's final check accepts (issue 34). */
@@ -778,7 +804,13 @@ export interface PdRulePlan {
   value?: number
   /** The money its Sleeves share. */
   cash?: number
-  legacy?: { security_id: string; name: string | null; qty: number }[]
+  /**
+   * A real Book's Legacy holdings (issue 43), sold for its Sleeves' buys (their orders under the
+   * Sleeve legacy); a winner close to turning long-term waits until the day it has (`waits_until`).
+   */
+  legacy?: { security_id: string; name: string | null; qty: number; waits_until: string | null }[]
+  /** A real Book's plan's (issue 43): its Kept holdings, outside it and never sold, each counted toward the caps. */
+  kept?: { security_id: string; name: string | null; shares: number; close: number; sector: string | null; rs_rating: number | null; value: number }[]
   weights?: Record<string, number> | null
   not_traded?: { security_id: string; name: string | null; why: 'unsettled' | 'quarantined' }[]
   orders?: PdPlanOrder[]
@@ -978,6 +1010,8 @@ export interface PdDecisionRecord {
   judged_on: string
   /** The Desk's views it follows (issue 39), each by its analyst and the security it is of. */
   views: { analyst: PdAnalyst; security_id: string }[]
+  /** The approved Lessons it follows (issue 41), by their ids; the override scorecard tallies them. */
+  lessons?: number[]
 }
 
 /** The kinds of change from the Rule plan the Portfolio Manager may make (issue 34). */

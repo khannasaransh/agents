@@ -5,6 +5,7 @@ import { startDashboard } from './dashboard.ts'
 import { parseArgs } from 'node:util'
 import { workerNames, type WorkerName } from './agent.ts'
 import { acquireLock } from './lock.ts'
+import { decideLesson, lessonsMemory } from './lessons.ts'
 import { decideProposal, memoryFile, pendingProposals, proposalDiff } from './memory.ts'
 import { runDir } from './paths.ts'
 import { loadPipeline, runPipeline, runSingleStep } from './pipeline.ts'
@@ -94,17 +95,24 @@ async function main(argv: string[]): Promise<number> {
         if (!agent || !name || extra.length) return fail(usage)
         // Under the Run lock, so no Run's Save state queues a proposal for this Memory meanwhile.
         const release = acquireLock()
-        let run: string
+        let message: string
+        const decision = action === 'accept' ? 'accepted' : 'rejected'
         try {
-          run = decideProposal(agent, name, action === 'accept' ? 'accepted' : 'rejected').run
+          // A Lesson goes into the Lessons file either way, its range change decided in ash_new with it (issue 41).
+          const lesson = pendingProposals().find((p) => p.agent === agent && p.name === name)?.lesson
+          if (lesson) {
+            const decided = await decideLesson(lesson.id, decision, { cwd: process.cwd() })
+            if (!decided.changed) return fail(`Lesson ${lesson.id} still waits: ${decided.why}`)
+            const file = memoryFile(agent, lessonsMemory)
+            message = action === 'accept' ? `Approved Lesson ${lesson.id} from Run ${lesson.run}: the next Run reads it in ${file}` : `Rejected Lesson ${lesson.id} from Run ${lesson.run}: it is under Rejected in ${file}, so it isn't proposed again`
+          } else {
+            const { run } = decideProposal(agent, name, decision)
+            message = action === 'accept' ? `Accepted ${agent} ${name} from Run ${run}: the next Run reads it from ${memoryFile(agent, name)}` : `Rejected ${agent} ${name} from Run ${run}: the Memory stays as you have it`
+          }
         } finally {
           release()
         }
-        console.log(
-          action === 'accept'
-            ? `Accepted ${agent} ${name} from Run ${run}: the next Run reads it from ${memoryFile(agent, name)}`
-            : `Rejected ${agent} ${name} from Run ${run}: the Memory stays as you have it`,
-        )
+        console.log(message)
         return 0
       }
       if (action !== undefined) return fail(usage)

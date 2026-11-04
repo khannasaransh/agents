@@ -14,6 +14,8 @@ export type Inputs = Record<string, unknown>
 /** Where an Agent call runs, and the model and reasoning effort it asks the Worker for. */
 export interface CallOptions {
   cwd: string
+  /** Folders the Agent may not read, even with a read-only tool. A Worker that can't enforce it refuses the call. */
+  denyRead?: string[]
   model: string
   effort: Effort
   /** Usage reported by the CLI, including failed calls when available. */
@@ -41,13 +43,14 @@ export function attemptOrder(agent: Agent, override?: WorkerName): [WorkerChoice
  * Calls an Agent on its Worker, or on the fake Worker in a dry run, and returns its answer. A call
  * that fails, times out, hits a quota limit or answers in the wrong shape is retried once on the
  * Agent's fallback Worker, and `log` gets a line for each attempt. `worker` runs it on that Worker
- * instead, when the Agent names it. Throws when the inputs aren't exactly those the Agent's config
- * declares, or when both attempts fail.
+ * instead, when the Agent names it. `denyRead` are folders no attempt may read: a Worker that can't
+ * keep it from them refuses. Throws when the inputs aren't exactly those the Agent's config declares, or
+ * when both attempts fail.
  */
 export async function callAgent(
   agent: Agent,
   inputs: Inputs,
-  { cwd, dryRun, worker, log = console.log, onAdversary }: { cwd: string; dryRun: boolean; worker?: WorkerName; log?: (line: string) => void; onAdversary?: (result: AdversaryResult) => void },
+  { cwd, denyRead, dryRun, worker, log = console.log, onAdversary }: { cwd: string; denyRead?: string[]; dryRun: boolean; worker?: WorkerName; log?: (line: string) => void; onAdversary?: (result: AdversaryResult) => void },
 ): Promise<unknown> {
   const declared = Object.keys(agent.config.inputs)
   const missing = declared.filter((name) => !(name in inputs))
@@ -66,7 +69,7 @@ export async function callAgent(
     const started = Date.now()
     const took = () => `${Math.round((Date.now() - started) / 1000)}s`
     try {
-      const answer = checkedAnswer(target, await (dryRun ? fakeWorker : workers[choice.name]).call(target, given, { cwd, model: choice.model, effort: choice.effort, onUsage: reported => { usage = reported } }))
+      const answer = checkedAnswer(target, await (dryRun ? fakeWorker : workers[choice.name]).call(target, given, { cwd, denyRead, model: choice.model, effort: choice.effort, onUsage: reported => { usage = reported } }))
       log(`${target.name} answered on ${dryRun ? 'fake for ' : ''}${described(choice)} in ${took()}${usageSuffix()}`)
       return answer
     } catch (error) {

@@ -103,6 +103,7 @@ await runAsStep(async ({ runFolder, runId }) => {
     for (const file of imported.files) console.log(fileLine(file))
     for (const file of imported.files) {
       for (const own of file.fills?.own ?? []) console.log(`${file.file}: ${ownTradeText(own)} matches no order of ${bookName(file.book)}: your own trade`)
+      if (file.legacy?.length) console.log(`${file.file}: ${file.legacy.join(', ')} recorded as Legacy holdings of ${bookName(file.book)}, which has had no Order list yet: the Brief asks whether to keep each`)
     }
     if (dryRun) console.log('Dry run: nothing was recorded in ash_new, and every file stays in the Broker inbox')
     result.files.push(...(dryRun ? imported.files.map((file) => ({ ...file, movedTo: null, setAside: null })) : moveOut(imported.files, runFolder)))

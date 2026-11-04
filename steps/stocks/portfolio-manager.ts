@@ -7,11 +7,12 @@
 // last 3 months; on a month's first Saturday it writes the monthly review's commentary. It runs
 // read-only in the Run folder, on Claude Code with Codex as fallback, given the Rule plans, the Book
 // states, the Stages, the Health Agent's diagnosis, the review's figures (null on other days), the
-// Desk's views (issue 39; null when the Desk didn't review) and its Journal; not the dossiers, which
+// Desk's views (issue 39; null when the Desk didn't review), its Journal and its Lessons (issue 41:
+// its Lessons file, approved and rejected, and those still waiting); not the dossiers, which
 // the Desk reads. Each Decision record names the Desk's views it follows. Its answer is kept as
 // portfolio-manager.json, with the Journal it read, for the Check Step (which holds each change to
-// the final check in ash_new) and Save state (which applies the Journal and records the promotions
-// and the narrower ranges). It skips itself unless this Run's Plan Step succeeded with a real or
+// the final check in ash_new) and Save state (which applies the Journal, records the promotions and
+// the narrower ranges, and queues the Lessons it proposes). It skips itself unless this Run's Plan Step succeeded with a real or
 // paper Book's plan to judge, or there is a review to comment on. An Agent that fails on both Workers
 // is recorded as failed, and fails the Step: the Rule plans go out instead.
 import { existsSync, rmSync } from 'node:fs'
@@ -22,6 +23,7 @@ import type { DeskResult } from '../../src/desk.ts'
 import type { HealthResult } from './health.ts'
 import { bookNames } from '../../src/brokers.ts'
 import { readJson, writeJson } from '../../src/files.ts'
+import { lessonsAgent, lessonsMemory, waitingLessons, type ProposedLesson } from '../../src/lessons.ts'
 import { readMemory } from '../../src/memory.ts'
 import { percent } from '../../src/plans.ts'
 import type { PdJudgedBook, PdLever, PdPlan, PdReview, playbookRanges } from '../../src/pd.ts'
@@ -41,6 +43,10 @@ export interface PortfolioManagerAnswer {
   promotions: { sleeve: number; why: string }[]
   /** The narrower Playbook ranges it proposes, each for a Lever that lost to the Rule plan over the last 3 months. */
   narrower: NarrowerRanges[]
+  /** Whether what each judged Override expected happened, apart from whether it beat the Rule plan. */
+  expectations: { book: 'IN' | 'US' | 'HK'; override: number; happened: 'yes' | 'no' | 'unclear'; why: string }[]
+  /** The Lessons it proposes (issue 41), each for Saransh's Answer. */
+  lessons: ProposedLesson[]
   journal: { entries: string[]; open: string[] }
 }
 
@@ -86,6 +92,8 @@ await runAsStep(async ({ runId, runFolder }) => {
   }
 
   const journal = readMemory('portfolio-manager', journalMemory)
+  // Its Lessons file, approved and rejected, and those still waiting (issue 41).
+  const lessons = { file: readMemory(lessonsAgent, lessonsMemory), waiting: waitingLessons() }
   const inputs = {
     plans,
     bookStates: read(inputFiles.bookStates),
@@ -95,6 +103,7 @@ await runAsStep(async ({ runId, runFolder }) => {
     dossiers: null,
     desk: deskOf(read<DeskResult>('desk.json')),
     journal,
+    lessons,
   }
   let adversary: AdversaryResult | undefined
   let answer: PortfolioManagerAnswer
@@ -114,4 +123,5 @@ await runAsStep(async ({ runId, runFolder }) => {
   }
   for (const promotion of answer.promotions) console.log(`Proposes promoting Sleeve ${promotion.sleeve}: ${promotion.why}`)
   for (const each of answer.narrower) console.log(`Proposes narrowing the ${each.lever} Lever in ${bookNames[each.book] ?? each.book}: ${each.why}`)
+  for (const each of answer.lessons) console.log(`Proposes a Lesson: ${each.lesson}`)
 })

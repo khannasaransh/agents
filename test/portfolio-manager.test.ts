@@ -20,6 +20,8 @@ const answer = {
   monthly: null,
   promotions: [],
   narrower: [],
+  expectations: [],
+  lessons: [],
   journal: { entries: ['Dropped Rategain: the weakest RS Rating of the plan in a Correction; judge on 2026-12-24'], open: ['Is Rategain still lagging on 2026-12-24?'] },
 }
 

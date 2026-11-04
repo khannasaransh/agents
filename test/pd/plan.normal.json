@@ -124,12 +124,14 @@
         {
           "security_id": "IN:ASIANPAINT",
           "name": "Asian Paints Ltd",
-          "qty": 100.0
+          "qty": 100.0,
+          "waits_until": null
         },
         {
           "security_id": "IN:IDFCFIRSTB",
           "name": "IDFC First Bank Ltd",
-          "qty": 40.0
+          "qty": 40.0,
+          "waits_until": null
         }
       ],
       "weights": {

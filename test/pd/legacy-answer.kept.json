@@ -1,0 +1,13 @@
+{
+  "changed": true,
+  "why": null,
+  "legacy": {
+    "id": 1,
+    "book": "IN",
+    "security_id": "IN:ASIANPAINT",
+    "recorded_at": "2026-07-03T12:00:00+00:00",
+    "answer": "keep",
+    "answered_at": "2026-11-04T03:00:00+00:00",
+    "answered_by": "Saransh"
+  }
+}

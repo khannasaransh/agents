@@ -29,11 +29,12 @@ const extraToolFeatures = ['apps', 'plugins', 'browser_use', 'computer_use', 'im
 type SandboxRule = [path: string, access: 'write' | 'deny']
 
 /** The `codex exec` command line for one call of `agent`, with the prompt on stdin. */
-export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort, schemaFile, undeclaredTools, foundSkills }: CodexOptions): CommandLine {
+export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, denyRead = [], model, effort, schemaFile, undeclaredTools, foundSkills }: CodexOptions): CommandLine {
   const { outputSchema, timeoutSeconds } = agent.config
   const sandboxRules = [
     ...writeFolders(agent, cwd).map((folder): SandboxRule => [folder, 'write']),
     ...undeclaredTools.map((tool): SandboxRule => [tool, 'deny']),
+    ...denyRead.map((folder): SandboxRule => [folder, 'deny']),
   ]
   return {
     command: 'codex',
@@ -52,18 +53,17 @@ export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, model, eff
       '--config',
       `model_reasoning_effort="${effort}"`,
       // Its sandbox reads everywhere, writes only the Agent's write folders (not even the folder it
-      // runs in), has no network, and can't read or run a Tool the Agent doesn't declare.
+      // runs in), has no network, and can't read or run a Tool the Agent doesn't declare, or read a
+      // folder the call denies.
       '--config',
       'default_permissions="agent"',
       '--config',
       `permissions.agent={extends=":read-only",filesystem={${sandboxRules.map(([path, access]) => `${JSON.stringify(path)}="${access}"`).join(',')}}}`,
-      // On Windows that sandbox is a restricted token, which needs no setup on the machine. Without
-      // it, Codex there has no sandbox and refuses every command, even one that only reads, yet can
-      // still answer. A restricted token can't enforce a deny rule, so a call that denies a Tool
-      // fails at once instead, and the Agent falls back to its other Worker. Other platforms ignore
-      // the setting.
+      // Use the provisioned Windows sandbox that supports denied reads. The legacy unelevated
+      // mode cannot enforce them and prevented Agents with undeclared Tools from starting.
+      // Permissions above remain unchanged; missing sandbox support fails closed.
       '--config',
-      'windows.sandbox="unelevated"',
+      'windows.sandbox="elevated"',
       // The Agent's skills are in the prompt, so every skill Codex would find by itself is turned off.
       ...(foundSkills.length ? ['--config', `skills.config=[${foundSkills.map((file) => `{path=${JSON.stringify(file)},enabled=false}`).join(',')}]`] : []),
       '--cd',
@@ -101,11 +101,11 @@ function skillsCodexFinds(cwd: string): string[] {
 
 export const codexWorker: Worker = {
   name: 'codex',
-  call(agent, inputs, { cwd, model, effort, onUsage }) {
+  call(agent, inputs, { cwd, denyRead, model, effort, onUsage }) {
     return withTempFolder('agents-codex-', async (temp) => {
       const schemaFile = join(temp, 'output-schema.json')
       if (agent.config.outputSchema) writeFileSync(schemaFile, JSON.stringify(agent.config.outputSchema))
-      const line = codexCommandLine(agent, inputs, { cwd, model, effort, schemaFile, undeclaredTools: undeclaredTools(agent), foundSkills: skillsCodexFinds(cwd) })
+      const line = codexCommandLine(agent, inputs, { cwd, denyRead, model, effort, schemaFile, undeclaredTools: undeclaredTools(agent), foundSkills: skillsCodexFinds(cwd) })
       return codexAnswer(agent, await runCommandLine(line, cwd, result => {
         const usage = workerTokenUsage('codex', result.stdout, result.timedOut)
         if (usage) onUsage?.(usage)

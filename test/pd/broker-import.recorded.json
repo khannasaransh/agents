@@ -53,6 +53,7 @@
           }
         ]
       },
+      "legacy": null,
       "reconciliation": null
     },
     {
@@ -66,6 +67,7 @@
       "why": null,
       "trades": null,
       "fills": null,
+      "legacy": null,
       "reconciliation": {
         "as_of": "2026-10-31",
         "matched": 3,

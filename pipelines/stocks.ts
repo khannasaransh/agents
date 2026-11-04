@@ -10,7 +10,7 @@ const stocks: Pipeline = {
   // the plans Plan made with the Desk's views, and Check holds its changes to the final check and
   // records the Order lists. Save state applies the Portfolio Manager's Journal and records the
   // promotions it proposes. Brief comes last so its Run health covers every other Step.
-  steps: ['answers', 'broker-inbox', 'marketsmith', 'lake', 'review', 'stages', 'health', 'plan', 'feeds', 'desk', 'portfolio-manager', 'check', 'save-state', 'brief'],
+  steps: ['answers', 'broker-inbox', 'marketsmith', 'lake', 'review', 'stages', 'health', 'plan', 'feeds', 'desk', 'portfolio-manager', 'check', 'save-state', 'sash', 'brief'],
   brief: 'brief.html',
 }
 

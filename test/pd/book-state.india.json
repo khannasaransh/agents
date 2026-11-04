@@ -19,14 +19,34 @@
       "name": "Asian Paints Ltd",
       "qty": 100.0,
       "avg_cost": 120.0,
-      "legacy": true
+      "legacy": true,
+      "kept": false,
+      "lots": [
+        {
+          "day": "2026-07-01",
+          "qty": 100.0,
+          "price": 120.0
+        }
+      ],
+      "legacy_id": 1,
+      "answer": null
     },
     {
       "security_id": "IN:IDFCFIRSTB",
       "name": "IDFC First Bank Ltd",
       "qty": 40.0,
       "avg_cost": 95.5,
-      "legacy": true
+      "legacy": true,
+      "kept": false,
+      "lots": [
+        {
+          "day": "2026-07-02",
+          "qty": 40.0,
+          "price": 95.5
+        }
+      ],
+      "legacy_id": 2,
+      "answer": null
     }
   ],
   "reconciliation": {

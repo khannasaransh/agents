@@ -10,6 +10,20 @@ function readEnvFile(): Record<string, string | undefined> {
   return existsSync(file) ? parseEnv(readFileSync(file, 'utf8')) : {}
 }
 
+/** Credentials for the managed Sash projections; never passed to an analyst. */
+export function sashConfig(): { url: string; key: string; userId: string } | null {
+  const env = readEnvFile()
+  if (env.SASH_SYNC_ENABLED !== 'true') return null
+  const source = env.SASH_CREDENTIALS_FILE?.trim()
+  const shared = source ? parseEnv(readFileSync(source, 'utf8')) : {}
+  const url = (env.SASH_SUPABASE_URL ?? shared.SUPABASE_URL)?.trim()
+  const key = (env.SASH_SUPABASE_SERVICE_ROLE_KEY ?? shared.SUPABASE_SERVICE_ROLE_KEY)?.trim()
+  const userId = (env.SASH_USER_ID ?? shared.SENTINEL_USER_ID)?.trim()
+  if (!url || !key || !userId) throw new Error('Sash sync needs SASH_SUPABASE_URL, SASH_SUPABASE_SERVICE_ROLE_KEY and SASH_USER_ID')
+  if (new URL(url).protocol !== 'https:' || !/^[0-9a-f-]{36}$/i.test(userId)) throw new Error('Invalid Sash URL or user ID')
+  return { url, key, userId }
+}
+
 /**
  * What the Discord Step reads with: a bot's token, never Saransh's own, the channels it watches, and
  * Saransh's Discord user ID. A bot sees only its own DMs, so a DM here is one with the bot.

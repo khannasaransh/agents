@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { readJson, readJsonFiles, writeJson, writeText } from './files.ts'
+import type { Lesson } from './lessons.ts'
 import { memoryDir, runDir, stateDir } from './paths.ts'
 
 /** The Markdown file holding one of an Agent's Memory notes, such as the Reviewer's for one Repo. */
@@ -16,13 +17,34 @@ export function readMemory(agent: string, name: string): string {
   return existsSync(file) ? readFileSync(file, 'utf8') : ''
 }
 
+/**
+ * A block a proposal adds under a heading of a Memory file, rather than a whole new version of it (a
+ * Lesson, issue 41): settled, it is added to the file as it is by then, so proposals of the same file
+ * can wait and be settled in any order. Rejected, it goes under `rejected` instead, so the Agent reads
+ * what Saransh rejected too.
+ */
+export interface MemoryAddition {
+  /** The Memory file it adds to, by name. */
+  file: string
+  /** The file's first line when it is new: `# Lessons`. */
+  title: string
+  /** The `## ` heading it goes under once accepted (or applied), and once rejected. */
+  accepted: string
+  rejected: string
+}
+
 /** A new version of one Memory file that an Agent proposed in a Run, waiting for Saransh to accept or reject. */
 export interface MemoryProposal {
   agent: string
+  /** What the queue knows it by: its Memory file's name, or an addition's own (lesson-3). */
   name: string
   run: string
-  /** The whole Memory file as proposed. */
+  /** The whole Memory file as proposed; an addition's block. */
   memory: string
+  /** Set when it adds `memory` to a file (`MemoryAddition`) rather than replacing the file `name`. */
+  adds?: MemoryAddition
+  /** A Lesson's (issue 41), as the Portfolio Manager proposed it, for the Brief and its Answer. */
+  lesson?: Lesson
   /**
    * The Memory the Agent read, which the proposal builds on. Once the Memory has changed since, by
    * Saransh or by another Run, applying the proposal would undo that change. A proposal from before
@@ -31,9 +53,34 @@ export interface MemoryProposal {
   base?: string
 }
 
-/** Whether the Memory is still as the Agent read it when it made this proposal. */
-export function buildsOnCurrent({ agent, name, base }: MemoryProposal): boolean {
-  return base === undefined || readMemory(agent, name) === base
+/** Whether the Memory is still as the Agent read it when it made this proposal; an addition always is. */
+export function buildsOnCurrent({ agent, name, base, adds }: MemoryProposal): boolean {
+  return adds !== undefined || base === undefined || readMemory(agent, name) === base
+}
+
+/** A Memory file with `block` added at the end of its `## heading` section (made, after the rest, when it has none). */
+export function withBlock(memory: string, title: string, heading: string, block: string): string {
+  // Saransh may have edited it on Windows.
+  const lines = memory.replace(/\r\n?/g, '\n').replace(/\n+$/, '').split('\n')
+  if (!memory.trim()) lines.splice(0, lines.length, title)
+  let at = lines.findIndex((line) => line.trim() === `## ${heading}`)
+  if (at < 0) {
+    lines.push('', `## ${heading}`)
+    at = lines.length - 1
+  }
+  let end = lines.findIndex((line, i) => i > at && line.startsWith('## '))
+  if (end < 0) end = lines.length
+  while (end > at + 1 && !lines[end - 1].trim()) end--
+  lines.splice(end, 0, '', block.replace(/\n+$/, ''))
+  return `${lines.join('\n')}\n`
+}
+
+/** What settling a proposal makes its Memory file: the whole file proposed, or the file with its block added. */
+function settled(proposal: MemoryProposal, decision: MemoryDecision): { file: string; memory: string } {
+  const { agent, name, adds } = proposal
+  if (!adds) return { file: name, memory: proposal.memory }
+  const heading = decision === 'rejected' ? adds.rejected : adds.accepted
+  return { file: adds.file, memory: withBlock(readMemory(agent, adds.file), adds.title, heading, proposal.memory) }
 }
 
 /** Orders Run IDs by when they started, `2026-10-22-0530-10` after `2026-10-22-0530-9`. */
@@ -66,14 +113,16 @@ export function pendingProposals(): MemoryProposal[] {
 export type MemoryDecision = 'applied' | 'accepted' | 'rejected'
 
 /**
- * Makes the proposal the Memory the next Run reads, unless it was rejected, and records the
- * decision in the Run that proposed it, with the Memory proposed, before and after.
+ * Makes the proposal the Memory the next Run reads, unless it was rejected (an addition rejected goes
+ * under its rejected heading), and records the decision in the Run that proposed it, with the Memory
+ * proposed, before and after.
  */
 export function settleProposal(proposal: MemoryProposal, decision: MemoryDecision): void {
   const { agent, name } = proposal
-  const before = readMemory(agent, name)
-  if (decision !== 'rejected') writeText(memoryFile(agent, name), proposal.memory)
-  const after = readMemory(agent, name)
+  const { file, memory } = settled(proposal, decision)
+  const before = readMemory(agent, file)
+  if (decision !== 'rejected' || proposal.adds) writeText(memoryFile(agent, file), memory)
+  const after = readMemory(agent, file)
   writeJson(decisionFile(proposal), { agent, name, decision, decidedAt: new Date().toISOString(), proposed: proposal.memory, before, after })
 }
 
@@ -106,7 +155,9 @@ export function decideProposal(agent: string, name: string, decision: 'accepted'
 }
 
 /** The proposal as a unified diff against the Memory Saransh has now. */
-export function proposalDiff({ agent, name, memory }: MemoryProposal): string {
+export function proposalDiff(proposal: MemoryProposal): string {
+  const { agent } = proposal
+  const { file: name, memory } = settled(proposal, 'accepted')
   const temp = mkdtempSync(join(tmpdir(), 'agents-memory-'))
   try {
     const proposed = join(temp, `${name}.md`)

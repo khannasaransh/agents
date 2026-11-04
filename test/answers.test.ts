@@ -108,7 +108,7 @@ test('an Answer to a settled item is ignored and logged, and its file still move
       { item: 'correction:7', answer: 'reject' },
       { item: 'quarantine:99', answer: 'dismiss' },
       { item: 'quarantine:5', answer: 'approve' },
-      { item: 'lesson:12', answer: 'approve' },
+      { item: 'memo:12', answer: 'approve' },
     ]),
   )
   ws.setPd({ corrections: { example: 'corrections-decide.decided.json' }, quarantines: { example: 'quarantines-dismiss.none.json', exitCode: 1 } })
@@ -127,7 +127,7 @@ test('an Answer to a settled item is ignored and logged, and its file still move
       ['correction:7', 'ignored', 'Correction 7 was approved already'],
       ['quarantine:99', 'ignored', 'There is no Quarantine 99'],
       ['quarantine:5', 'ignored', 'A quarantine takes dismiss, not approve'],
-      ['lesson:12', 'ignored', "lesson:12 isn't an item the Brief asks about"],
+      ['memo:12', 'ignored', "memo:12 isn't an item the Brief asks about"],
     ],
   )
   const log = ws.readRunFile(nextRun, 'logs/answers.log')

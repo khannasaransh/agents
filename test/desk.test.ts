@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
-import { readFileSync, realpathSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { makeWorkspace, pdExamples, type Workspace, type WorkerCliCall } from './helpers.ts'
 
@@ -86,7 +86,7 @@ function promptInput(call: WorkerCliCall, name: string): any {
   return JSON.parse(block[1])
 }
 
-test("each analyst the review list needs is called at once, read-only in the Run folder, with its names and its part of their dossiers", async () => {
+test("each analyst the review list needs is called at once, read-only in an empty folder of its own and denied the data folder, with its names and its part of their dossiers", async () => {
   ws = makeWorkspace()
   prepare()
   workersAnswer()
@@ -99,8 +99,16 @@ test("each analyst the review list needs is called at once, read-only in the Run
   const [chart] = callsFor('claude', '# Chart analyst')
   assert.equal(ws.workerCliCalls('codex').length, 1)
   assert.equal(ws.workerCliCalls('claude').length, 2)
-  assert.equal(ws.workerCliCalls('agent').length, 3, 'Cursor attempts each independent assessment')
-  for (const call of [events, risk, chart]) assert.equal(realpathSync(call.cwd), realpathSync(join(ws.dataDir, 'runs', runId)))
+  // Cursor can't keep an analyst from the data folder, so its independent assessment isn't run.
+  assert.equal(ws.workerCliCalls('agent').length, 0)
+  // Each folder is removed once its analyst has answered.
+  for (const call of [events, risk, chart]) assert.ok(!resolve(call.cwd).startsWith(resolve(ws.dataDir)) && !existsSync(call.cwd), call.cwd)
+  assert.equal(new Set([events, risk, chart].map((call) => call.cwd)).size, 3)
+  assert.ok(events.args.some((arg) => arg.includes(`${JSON.stringify(ws.dataDir)}="deny"`)), events.args.join(' '))
+  for (const call of [risk, chart]) {
+    const denied = call.args.slice(call.args.indexOf('--disallowedTools') + 1)
+    assert.ok(denied[0]?.startsWith('Read(/') && denied[0].endsWith('/**)'), denied.join(' '))
+  }
   // Events and Risk may search the web; Chart may not. Events runs on Codex, Chart and Risk on Claude Code.
   assert.ok(events.args.includes('web_search="live"'))
   assert.equal(risk.args[risk.args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash,WebSearch')
@@ -152,7 +160,7 @@ test("an analyst no name needs isn't called, and the Desk skips itself when no a
   assert.equal((await step('desk')).status, 0)
 
   assert.deepEqual(ws.workerCliCalls('codex'), [])
-  assert.equal(ws.workerCliCalls('agent').length, 1, 'only Chart needs an assessment')
+  assert.equal(ws.workerCliCalls('agent').length, 0, "Cursor can't keep Chart from the data folder")
   assert.deepEqual(ws.workerCliCalls('claude').map((c) => c.stdin.split(/\r?\n/)[0]), ['# Chart analyst'])
   assert.deepEqual(desk().analysts.map((a: any) => a.analyst), ['chart'])
   ws.cleanup()
@@ -178,7 +186,7 @@ test("a view is reused, keeping its date, while nothing its analyst reads for th
 
   // Nothing changed, so no analyst is called, and every view keeps the date it was made.
   assert.equal(ws.workerCliCalls('claude').length + ws.workerCliCalls('codex').length, 3)
-  assert.equal(ws.workerCliCalls('agent').length, 3, 'cached views trigger no additional assessments')
+  assert.equal(ws.workerCliCalls('agent').length, 0, 'no assessment on Cursor, which cannot deny the data folder')
   assert.deepEqual(desk(later).analysts.map((a: any) => [a.analyst, a.status]), [['chart', 'reused'], ['events', 'reused'], ['risk', 'reused']])
   assert.deepEqual(desk(later).views.map((v: any) => [v.analyst, v.security_id, v.viewed_at, v.reused]), first.map((v: any) => [v.analyst, v.security_id, v.viewed_at, true]))
 
@@ -345,7 +353,7 @@ test('a dry run calls the analysts on the fake Worker, and keeps no view and pro
   assert.ok(desk('2026-10-28-0930').views.every((v: any) => !v.reused))
 })
 
-test('the Desk honors --worker for Chart while keeping Cursor as its adversary', async () => {
+test("the Desk honors --worker for Chart, and Cursor, its adversary, refuses it as it can't deny the data folder", async () => {
   ws = makeWorkspace()
   const plan = example('plan.normal.json')
   plan.review = { ...plan.review, names: plan.review.names.map((n: any) => ({ ...n, analysts: n.analysts.filter((a: any) => a.analyst === 'chart') })), risk: [], analysts: ['chart'] }
@@ -355,7 +363,9 @@ test('the Desk honors --worker for Chart while keeping Cursor as its adversary',
   assert.equal((await step('desk')).status, 0)
   assert.deepEqual(ws.workerCliCalls('claude'), [])
   assert.equal(ws.workerCliCalls('codex').length, 1)
-  assert.equal(ws.workerCliCalls('agent').length, 1)
+  assert.equal(ws.workerCliCalls('agent').length, 0)
   assert.equal(desk().adversaries[0].mainWorker.name, 'codex')
   assert.equal(desk().adversaries[0].worker.name, 'cursor')
+  assert.equal(desk().adversaries[0].status, 'failed')
+  assert.match(desk().adversaries[0].error, /The Cursor CLI can't keep the chart-adversary Agent from reading/)
 })

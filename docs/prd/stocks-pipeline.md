@@ -670,12 +670,14 @@ There are two seams, and both are a command with files in and files out.
   - a new version may enter Paper on his approval without first passing the Candidate test (his "9 ok" accepts the current behavior);
   - a demoted Paper strategy goes to Retired. The upper 95th-percentile promotion check is still under discussion, not confirmed by this acceptance;
   - a failed Portfolio Manager holds every reviewed buy; the Chart analyst uses Claude Code first;
-  - Sash remains: paper portfolios go to Supabase `watchlists`, real portfolios to `portfolios`; the alarm decision remains open;
+  - Sash remains: separate managed lists for each Book, paper portfolios in Supabase `watchlists`, real portfolios in `portfolios`; the alarm decision remains open. The Sash Step is implemented, but Saransh explicitly left synchronization disabled pending connection activation;
   - the SEC contact is configured locally with his name and the email already recorded in agents' `.env`;
   - each Book's limit tolerance for buys is 3% above the last close, and a sale's proceeds at ICICI Direct and moomoo pay for a buy at the same open;
   - each Book's capital: ₹1 crore for India, ₹1 crore for the US ($105,000) and ₹30 lakh for Hong Kong (HK$247,000), at 29 October's rates;
   - the Mandate's numbers are its first version (f99c88f13b5b);
   - into Paper, on his word: `in-super30-ok-tuned` (the Candidate test's choice) and CW2's selected variant in all three Books (`in-`, `us-` and `hk-cw2-selected`), which the Candidate test didn't choose.
+  - into Paper on 3 and 4 November, on his word: Super 30 OK, tuned in the US and Hong Kong (`us-` and `hk-super30-ok-tuned`), India's screen on each market's data, which no Candidate test has chosen.
+  - a live record outside its tested range, under or above it, goes to him with its promotion rather than blocking it; his own Playbook widenings may go past the override scorecard with a recorded reason.
 - **Waiting on Saransh:**
   - which strategy versions the Candidate test may choose from, once the ash ports' audit is out;
   - what counts as a paper Book matching its rules-only paper Book (placeholder: at least its return over the 3 months, with no deeper max drawdown);
@@ -684,7 +686,7 @@ There are two seams, and both are a command with files in and files out.
   - later, contract notes, if real brokerage is to enter the costs.
 - **Unconfirmed:**
   - The upper 95th-percentile promotion block, attribution interpretation, analyst input isolation, and Override expectation scoring/manual widening policy still need decisions after explanation. See [the 31 October follow-up](../review/decisions-follow-up-2026-10-31.md).
-  - **Codex's read-only sandbox on Windows:** its unelevated sandbox holds, but it can't enforce the deny rules that keep an Agent from Tools it doesn't declare, so Codex refuses those calls (issue 19). The Agent then falls back to Claude Code.
+  - **Codex's read-only sandbox on Windows:** the Worker uses the provisioned elevated sandbox, which supports denied reads. A live probe on 2 November verified allowed reads, denied reads and denied writes. Health uses the account-supported `gpt-6-astra` model through Codex CLI; the previous `gpt-6.1-sol` model was rejected by this account. Permissions remain read-only, and unavailable sandbox support fails the call rather than removing enforcement (issue 19).
   - **NSE and BSE endpoints** need browser-like headers and cookies, and change without notice. A failing Feed skips itself with a To-do.
   - **Broker charges in exports:** answered. ICICI Direct's tradebook has every charge, and its brokerage isn't ₹0: about 0.24% of each trade in Saransh's sample (issue 23). moomoo's trade history has none: its Fill Amount is the shares times the price, so the reviews can't check the $0 brokerage from it (issue 24).
   - **Web search verification:** the Claude Code Worker explicitly allows built-in `WebSearch` when an analyst's `webSearch` flag is enabled, independently of read-only shell permissions. The policy recommendation and an end-to-end live-search check remain open; see the 31 October follow-up.

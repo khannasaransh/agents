@@ -14,7 +14,7 @@
 - [x] A MarketSmith Step runs before the Lake Step on Saturdays, and skips itself on other days.
 - [x] An expired cookie skips the Step and gives a To-do naming the cookie.
 - [x] The Saturday refresh builds fundamentals from the new fetch.
-- [ ] ash_backend's Portfolio Manager agent and Sash's `PM_BUY` alerts are turned off. ash_backend's own timer keeps running for the Sash app until Saransh decides on the app; then ash_backend is archived.
+- [ ] Deploy the change that turns off ash_backend's Portfolio Manager agent and Sash's `PM_BUY` alerts. Sash remains (31 October decision); keep its backend data dependencies until replacements work. Separate managed paper watchlists and real portfolios have a new sync implementation in agents, currently disabled at Saransh's request. The alarm decision remains open; do not archive ash_backend just because Sash's destination is decided.
 - [x] Tests:
   - **ash_new:** a fetch parsed from recorded responses, never the network, writes the raw store and a dated snapshot; a rejected cookie exits 78.
   - **agents:** the Step skips itself on a weekday; a stand-in `pd marketsmith` that exits 78 becomes a skip with a To-do; a successful fetch is recorded.

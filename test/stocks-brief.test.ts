@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
@@ -473,7 +473,7 @@ test("the India Book's state is shown beside its Rule plan, for placing, with ea
   assert.match(page, /India Book: its Rule plan for 2026-10-26, for placing The real Book holds each strategy at its Stage's share/)
   // The state: its cash, its Legacy holdings and what is unsettled.
   assert.match(page, /The Book state fa1dba342bad ₹9,84,160 in cash: its capital, ₹10,00,000 until you set it \(its market's cost preset's\), with 2 trades in its ledger, the last on 2026-07-02/)
-  assert.match(page, /Asian Paints Ltd IN:ASIANPAINT 100 ₹120\.00 Legacy/)
+  assert.match(page, /Asian Paints Ltd IN:ASIANPAINT 100 ₹120\.00 Legacy: keep or sell\? See above/)
   assert.match(page, /Unsettled, so neither bought nor sold on a signal until a holdings export settles it: Rategain Travel Technologies Ltd \(IN:RATEGAIN\): quantity, ledger 100, broker 50/)
   // The plan: what it was made from, then each order with its signal and cut, its final list at the top.
   assert.match(page, /Made from the Book state fa1dba342bad, the data to 2026-10-23's close \(version 2026-10-23\.70c27d24c7a7\), India CW2, selected \(in-cw2-selected, version 7c41d0e2a9b3, Real-small\), its Disaster stops 20% under, the Mandate's version f99c88f13b5b and the Playbook's e247b5b89ff0/)
@@ -482,7 +482,39 @@ test("the India Book's state is shown beside its Rule plan, for placing, with ea
   assert.match(page, /IN-2026-10-26-002 IN:GOLD1 Buy 2445 ₹40\.00 ₹41\.20 Gold's share of the Book — See its Order list/)
   assert.match(page, /Stopped by a rule, so not in the plan: Rategain Travel Technologies Ltd \(IN:RATEGAIN\): a buy of 2642 shares stopped by an open Reconciliation difference/)
   assert.match(page, /Disaster stops to place with the buys, or raise: Stove Kraft Ltd \(IN:STOVEKRAFT\): place at ₹50\.02/)
-  assert.match(page, /Legacy holdings, held, not sold: issue 43 sells them as the Sleeves need the cash\. Asian Paints Ltd \(IN:ASIANPAINT\): 100 shares/)
+  assert.match(page, /Legacy holdings left after the plan, sold as the Sleeves' buys need their money: losses first, then the smallest gains\. Asian Paints Ltd \(IN:ASIANPAINT\): 100 shares/)
+})
+
+test('the Brief asks whether to keep each Legacy holding, with Keep and Sell, and the Answers Step applies one through pd legacy', async () => {
+  prepare()
+  planned('plan.normal.json')
+
+  const html = await brief()
+  const page = text(html)
+
+  assert.match(page, /Legacy holdings: keep or sell\? What you held before the Books' first Order lists, which no strategy bought\./)
+  assert.match(page, /India Book Asian Paints Ltd IN:ASIANPAINT 100 ₹120\.00 2026-07-01 Keep Sell/)
+  assert.match(page, /India Book IDFC First Bank Ltd IN:IDFCFIRSTB 40 ₹95\.50 2026-07-02 Keep Sell/)
+  const items = JSON.parse(html.match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
+  assert.deepEqual(
+    items.filter((i: { item: string }) => i.item.startsWith('legacy:')),
+    [
+      { item: 'legacy:1', answers: ['keep', 'sell'] },
+      { item: 'legacy:2', answers: ['keep', 'sell'] },
+    ],
+  )
+
+  const next = '2026-10-28-0930'
+  ws.prepareRun(next, { pipeline: 'stocks', steps: [{ name: 'answers', status: 'pending' }] })
+  const saved = { kind: 'stocks-answers', run: runId, savedAt: '2026-10-27T16:00:00.000Z', answers: [{ item: 'legacy:1', answer: 'keep' }] }
+  mkdirSync(join(ws.homeDir, 'Downloads'), { recursive: true })
+  writeFileSync(join(ws.homeDir, 'Downloads', 'stocks-answers-2026-10-27-0930-20261027160000.json'), JSON.stringify(saved))
+  ws.setPd({ legacy: { example: 'legacy-answer.kept.json' } })
+
+  const applied = await ws.agents('step', 'answers', '--run', next)
+
+  assert.equal(applied.status, 0, applied.stderr)
+  assert.deepEqual(ws.pdCalls().map((c) => c.args), [['legacy', 'keep', '1']])
 })
 
 test("each paper Book's Rule plan is shown beside its state, its strategies from Paper up at their full share", async () => {
@@ -738,9 +770,12 @@ test("on Saturdays the weekly review shows the Portfolio Manager's commentary an
   assert.doesNotMatch(page, /US Book .* Paper Book/, 'a Book with no record and no Sleeve is left out')
 })
 
-test("on Saturdays the weekly review shows each paper Book's override scorecard, the Levers that lost with the narrower range proposed, the sum beside the gap and the gate", async () => {
+test("on Saturdays the weekly review shows each paper Book's override scorecard, whether each beat the Rule plan apart from whether what it expected happened, the Levers that lost with the narrower range proposed, the sum beside the gap and the gate", async () => {
   prepare()
   ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.saturday.json')))
+  // The Portfolio Manager's reading of what Rategain's veto expected; Stove Kraft's it didn't judge.
+  const expectations = [{ book: 'IN', override: 4, happened: 'no', why: "Rategain kept pace with the Sleeve into its results; the veto won only on the market's fall" }]
+  ws.writeRunFile(runId, 'portfolio-manager.json', { status: 'answered', answer: { books: [], review: null, monthly: null, promotions: [], narrower: [], expectations, journal: { entries: [], open: [] } }, journalRead: '', inputs: [] })
   const narrower = { book: 'IN', lever: 'timing', ranges: [{ name: 'timing_sessions', value: 3 }], why: 'Waits lost', proposed: JSON.parse(example('judgement-propose.narrower.json')) }
   ws.writeRunFile(runId, 'narrower.json', { narrower: [narrower] })
 
@@ -749,9 +784,9 @@ test("on Saturdays the weekly review shows each paper Book's override scorecard,
 
   assert.match(page, /Override scorecard The gate for Playbook mode: The two paper Books have closes together only from 2026-08-03: the gate needs the 3 months from 2026-07-31\./)
   assert.match(page, /The scores of the 3 Overrides made since the two paper Books started on 2026-08-03 add up to \+9\.0 bp; the paper Book's gap to its rules-only paper Book over the same closes is \+14\.6 bp\. The Overrides interact/)
-  assert.match(page, /2026-08-04 Veto of Rategain Travel Technologies Selection Events It lags the Sleeve into its results 2026-09-01 ₹3,121, \+31\.2 bp Yes/)
-  assert.match(page, /2026-09-15 Wait of Stove Kraft Timing Chart .* 2026-10-13 -₹1,840, -18\.1 bp No/)
-  assert.match(page, /2026-10-20 Wait of KPI Green Energy Timing — A cheaper entry after the gap Open: judged on 2026-11-17, valued to 2026-10-30 -₹420, -4\.1 bp —/)
+  assert.match(page, /2026-08-04 Veto of Rategain Travel Technologies Selection Events It lags the Sleeve into its results 2026-09-01 ₹3,121, \+31\.2 bp Yes No: Rategain kept pace with the Sleeve into its results; the veto won only on the market's fall/)
+  assert.match(page, /2026-09-15 Wait of Stove Kraft Timing Chart .* 2026-10-13 -₹1,840, -18\.1 bp No Not judged by the Portfolio Manager/)
+  assert.match(page, /2026-10-20 Wait of KPI Green Energy Timing — A cheaper entry after the gap Open: judged on 2026-11-17, valued to 2026-10-30 -₹420, -4\.1 bp — —/)
   assert.match(page, /Every Override so far, tallied: Judged Open Hit rate Against the Rule plan Lever: selection 1 0 100% ₹3,121, \+31\.2 bp Lever: timing 1 1 0% -₹1,840, -18\.1 bp Analyst: Events 1 0 100%/)
   assert.match(page, /Analyst: none, the Portfolio Manager alone 0 1 — —/)
   assert.match(page, /The timing Lever lost to the Rule plan over the 3 months from 2026-07-31: -₹1,840, -18\.1 bp, over 1 Override\. The Portfolio Manager proposes a narrower range: proposal 5, waiting for your Answer\./)

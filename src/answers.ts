@@ -3,7 +3,7 @@
 // naming the Run and each Answer, and the next Run's Answers Step applies it through `pd`. A kind of
 // item is added here, with its Answers and the `pd` command that applies one, and the Brief and the
 // Step follow (the stocks Pipeline PRD's "Answers").
-import type { PdEarlyExit, PdJudgementShow, PdOrders, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from './pd.ts'
+import type { PdBookState, PdEarlyExit, PdHolding, PdJudgementShow, PdOrders, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus } from './pd.ts'
 
 /**
  * Each kind of item waiting on Saransh: the Answers it takes, and the `pd` command that applies one to
@@ -25,7 +25,12 @@ const kinds = {
   order: { answers: ['placed', 'skipped'], pd: (id: string, answer: string, savedAt: string) => ['orders', 'mark', id, answer, '--saved-at', savedAt] },
   // A real Book's Disaster stop to place or raise: placed at the broker.
   stop: { answers: ['placed'], pd: (id: string, _answer: string, savedAt: string) => ['orders', 'stop', id, '--saved-at', savedAt] },
-} satisfies Record<string, { answers: string[]; pd(id: string, answer: string, savedAt: string): string[] }>
+  // A real Book's Legacy holding (issue 43): kept (a Kept holding, never sold) or sold as the Sleeves need the cash.
+  legacy: { answers: ['keep', 'sell'], pd: (id: string, answer: string) => ['legacy', answer, id] },
+  // A Lesson the Portfolio Manager proposed (issue 41): its Answer settles the Lesson queued in this repo
+  // (src/lessons.ts), and its range change's proposal in ash_new with it, so no `pd` command alone applies it.
+  lesson: { answers: ['approve', 'reject'], pd: null },
+} satisfies Record<string, { answers: string[]; pd: ((id: string, answer: string, savedAt: string) => string[]) | null }>
 
 /** An item waiting on Saransh, as the Brief embeds it: its id and the Answers it takes. */
 export interface AnswerItem {
@@ -69,22 +74,32 @@ export function stopsToPlace(orders: PdOrders | null) {
   return (orders?.books ?? []).flatMap((b) => b.stops.filter((s) => s.state === 'proposed'))
 }
 
+/** The real Books' Legacy holdings Saransh hasn't answered on yet, Book by Book: each by its record's id. */
+export function legacyToAnswer(states: PdBookState[]): (PdHolding & { legacy_id: number; book: string })[] {
+  return states
+    .filter((s) => !s.paper)
+    .flatMap((s) => s.holdings.filter((h): h is PdHolding & { legacy_id: number } => h.legacy && h.legacy_id !== null && h.answer === null).map((h) => ({ ...h, book: s.book })))
+}
+
 /**
  * The items waiting on Saransh: each real Book's order still to place and Disaster stop to place or
- * raise, then each waiting Correction and each Quarantine in the Lake's status, then each Candidate,
- * then each promotion, then each early exit, then each proposal to move a Judgement mode or change a
- * Playbook's ranges.
+ * raise, then each Legacy holding to keep or sell, then each waiting Correction and each Quarantine in
+ * the Lake's status, then each Candidate, then each promotion, then each early exit, then each proposal
+ * to move a Judgement mode or change a Playbook's ranges (but a Lesson's, which its Lesson's Answer
+ * decides), then each Lesson (by its id).
  */
-export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null, judgement: PdJudgementShow | null = null, promotions: PdStageProposal[] = [], exits: PdEarlyExit[] = [], orders: PdOrders | null = null): AnswerItem[] {
+export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | null, judgement: PdJudgementShow | null = null, promotions: PdStageProposal[] = [], exits: PdEarlyExit[] = [], orders: PdOrders | null = null, states: PdBookState[] = [], lessons: { id: number; judgement: number | null }[] = []): AnswerItem[] {
   return [
     ...ordersToPlace(orders).map((o) => answerItem('order', o.id)),
     ...stopsToPlace(orders).map((s) => answerItem('stop', s.id)),
+    ...legacyToAnswer(states).map((h) => answerItem('legacy', h.legacy_id)),
     ...(status?.corrections ?? []).map((c) => answerItem('correction', c.id)),
     ...(status?.quarantines ?? []).map((q) => answerItem('quarantine', q.id)),
     ...waitingCandidates(stages).map((s) => answerItem('candidate', s.id)),
     ...promotions.map((p) => answerItem('promotion', p.id)),
     ...exits.filter((e) => e.decision === null).map((e) => answerItem('exit', e.id)),
-    ...(judgement?.proposals ?? []).map((p) => answerItem('judgement', p.id)),
+    ...(judgement?.proposals ?? []).filter((p) => !lessons.some((l) => l.judgement === p.id)).map((p) => answerItem('judgement', p.id)),
+    ...lessons.map((l) => answerItem('lesson', l.id)),
   ]
 }
 
@@ -140,12 +155,16 @@ export function answersFileError(value: unknown): string | null {
   return bad === -1 ? null : `its Answer ${bad + 1} names no item or no Answer`
 }
 
-/** The `pd` arguments that apply an Answer saved at `savedAt`, or why the Answer isn't one its item takes. */
-export function pdArgs({ item, answer }: Answer, savedAt: string): { args: string[] } | { why: string } {
+/**
+ * The `pd` arguments that apply an Answer saved at `savedAt`; for a Lesson, which this repo settles,
+ * its id and the decision; or why the Answer isn't one its item takes.
+ */
+export function pdArgs({ item, answer }: Answer, savedAt: string): { args: string[] } | { lesson: number; decision: 'accepted' | 'rejected' } | { why: string } {
   const { kind, id } = parseItem(item)
   const known = Object.hasOwn(kinds, kind) ? kinds[kind as keyof typeof kinds] : null
   if (!known || !/^\d+$/.test(id)) return { why: `${item} isn't an item the Brief asks about` }
   if (!known.answers.includes(answer)) return { why: `A ${kind} takes ${known.answers.join(' or ')}, not ${answer}` }
+  if (known.pd === null) return { lesson: Number(id), decision: answer === 'approve' ? 'accepted' : 'rejected' }
   return { args: known.pd(id, answer, savedAt) }
 }
 

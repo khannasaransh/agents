@@ -1,6 +1,6 @@
 # Decision follow-up, 31 October 2026
 
-This records Saransh's replies to items 5–20. Explanations and recommendations below are not approvals to change the remaining rules.
+This records Saransh's replies to items 5–20. Explanations and recommendations below are not approvals to change the remaining rules. In the subsequent rerun request he confirmed only the explicitly accepted decisions, chose separate managed Sash lists, and then explicitly left live Sash sync disabled. The integration is implemented for later activation; see [the rerun record](stocks-rerun-2026-10-31.md).
 
 ## Accepted and deferred
 
@@ -26,3 +26,13 @@ This records Saransh's replies to items 5–20. Explanations and recommendations
 **13 — Override scorecard.** Currently `came_true` means the Override financially beat the Rule plan by the predeclared review session. That does not prove its written thesis happened: vetoing a stock before a general selloff can win even if the predicted company event never occurs. Recommendation: label the deterministic metric "beat Rule plan" and assess the factual thesis separately. Widening means allowing more discretion (for example a longer wait or a lower minimum size). Currently the evidence gate also refuses Saransh's own widening through `pd judgement propose`; direct config editing is still possible. Recommendation: retain the same default gate, with any owner exception explicit, reasoned and recorded, rather than silently bypassing it. No change made pending his decision.
 
 **20 — Search recommendation.** Keep read-only filesystem permissions and independently allow the built-in WebSearch tool only for Events and Risk. The existing Claude adapter already adds WebSearch when webSearch is enabled; the Codex adapter selects live search. Prefer filings, exchanges and company releases, query only public company/event facts, and retain source URLs and retrieval times. Do not enable arbitrary network shell commands as a substitute. Treat retrieved content as evidence, not instructions. This is a recommendation plus source inspection, not an end-to-end live-search verification. Official Codex guidance: https://learn.chatgpt.com/docs/web-search.
+
+## Applied, 4 November 2026
+
+Saransh accepted the recommendations for 10, 12 and 13, and approved the US and Hong Kong Super 30 OK into Paper.
+
+- **10:** a live record outside its tested range, under it or above it, no longer holds a promotion back: it goes to him with the proposal, whose why says how it is outside (`pd review`'s `promotion.outside_range`; ash_new `pipeline.review._promotion`, `stages.promotions.propose`). The drawdown and the demotion rule are unchanged: a Sleeve that breaks the demotion rule still isn't promoted, and every promotion still waits for his Answer.
+- **12:** each Desk analyst runs in an empty folder of its own, outside the data folder, and may not read the data folder (its Run folders and state): a Read deny rule on Claude Code, a `deny` sandbox rule on Codex (`denyRead`, `src/worker.ts`). A Worker that can't enforce it refuses the call: Cursor, so the analysts' independent assessment is unavailable until Cursor can be held to it, and Antigravity. The ash_new database and .env files outside the data folder aren't denied: Claude Code's file tools can't reach them from the analyst's folder, but Codex's read-only sandbox could.
+- **13:** the scorecard's `came_true` is now `beat_rule_plan` (money against the Rule plan). The Portfolio Manager judges, in `expectations`, whether what each judged Override expected happened (yes, no or unclear, and why), and the Brief shows both. Saransh may widen a Playbook range the scorecard doesn't support with `pd judgement propose ... --despite-scorecard "why"`, which the proposal's why records; no one else may, and it still waits for his Answer.
+- **Super 30 OK in the US and Hong Kong:** `us-super30-ok-tuned` (Sleeve 5) and `hk-super30-ok-tuned` (Sleeve 6) are in Paper from 3 and 4 November, on his word, not the Candidate test's. Their Book backtests (2016–2026): the US 3.7% a year, under its gold and cash fund alone (4.8%), against the S&P 500's 15.7%; Hong Kong 8.6% against the Hang Seng's 0.0%.
+

@@ -13,6 +13,7 @@ const rules: Record<string, string> = {
   unsettled: 'an open Reconciliation difference',
   quarantined: 'its Quarantine',
   hold: 'Hold mode',
+  legacy_held: 'the Legacy holdings that would pay for it being held (close to turning long-term, or not traded)',
 }
 
 const conditions: Record<PdCondition, string> = { uptrend: 'Uptrend', under_pressure: 'Under pressure', correction: 'Correction' }
@@ -44,6 +45,7 @@ const ownReasons: Record<string, string> = {
   disaster_stop: 'Its Disaster stop, which the last close is under',
   exposure: 'The exposure level, trimming the weakest holdings first',
   early_exit: 'An early exit you approved, selling it before its strategy does',
+  legacy: "A Legacy holding, sold for the Sleeves' buys: losses first, then the smallest gains",
 }
 
 /**

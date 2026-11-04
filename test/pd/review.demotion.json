@@ -134,7 +134,8 @@
             "to_name": "Real-small",
             "due": "2026-10-29",
             "due_now": false,
-            "why": "It breaks the demotion rule"
+            "why": "It breaks the demotion rule",
+            "outside_range": []
           }
         }
       ],
@@ -179,7 +180,7 @@
             "valued_to": "2026-09-01",
             "value": 3120.5,
             "bps": 31.2,
-            "came_true": true
+            "beat_rule_plan": true
           },
           {
             "id": 7,
@@ -198,7 +199,7 @@
             "valued_to": "2026-10-13",
             "value": -1840.0,
             "bps": -18.1,
-            "came_true": false
+            "beat_rule_plan": false
           },
           {
             "id": 9,
@@ -215,7 +216,7 @@
             "valued_to": "2026-10-30",
             "value": -420.0,
             "bps": -4.1,
-            "came_true": null
+            "beat_rule_plan": null
           }
         ],
         "tallies": {

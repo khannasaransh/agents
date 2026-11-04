@@ -38,11 +38,22 @@ export interface AgentConfig {
   webSearch?: boolean
   /**
    * What Save state does with the Memory the Agent proposes: apply it straight away (the default),
-   * or queue it for Saransh to accept or reject with `agents memory`.
+   * or queue it for Saransh to accept or reject with `agents memory`; for all its Memory files, or for
+   * each by its name (one not named is applied), as the Portfolio Manager's Journal is applied and
+   * its Lessons reviewed.
    */
-  memoryChanges?: 'apply' | 'review'
+  memoryChanges?: MemoryChanges | Record<string, MemoryChanges>
   timeoutSeconds: number
   maxTurns: number
+}
+
+/** Applied by Save state, or reviewed by Saransh. */
+export type MemoryChanges = 'apply' | 'review'
+
+/** What Save state does with a change the Agent proposes to its Memory file `name`. */
+export function memoryChangesFor(config: AgentConfig, name: string): MemoryChanges {
+  const set = config.memoryChanges
+  return (typeof set === 'string' ? set : set?.[name]) ?? 'apply'
 }
 
 /** A command an Agent owns, in its tools folder, that its Worker may run during a call. */
@@ -101,7 +112,10 @@ const configSchema: JsonSchema = {
     tools: { type: 'object', additionalProperties: { type: 'string' } },
     outputSchema: { type: 'object' },
     webSearch: { type: 'boolean' },
-    memoryChanges: { enum: ['apply', 'review'] },
+    memoryChanges: {
+      description: '"apply" or "review", or either for each Memory file by its name',
+      anyOf: [{ enum: ['apply', 'review'] }, { type: 'object', additionalProperties: { enum: ['apply', 'review'] } }],
+    },
     timeoutSeconds: { type: 'integer', minimum: 1 },
     maxTurns: { type: 'integer', minimum: 1 },
   },

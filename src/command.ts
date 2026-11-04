@@ -1,8 +1,8 @@
 // Finds the program a command names, as a shell would, so it can start without one. On Windows that
 // means PATH with PATHEXT's extensions, and npm's .cmd shims, which only cmd.exe runs: instead, the
 // script a shim hands to Node is started with Node directly.
-import { existsSync, readFileSync } from 'node:fs'
-import { delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { basename, delimiter, dirname, isAbsolute, join, resolve } from 'node:path'
 
 const windows = process.platform === 'win32'
 
@@ -12,10 +12,39 @@ export function commandLine(command: string, args: string[], { env = process.env
   const file = findOnPath(command, { env, cwd })
   if (!file) return { file: command, args }
   if (!/\.(cmd|bat)$/i.test(file)) return { file, args }
+  const cursor = cursorBundle(file)
+  if (cursor) return { file: join(cursor, 'node.exe'), args: [join(cursor, 'index.js'), ...args] }
   const script = npmShimScript(file)
   if (!script) throw new Error(`${file} only runs through cmd.exe, and the Pipeline starts nothing through a shell`)
   const node = join(dirname(file), 'node.exe')
   return { file: existsSync(node) ? node : process.execPath, args: [script, ...args] }
+}
+
+/** Cursor's Windows installer wraps its bundled Node entry point in batch and PowerShell launchers.
+ * Recognise that layout without executing either shell. Unknown wrappers remain refused. */
+function cursorBundle(shim: string): string | null {
+  if (!/^(agent|cursor-agent)\.cmd$/i.test(basename(shim))) return null
+  const root = dirname(shim)
+  const wrapper = readFileSync(shim, 'utf8')
+  if (!/powershell\.exe\s+-NoProfile\s+-ExecutionPolicy\s+Bypass\s+-File\s+"%SCRIPT_DIR%\\cursor-agent\.ps1"\s+%\*/i.test(wrapper)) return null
+  try {
+    const launcher = readFileSync(join(root, 'cursor-agent.ps1'), 'utf8')
+    if (!launcher.includes('& "$nodePath" "$scriptPath\\versions\\$versionName\\index.js" $args')) return null
+    if (existsSync(join(root, 'node.exe'))) return existsSync(join(root, 'index.js')) ? root : null
+    const versions = readdirSync(join(root, 'versions'), { withFileTypes: true }).flatMap(entry => {
+      const match = /^(\d{4})\.(\d{1,2})\.(\d{1,2})(?:-(\d{2})-(\d{2})-(\d{2}))?-[a-f0-9]+$/.exec(entry.name)
+      return entry.isDirectory() && match ? [{ name: entry.name, order: match.slice(1).map(part => Number(part ?? 0)) }] : []
+    })
+    versions.sort((a, b) => {
+      for (let i = 0; i < a.order.length; i++) if (a.order[i] !== b.order[i]) return b.order[i] - a.order[i]
+      return b.name.localeCompare(a.name)
+    })
+    if (!versions.length) return null
+    const folder = join(root, 'versions', versions[0].name)
+    return existsSync(join(folder, 'node.exe')) && existsSync(join(folder, 'index.js')) ? folder : null
+  } catch {
+    return null
+  }
 }
 
 /**

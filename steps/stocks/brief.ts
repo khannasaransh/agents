@@ -46,7 +46,7 @@
 import { contestedHtml, type ContestEntry } from '../../src/adversary.ts'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { answerItem, answersFile, answersFileName, capitalised, itemName, waitingCandidates, waitingItems, type AnswerItem } from '../../src/answers.ts'
+import { answerItem, answersFile, answersFileName, capitalised, itemName, legacyToAnswer, waitingCandidates, waitingItems, type AnswerItem } from '../../src/answers.ts'
 import { bookNames, brokerFiles, brokerName, differenceText, fileLine, securityName, shares } from '../../src/brokers.ts'
 import { analysts, viewText, viewVerdict, type DeskResult, type DeskView } from '../../src/desk.ts'
 import { comingDays, comingEvents, kindName } from '../../src/feeds.ts'
@@ -55,7 +55,7 @@ import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { changeText, decisionText, modeName, proposalText, sentence } from '../../src/judgement.ts'
 import { orderWhat, ownTradeText, stateText } from '../../src/orders.ts'
-import type { PdBook, PdBookState, PdEarlyExit, PdFeeds, PdFillCosts, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrder, PdOrderList, PdOrders, PdPaperBook, PdPaperBooks, PdPlan, PdRealGap, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally } from '../../src/pd.ts'
+import type { PdBook, PdBookState, PdEarlyExit, PdHolding, PdFeeds, PdFillCosts, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrder, PdOrderList, PdOrders, PdPaperBook, PdPaperBooks, PdPlan, PdRealGap, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally } from '../../src/pd.ts'
 import { analystName, breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -68,8 +68,9 @@ import type { CheckResult } from './check.ts'
 import type { HealthResult, Proposals } from './health.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 import type { BookStates } from './plan.ts'
-import type { PortfolioManagerResult } from './portfolio-manager.ts'
-import type { NarrowerResult, PromotionsResult } from './save-state.ts'
+import type { PortfolioManagerAnswer, PortfolioManagerResult } from './portfolio-manager.ts'
+import type { LessonsResult, NarrowerResult, PromotionsResult } from './save-state.ts'
+import { lessonChangeText, waitingLessons, type Lesson } from '../../src/lessons.ts'
 
 /** Escapes text for HTML, so nothing from the Lake or a log is read as markup. */
 const esc = (text: string) => text.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#39;')
@@ -418,6 +419,32 @@ function proposalsSection(waiting: PdJudgementProposal[], modes: PdJudgementShow
   ].join('\n')
 }
 
+/**
+ * The Lessons waiting for Saransh's Answer (issue 41), each with its Approve and Reject buttons: its
+ * words, why, and the Playbook range it changes, which its Answer decides in ash_new too; then what
+ * became of each Lesson the Portfolio Manager proposed in this Run that wasn't queued. Nothing when
+ * neither.
+ */
+function lessonsSection(waiting: Lesson[], learnt: LessonsResult | null): string {
+  const refused = (learnt?.lessons ?? []).filter((l) => !l.lesson)
+  if (!waiting.length && !refused.length) return ''
+  const rows = waiting.map((l) => {
+    const change = lessonChangeText(l, bookNames)
+    const range = change ? `<br><span class="muted">Changes ${esc(change)}${l.judgement === null ? '' : `, as ash_new's proposal ${l.judgement}`}</span>` : ''
+    return [String(l.id), `${esc(l.lesson)}${range}`, esc(l.why), esc(l.run), answerButtons(answerItem('lesson', l.id))]
+  })
+  const notQueued = refused.map((l) => `${esc(l.proposed.lesson)}: ${esc(l.why ?? '')}`)
+  return [
+    `<section><h2>Lessons waiting for your Answer: ${waiting.length}</h2>`,
+    "<p>What the Portfolio Manager learnt from its Journal and the override scorecard. A Lesson shapes its decisions only once you approve it; one you reject is given to it too, so it doesn't propose it again. Approving one that changes a range changes the Book's Playbook, which the final check holds every decision to.</p>",
+    waiting.length ? table(['Id', 'Lesson', 'Why', 'Proposed in Run', 'Your Answer'], rows) : '',
+    ...(notQueued.length ? ['<p>Proposed in this Run, but not queued:</p>', list(notQueued)] : []),
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
 /** The promotions waiting on Saransh: those the Stages Step read, then those Save state recorded in this Run. */
 function waitingPromotions(stages: PdStagesCheck | null, promotions: PromotionsResult | null): PdStageProposal[] {
   const proposed = (promotions?.promotions ?? []).flatMap(({ decided }) => (decided.changed && decided.proposal ? [decided.proposal] : []))
@@ -443,7 +470,7 @@ function promotionsSection(waiting: PdStageProposal[], stages: PdStagesCheck | n
   })
   return [
     `<section><h2>Promotions waiting for your approval: ${waiting.length}</h2>`,
-    "<p>A strategy gets more money only by your Answer. The Portfolio Manager proposes a promotion when its time in its Stage is up (3 months of Paper, 6 of Real-small) and its live record is inside its tested range. Approve or reject each, then Save answers: the next Run records your Answers in ash_new, and its Rule plans hold an approved one at its new Stage. One you don't answer waits here while it stays in its Stage.</p>",
+    "<p>A strategy gets more money only by your Answer. The Portfolio Manager proposes a promotion when its time in its Stage is up (3 months of Paper, 6 of Real-small) and it breaks no demotion rule. A live record outside its tested range, under it or above it, doesn't hold it back: its why says how, for you to judge. Approve or reject each, then Save answers: the next Run records your Answers in ash_new, and its Rule plans hold an approved one at its new Stage. One you don't answer waits here while it stays in its Stage.</p>",
     table(['Id', 'Book', 'Strategy', 'Promotion', 'Proposed', 'Why', 'Your Answer'], rows),
     '</section>',
   ].join('\n')
@@ -656,13 +683,20 @@ function gateText(gate: NonNullable<PdScorecard['gate']>): string {
   return `The gate for Playbook mode, over the 3 months from ${gate.start} to ${gate.end}: the paper Book made ${percent(gate.paper.return)} at a max drawdown of ${percent(gate.paper.max_drawdown)}, its rules-only paper Book ${percent(gate.rules_only.return)} at ${percent(gate.rules_only.max_drawdown)}, by the bar fixed on ${gate.bar.fixed_on}. ${verdict}`
 }
 
+/** The Portfolio Manager's reading of whether what a judged Override expected happened, apart from its score. */
+function expectationCell(found: PortfolioManagerAnswer['expectations'][number] | undefined, status: 'judged' | 'open'): string {
+  if (status === 'open') return '—'
+  if (!found) return '<span class="muted">Not judged by the Portfolio Manager</span>'
+  return esc(`${{ yes: 'Yes', no: 'No', unclear: 'Unclear' }[found.happened]}: ${found.why}`)
+}
+
 /**
  * A paper Book's override scorecard: the gate for moving its real Book to Playbook mode, the sum of
  * its Overrides' scores beside its gap to its rules-only paper Book, each Override open or judged in
  * the last 3 months, the tallies by Lever, analyst and Lesson, and each Lever that lost over the last
  * 3 months with the narrower range proposed for it.
  */
-function scorecardPart(card: PdScorecard, narrower: NarrowerResult['narrower']): string {
+function scorecardPart(card: PdScorecard, narrower: NarrowerResult['narrower'], expectations: PortfolioManagerAnswer['expectations']): string {
   if (card.status !== 'scored') return ''
   const at = (amount: number) => money(amount, card.currency)
   const out = ['<h4>Override scorecard</h4>']
@@ -681,9 +715,10 @@ function scorecardPart(card: PdScorecard, narrower: NarrowerResult['narrower']):
       esc(o.expected ?? ''),
       esc(o.status === 'judged' ? (o.judged_on ?? '') : `Open: judged on ${o.judged_on ?? "the track's sale"}, valued to ${o.valued_to}`),
       esc(`${at(o.value)}${o.bps === null ? '' : `, ${bp(o.bps)}`}`),
-      o.came_true === null ? '—' : o.came_true ? 'Yes' : 'No',
+      o.beat_rule_plan === null ? '—' : o.beat_rule_plan ? 'Yes' : 'No',
+      expectationCell(expectations.find((e) => e.override === o.id), o.status),
     ])
-    out.push(table(['Session', 'Override', 'Lever', 'Views', 'Expected', 'Judged on', 'Against the Rule plan', 'Beat it'], rows))
+    out.push(table(['Session', 'Override', 'Lever', 'Views', 'Expected', 'Judged on', 'Against the Rule plan', 'Beat the Rule plan', 'What it expected happened'], rows))
   } else out.push('<p>No Override is open or was judged in the last 3 months.</p>')
   const { lever, analyst, lesson } = card.tallies
   const tallies = [
@@ -762,7 +797,7 @@ function reviewSection(run: RunRecord, review: PdReview | null, pm: PortfolioMan
         table(head, rows),
         realGapPart(book.real_gap),
         ...(differences.length ? [`<p>Reconciliation, as of ${esc(book.reconciliation!.as_of)}:</p>`, list(differences.map((d) => esc(differenceText(d, book))))] : []),
-        scorecardPart(book.scorecard, (narrower?.narrower ?? []).filter((n) => n.book === book.book)),
+        scorecardPart(book.scorecard, (narrower?.narrower ?? []).filter((n) => n.book === book.book), (pm?.status === 'answered' ? (pm.answer.expectations ?? []) : []).filter((e) => e.book === book.book)),
       ].join('\n')
     })
   const due = review.promotions_due.map((p) => {
@@ -904,13 +939,45 @@ function eventsSection(run: RunRecord, feeds: PdFeeds | null): string {
   return ['<section><h2>Coming events for the holdings</h2>', about, body, ...notes.filter(Boolean), '</section>'].join('\n')
 }
 
+/** What a holding is to its Book: Legacy (sold for the Sleeves' buys), Kept (outside it), or a Sleeve's. */
+function holdingKind(h: PdHolding): string {
+  if (h.kept) return 'Kept: outside the Book, never sold'
+  if (!h.legacy) return ''
+  return h.answer === 'sell' ? 'Legacy: you said sell' : h.legacy_id !== null && h.answer === null ? 'Legacy: keep or sell? See above' : 'Legacy'
+}
+
+/**
+ * The real Books' Legacy holdings waiting on Saransh (issue 43): what each held before its first Order
+ * list, which no strategy bought. Each is sold as the Sleeves need its money unless he keeps it; nothing
+ * when none waits.
+ */
+function legacySection(states: BookStates | null): string {
+  const waiting = legacyToAnswer(states?.states ?? [])
+  if (!waiting.length) return ''
+  const currency = (book: string) => states?.states.find((s) => s.book === book && !s.paper)?.currency ?? 'INR'
+  const rows = waiting.map((h) => [
+    esc(capitalised(bookNames[h.book] ?? h.book)),
+    securityCell(h.security_id, h.name),
+    esc(shares(h.qty)),
+    h.avg_cost === null ? '—' : esc(money(h.avg_cost, currency(h.book), 2)),
+    esc(h.lots.map((lot) => lot.day).join(', ')) || '—',
+    answerButtons(answerItem('legacy', h.legacy_id)),
+  ])
+  return [
+    '<section><h2>Legacy holdings: keep or sell?</h2>',
+    "<p>What you held before the Books' first Order lists, which no strategy bought. Keep one, and it stays outside its Book, never sold, though it counts toward the position cap when a strategy buys the same stock. Otherwise it is sold as the Sleeves' buys need its money: losses first, then gains, and a winner within two months of turning long-term (12 months in India, 24 in the US and Hong Kong) only once it has. Sell says so, and this stops asking.</p>",
+    table(['Book', 'Holding', 'Shares', 'Average cost', 'Bought', 'Your Answer'], rows),
+    '</section>',
+  ].join('\n')
+}
+
 /** A Book state, as its Rule plan starts from it: its cash, its holdings, what is unsettled. */
 function statePart(state: PdBookState | undefined): string {
   if (!state) return "<p>Its state couldn't be read in this Run.</p>"
   const at = (amount: number) => esc(money(amount, state.currency))
   const capital = state.capital_set ? `its capital of ${at(state.capital)}` : `its capital, ${at(state.capital)} until you set it (its market's cost preset's)`
   const ledger = state.ledger.transactions ? `${plural(state.ledger.transactions, 'trade')} in its ledger, the last on ${esc(state.ledger.last ?? '')}` : 'nothing in its ledger yet'
-  const rows = state.holdings.map((h) => [securityCell(h.security_id, h.name), esc(shares(h.qty)), h.avg_cost === null ? '—' : esc(money(h.avg_cost, state.currency, 2)), h.legacy ? 'Legacy' : ''])
+  const rows = state.holdings.map((h) => [securityCell(h.security_id, h.name), esc(shares(h.qty)), h.avg_cost === null ? '—' : esc(money(h.avg_cost, state.currency, 2)), holdingKind(h)])
   const unsettled = state.unsettled.map(
     (u) => `${esc(u.name ?? u.security_id ?? '')}${u.security_id ? ` (${esc(u.security_id)})` : ''}: ${esc(u.kind.replaceAll('_', ' '))}, ledger ${u.ledger_qty === null ? '—' : esc(shares(u.ledger_qty))}, broker ${esc(shares(u.broker_qty))}`,
   )
@@ -1005,7 +1072,10 @@ function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
   const leftOut = (plan.left_out ?? []).map((l) => `${esc(l.strategy_id)} version ${esc(l.version)} (${esc(stageName(l.stage))}): ${esc(l.why)}`)
   const dropped = (plan.dropped ?? []).map((d) => `${esc(d.name ?? d.security_id)} (${esc(d.security_id)}): a ${d.side === 'BUY' ? 'buy' : 'sale'} of ${esc(shares(d.wanted))} shares stopped by ${esc(ruleName(d.rule))}`)
   const stops = (plan.stops ?? []).map((s) => `${esc(s.name ?? s.security_id)} (${esc(s.security_id)}): ${s.was === null ? 'place at' : `raise from ${esc(money(s.was, currency, 2))} to`} ${esc(money(s.price, currency, 2))}`)
-  const legacy = (plan.legacy ?? []).map((h) => `${esc(h.name ?? h.security_id)} (${esc(h.security_id)}): ${esc(shares(h.qty))} shares`)
+  const legacy = (plan.legacy ?? []).map(
+    (h) => `${esc(h.name ?? h.security_id)} (${esc(h.security_id)}): ${esc(shares(h.qty))} shares${h.waits_until ? `, a winner held until its shares turn long-term on ${esc(h.waits_until)}` : ''}`,
+  )
+  const kept = (plan.kept ?? []).map((k) => `${esc(k.name ?? k.security_id)} (${esc(k.security_id)}): ${esc(shares(k.shares))} shares, ${esc(money(k.value, currency))}`)
   const exits = (plan.early_exits ?? []).map((e) => `${esc(e.name ?? e.security_id)} (${esc(e.security_id)}), early exit ${e.id}: ${e.status === 'planned' ? `sold by ${esc(e.orders.join(', '))}` : esc(e.why ?? '')}`)
   return [
     `<section>${head}`,
@@ -1021,7 +1091,8 @@ function planPart(plan: PdRulePlan, state: PdBookState | undefined): string {
     ...(dropped.length ? ['<p>Stopped by a rule, so not in the plan:</p>', list(dropped)] : []),
     ...(stops.length ? ['<p>Disaster stops to place with the buys, or raise:</p>', list(stops)] : []),
     ...(exits.length ? ['<p>Early exits you approved:</p>', list(exits)] : []),
-    ...(legacy.length ? ['<p>Legacy holdings, held, not sold: issue 43 sells them as the Sleeves need the cash.</p>', list(legacy)] : []),
+    ...(legacy.length ? ["<p>Legacy holdings left after the plan, sold as the Sleeves' buys need their money: losses first, then the smallest gains.</p>", list(legacy)] : []),
+    ...(kept.length ? ["<p>Kept holdings, outside the Book and never sold, counted toward the position and sector caps:</p>", list(kept)] : []),
     '</section>',
   ].join('\n')
 }
@@ -1346,6 +1417,8 @@ interface Inputs {
   review: PdReview | null
   /** The narrower Playbook ranges Save state proposed in this Run. */
   narrower: NarrowerResult | null
+  /** What Save state did with the Lessons the Portfolio Manager proposed in this Run (issue 41). */
+  lessons: LessonsResult | null
   /** The promotions Save state recorded in this Run. */
   promotions: PromotionsResult | null
   /** The real Books' orders, stops and own trades, as the Check Step read them (issue 42). */
@@ -1353,7 +1426,7 @@ interface Inputs {
   todos: { step: string; todo: string }[]
 }
 
-function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, narrower, orders, todos }: Inputs): string {
+function render({ run, answers, inbox, marketSmith, lake, status, latest, stages, health, plan, states, feeds, desk, pm, check, paperBooks, modes, review, promotions, narrower, lessons, orders, todos }: Inputs): string {
   const contested: ContestEntry[] = []
   if (health?.status === 'diagnosed' && health.adversary) contested.push({ label: 'Health', result: health.adversary })
   for (const result of desk?.adversaries ?? []) contested.push({ label: result.agent, result })
@@ -1362,7 +1435,9 @@ function render({ run, answers, inbox, marketSmith, lake, status, latest, stages
   const waiting = latest ?? status
   const promoting = waitingPromotions(stages, promotions)
   const exits = openExits(modes, desk)
-  const proposals = waitingProposals(modes, narrower)
+  // A Lesson's range change is decided by the Lesson's Answer, so it isn't asked about apart.
+  const learning = waitingLessons()
+  const proposals = waitingProposals(modes, narrower).filter((p) => !learning.some((l) => l.judgement === p.id))
   // The Check Step's read, else the Broker inbox Step's, before this Run's lists.
   const placing = orders ?? inbox?.orders ?? null
   return `<!doctype html>
@@ -1379,6 +1454,7 @@ ${run.dryRun ? '<p class="note">Dry run: the Lake was read as it is, not refresh
 ${diagnosisSection(run, health)}
 ${orderListsSection(run, placing, check)}
 ${unplacedStopsSection(run, placing)}
+${legacySection(states)}
 ${todosSection(todos)}
 ${contestedHtml(contested)}
 ${correctionsSection(waiting)}
@@ -1387,6 +1463,7 @@ ${candidatesSection(stages)}
 ${promotionsSection(promoting, stages)}
 ${exitsSection(exits)}
 ${proposalsSection(proposals, modes)}
+${lessonsSection(learning, lessons)}
 ${answersSection(answers)}
 ${marketsSection(status)}
 ${stagesSection(run, stages)}
@@ -1403,7 +1480,7 @@ ${marketSmithSection(marketSmith)}
 ${lakeSection(lake, status)}
 ${healthSection(status)}
 ${runHealthSection(run)}
-${saveAnswers(run.id, waitingItems(waiting, stages, { books: [], exits: [], ...modes, proposals }, promoting, exits, placing))}
+${saveAnswers(run.id, waitingItems(waiting, stages, { books: [], exits: [], ...modes, proposals }, promoting, exits, placing, states?.states ?? [], learning))}
 </body>
 </html>
 `
@@ -1439,6 +1516,7 @@ await runAsStep(({ runId, runFolder, force }) => {
       review: read<PdReview>('review.json'),
       promotions: read<PromotionsResult>('promotions.json'),
       narrower: read<NarrowerResult>('narrower.json'),
+      lessons: read<LessonsResult>('lessons.json'),
       orders: read<PdOrders>('orders.json'),
       todos: readTodos(runFolder),
     }),

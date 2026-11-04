@@ -95,7 +95,7 @@ test('the Codex Worker runs a read-only Agent through codex exec with only its b
     '--config',
     `permissions.agent={extends=":read-only",filesystem={"${commit}"="deny","${blame}"="deny","${secret}"="deny"}}`,
     '--config',
-    'windows.sandbox="unelevated"',
+    'windows.sandbox="elevated"',
     '--config',
     `skills.config=[${foundSkills.map((file) => `{path=${JSON.stringify(file)},enabled=false}`).join(',')}]`,
     '--cd',

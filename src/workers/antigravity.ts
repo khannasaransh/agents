@@ -107,7 +107,9 @@ const rulesOfRunningCalls = new Set<Permissions>()
 
 export const antigravityWorker: Worker = {
   name: 'antigravity',
-  async call(agent, inputs, { cwd, model, effort }) {
+  async call(agent, inputs, { cwd, denyRead, model, effort }) {
+    // Its rules aren't checked against a denied folder: it refuses a call that denies one.
+    if (denyRead?.length) throw new Error(`The Antigravity CLI can't be held to keeping the ${agent.name} Agent from reading ${denyRead.join(', ')}, so it isn't run there`)
     const home = antigravityHomeDir()
     const gitDir = await runGit(cwd, ['rev-parse', '--path-format=absolute', '--git-common-dir']).then(
       (dir) => dir.trim(),

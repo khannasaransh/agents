@@ -66,6 +66,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['portfolio-manager', 'succeeded'],
       ['check', 'succeeded'],
       ['save-state', 'skipped'],
+      ['sash', 'skipped'],
       ['brief', 'succeeded'],
     ],
   )
@@ -141,6 +142,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['portfolio-manager', 'failed'],
       ['check', 'succeeded'],
       ['save-state', 'skipped'],
+      ['sash', 'skipped'],
       ['brief', 'succeeded'],
     ],
   )

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { afterEach, test } from 'node:test'
 import reviewer from '../agents/reviewer/config.ts'
+import { memoryChangesFor, type MemoryChanges } from '../src/agent.ts'
 import type { FetchResult } from '../steps/fetch.ts'
 import type { ReviewResult } from '../steps/review.ts'
 import { makeWorkspace, type Workspace } from './helpers.ts'
@@ -36,12 +37,12 @@ const reviewed = (repo: string, memory: string | null): ReviewResult => ({
 const saveState = () => ws.agents('step', 'save-state', '--run', runId)
 
 /** Sets how the Reviewer's Memory changes are handled, in its config. */
-function reviewerMemoryChanges(memoryChanges: 'apply' | 'review') {
+function reviewerMemoryChanges(memoryChanges: MemoryChanges | Record<string, MemoryChanges>) {
   ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...reviewer, memoryChanges })}\n`, 'instructions.md': '# Reviewer\n' })
 }
 
 /** Prepares a Run whose Reviewer proposed `memory` for each Repo, then runs its Save state. */
-async function saveStateAfterReviews(proposals: Record<string, string | null>, { memoryChanges }: { memoryChanges?: 'apply' | 'review' } = {}) {
+async function saveStateAfterReviews(proposals: Record<string, string | null>, { memoryChanges }: { memoryChanges?: MemoryChanges | Record<string, MemoryChanges> } = {}) {
   if (memoryChanges) reviewerMemoryChanges(memoryChanges)
   ws.writeRepoList([])
   ws.prepareRun(runId)
@@ -103,6 +104,20 @@ test("with memoryChanges set to 'review', Save state queues the Reviewer's propo
   assert.match(listed.stdout, /^reviewer crux_flutter, proposed in Run 2026-10-22-0530:\n/m)
   assert.match(listed.stdout, /\n \n - Prices come from the payments service\.\n\+- Feature flags live in lib\/flags\.dart\.\n/)
   assert.match(listed.stdout, /agents memory accept reviewer crux_flutter/)
+})
+
+test('memoryChanges set per Memory file queues the change to one file named review and applies the rest', async () => {
+  ws = makeWorkspace()
+  const panel = '# inpix-panel\n\n- The panel builds with Vite.\n'
+
+  await saveStateAfterReviews({ crux_flutter: newMemory, 'inpix-panel': panel }, { memoryChanges: { crux_flutter: 'review', 'inpix-panel': 'apply' } })
+
+  assert.equal(ws.readMemory('reviewer', 'crux_flutter'), null)
+  assert.equal(ws.readMemory('reviewer', 'inpix-panel'), panel)
+  assert.match((await ws.agents('memory')).stdout, /^reviewer crux_flutter, proposed in Run 2026-10-22-0530:/m)
+  // A file the config doesn't name is applied, as by default.
+  assert.equal(memoryChangesFor({ ...reviewer, memoryChanges: { crux_flutter: 'review' } }, 'inpix-panel'), 'apply')
+  assert.equal(memoryChangesFor({ ...reviewer, memoryChanges: 'review' }, 'inpix-panel'), 'review')
 })
 
 test('a Run whose Reviewer proposes no Memory change applies nothing, queues nothing and leaves every Memory file as it is', async () => {

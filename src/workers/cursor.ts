@@ -52,6 +52,8 @@ function cursorPrompt(agent: Agent, inputs: Inputs, cwd: string): string {
 export const cursorWorker: Worker = {
   name: 'cursor',
   async call(agent, inputs, options) {
+    // Its sandbox holds commands, not reads: it can't keep an Agent from a folder, so it refuses a call that denies one.
+    if (options.denyRead?.length) throw new Error(`The Cursor CLI can't keep the ${agent.name} Agent from reading ${options.denyRead.join(', ')}, so it isn't run there`)
     return cursorAnswer(agent, await runCommandLine(cursorCommandLine(agent, inputs, options), options.cwd))
   },
 }

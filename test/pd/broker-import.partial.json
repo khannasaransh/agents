@@ -16,6 +16,7 @@
         "set_aside": 6
       },
       "fills": null,
+      "legacy": null,
       "reconciliation": null
     },
     {
@@ -29,6 +30,7 @@
       "why": "It sells 300 HK:0700 on 2026-08-20, but holds 200 then. Nothing in it was recorded",
       "trades": null,
       "fills": null,
+      "legacy": null,
       "reconciliation": null
     }
   ]

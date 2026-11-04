@@ -157,7 +157,7 @@ The Portfolio Manager's Memory: its Decision records, the Desk's views, what eac
 _Avoid_: log, history
 
 **Lesson**:
-A rule of thumb the Portfolio Manager draws from its Journal and proposes in the Stocks Brief, such as a narrower range for a Lever. It applies to later decisions only once Saransh approves it, and a Lesson that widens a range needs the override scorecard's support.
+A rule of thumb the Portfolio Manager draws from its Journal and proposes in the Stocks Brief, such as a narrower range for a Lever. It applies to later decisions only once Saransh approves it, and a Lesson that widens a range needs the override scorecard's support. Approved and rejected, each is kept in its Lessons file, its Memory beside the Journal, which Saransh reviews where Save state applies the Journal.
 _Avoid_: learning, insight, rule (a rule is a strategy's)
 
 **Review**:
