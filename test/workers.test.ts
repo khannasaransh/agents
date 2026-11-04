@@ -9,7 +9,7 @@ import { antigravityCustomAgent, antigravityCommandLine, antigravityPermissions 
 import { claudeCodeCommandLine } from '../src/workers/claude-code.ts'
 import type { CommandLine } from '../src/workers/cli.ts'
 import { codexCommandLine } from '../src/workers/codex.ts'
-import { cursorCommandLine } from '../src/workers/cursor.ts'
+import { cursorCommandLine, jsonObjectFromAnswer } from '../src/workers/cursor.ts'
 
 // Absolute paths as this platform spells them: on Windows, on the current drive.
 const cwd = resolve('/data/worktrees/crux_flutter-x1Yz')
@@ -259,7 +259,7 @@ test('the Cursor Worker runs a read-only Agent through the Cursor CLI in ask mod
     '--output-format',
     'json',
     '--model',
-    'grok-4.7[effort=xhigh]',
+    'grok-4.7-xhigh',
     '--trust',
     '--workspace',
     cwd,
@@ -273,6 +273,16 @@ test('the Cursor Worker runs a read-only Agent through the Cursor CLI in ask mod
   assert.match(prompt, /Do not search the web/)
   assert.match(prompt, /Hand back only the JSON object/)
   assert.ok(prompt.includes(JSON.stringify(reviewer.outputSchema, null, 2)), 'Cursor needs the output schema in its prompt')
+})
+
+test('the Cursor Worker reads a JSON object that follows narration the CLI joined in front of it', () => {
+  const nested = 'I will look at the commits.\n{"summary":"ok","findings":[{"severity":"low","file":"a.kt","line":1,"commit":"abc","author":"A","summary":"x"}],"memory":null}'
+  assert.deepEqual(jsonObjectFromAnswer(nested), {
+    summary: 'ok',
+    findings: [{ severity: 'low', file: 'a.kt', line: 1, commit: 'abc', author: 'A', summary: 'x' }],
+    memory: null,
+  })
+  assert.deepEqual(jsonObjectFromAnswer('{"summary":"plain","findings":[],"memory":null}'), { summary: 'plain', findings: [], memory: null })
 })
 
 test('the Cursor Worker lets an Agent write by forcing commands through, only in its named folders, and asks for no JSON wrapper when the Agent has no schema', () => {

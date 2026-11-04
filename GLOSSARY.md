@@ -15,7 +15,7 @@ The coding-agent CLI that runs an Agent: Claude Code, Codex, Antigravity or the 
 _Avoid_: engine, provider, harness, model (a Worker runs a model; it is not one)
 
 **Adversary Worker**:
-The Worker configured as `adversaryWorker`. It independently answers the same task before seeing the main answer, then compares the two and records substantive disagreements and missed items with evidence. It runs read-only and does not apply its proposed actions or Memory. It must use a different CLI from both main and fallback Workers, including when `--worker` swaps their order. Bundled Agents use Cursor with Grok 4.7 at extra-high effort.
+The Worker configured as `adversaryWorker`. It independently answers the same task before seeing the main answer, then compares the two and records substantive disagreements and missed items with evidence. It runs read-only and does not apply its proposed actions or Memory. It must use a different CLI from both main and fallback Workers, including when `--worker` swaps their order. Bundled Agents use Cursor with Grok 4.7 at extra-high effort. `ADVERSARY=false` in the env file turns it off for every Agent without removing that config.
 
 **Contested**:
 The Brief section preserving the main and adversarial positions, the evidence for their disagreement, and the check needed to resolve it. It also lists items one answer raised and the other left out, and reports an assessment that failed or found neither. A disagreement or a missed item does not replace the main answer.
