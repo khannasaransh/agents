@@ -94,7 +94,8 @@ test('when only the runner of a Run dies, the next Run first stops the Step and 
   repo.pushCommit('Add paywall')
   ws.setWorkerCli('codex', { hang: true })
   const abandoned = ws.start('run', 'daily')
-  await until(() => ws.workerCliCalls('codex').length === 1)
+  // The Run fetches before it reviews, which takes longer while the rest of the suite runs alongside.
+  await until(() => ws.workerCliCalls('codex').length === 1, 30_000)
   const [, abandonedId] = ws.runIds()
   const [worker] = ws.workerCliCalls('codex')
   abandoned.killCliOnly()
