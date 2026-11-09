@@ -61,7 +61,7 @@ Where the APKs attached on Discord wait to be tested, for the QA Agent to come. 
 _Avoid_: downloads, builds folder
 
 **Team**:
-The discipline a Repo belongs to: flutter, android, ios, backend, data, frontend or other.
+The discipline a Repo belongs to: flutter, android, ios, backend, data, ai, frontend or other.
 _Avoid_: category, group, stack
 
 ### Stocks

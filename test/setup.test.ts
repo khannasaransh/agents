@@ -79,13 +79,13 @@ function makeMachine(): Machine {
         git(upstream, 'commit', '-q', '--allow-empty', '-m', `On ${branch}`)
       }
       git(upstream, 'push', '-q', remote, ...new Set(['main', branch]))
-      const entry = { name, team, remote, folder: `~/Saransh/${team}/${name}`, branch }
+      const entry = { name, team, remote, folder: `~/Saransh/github/${team}/${name}`, branch }
       entries.push(entry)
       return entry
     },
 
     addBrokenRepo(name, team) {
-      const entry = { name, team, remote: join(base, 'remotes', `${name}-missing.git`), folder: `~/Saransh/${team}/${name}`, branch: 'main' }
+      const entry = { name, team, remote: join(base, 'remotes', `${name}-missing.git`), folder: `~/Saransh/github/${team}/${name}`, branch: 'main' }
       entries.push(entry)
       return entry
     },
@@ -163,12 +163,12 @@ test("setup clones each Repo into a folder named for its Team, on its production
     const result = await machine.setup()
 
     assert.equal(result.status, 0, result.stderr + result.stdout)
-    assert.deepEqual(readdirSync(machine.root).sort(), ['backend', 'flutter'])
-    assert.equal(checkedOut(join(machine.root, 'flutter', 'crux_flutter')), 'main')
-    assert.equal(checkedOut(join(machine.root, 'flutter', 'customcard_flutter')), 'development')
-    assert.equal(checkedOut(join(machine.root, 'backend', 'nis-search-go')), 'ind-production')
-    assert.equal(git(join(machine.root, 'backend', 'nis-search-go'), 'remote', 'get-url', 'origin'), search.remote)
-    for (const { name, team } of [crux, custom, search]) assert.match(lineWith(result.stdout, join(machine.root, team, name)) ?? '', /cloned/)
+    assert.deepEqual(readdirSync(join(machine.root, 'github')).sort(), ['backend', 'flutter'])
+    assert.equal(checkedOut(join(machine.root, 'github', 'flutter', 'crux_flutter')), 'main')
+    assert.equal(checkedOut(join(machine.root, 'github', 'flutter', 'customcard_flutter')), 'development')
+    assert.equal(checkedOut(join(machine.root, 'github', 'backend', 'nis-search-go')), 'ind-production')
+    assert.equal(git(join(machine.root, 'github', 'backend', 'nis-search-go'), 'remote', 'get-url', 'origin'), search.remote)
+    for (const { name, team } of [crux, custom, search]) assert.match(lineWith(result.stdout, join(machine.root, 'github', team, name)) ?? '', /cloned/)
   } finally {
     machine.cleanup()
   }
@@ -185,9 +185,9 @@ test('--team limits setup to the named Teams', async () => {
     const result = await machine.setup('--team', 'flutter,backend')
 
     assert.equal(result.status, 0, result.stderr + result.stdout)
-    assert.deepEqual(readdirSync(machine.root).sort(), ['backend', 'flutter'])
-    assert.ok(existsSync(join(machine.root, 'flutter', 'crux_flutter', '.git')))
-    assert.ok(existsSync(join(machine.root, 'backend', 'nis-search-go', '.git')))
+    assert.deepEqual(readdirSync(join(machine.root, 'github')).sort(), ['backend', 'flutter'])
+    assert.ok(existsSync(join(machine.root, 'github', 'flutter', 'crux_flutter', '.git')))
+    assert.ok(existsSync(join(machine.root, 'github', 'backend', 'nis-search-go', '.git')))
     assert.equal(lineWith(result.stdout, 'drama-android'), undefined)
   } finally {
     machine.cleanup()
@@ -204,7 +204,7 @@ test('--team can be given more than once', async () => {
     const result = await machine.setup('--team', 'flutter', '--team', 'android')
 
     assert.equal(result.status, 0, result.stderr + result.stdout)
-    assert.deepEqual(readdirSync(machine.root).sort(), ['android', 'flutter'])
+    assert.deepEqual(readdirSync(join(machine.root, 'github')).sort(), ['android', 'flutter'])
   } finally {
     machine.cleanup()
   }
@@ -218,7 +218,7 @@ test('setup refuses a Team that is not one of the Teams, and clones nothing', as
     const result = await machine.setup('--team', 'flutter,mobile')
 
     assert.notEqual(result.status, 0)
-    assert.match(result.stderr, /Unknown Team: mobile\. The Teams are flutter, android, ios, backend, data, frontend, other/)
+    assert.match(result.stderr, /Unknown Team: mobile\. The Teams are flutter, android, ios, backend, data, ai, frontend, other/)
     assert.equal(existsSync(machine.root), false)
   } finally {
     machine.cleanup()
@@ -231,7 +231,7 @@ test('a Repo whose folder already exists is left as it is and reported, and the 
     machine.addRepo('crux_flutter', 'flutter', 'development')
     machine.addRepo('skill-up', 'flutter')
     // Saransh's own clone, on a feature branch with work in progress.
-    const existing = join(machine.root, 'flutter', 'crux_flutter')
+    const existing = join(machine.root, 'github', 'flutter', 'crux_flutter')
     mkdirSync(dirname(existing), { recursive: true })
     git(dirname(existing), 'clone', '-q', join(dirname(machine.root), 'remotes', 'crux_flutter.git'), existing)
     git(existing, 'checkout', '-q', '-b', 'feature')
@@ -244,7 +244,7 @@ test('a Repo whose folder already exists is left as it is and reported, and the 
     assert.equal(readFileSync(join(existing, 'notes.txt'), 'utf8'), 'work in progress\n')
     assert.equal(git(existing, 'status', '--porcelain'), '?? notes.txt')
     assert.match(lineWith(result.stdout, existing) ?? '', /already there, left as it is/)
-    assert.equal(checkedOut(join(machine.root, 'flutter', 'skill-up')), 'main')
+    assert.equal(checkedOut(join(machine.root, 'github', 'flutter', 'skill-up')), 'main')
   } finally {
     machine.cleanup()
   }
@@ -259,9 +259,9 @@ test("a Repo that fails to clone is reported, the others are still cloned, and s
     const result = await machine.setup()
 
     assert.equal(result.status, 1)
-    assert.match(lineWith(result.stdout, join(machine.root, 'flutter', 'crux_flutter')) ?? '', /failed to clone: .+/)
-    assert.equal(existsSync(join(machine.root, 'flutter', 'crux_flutter')), false)
-    assert.equal(checkedOut(join(machine.root, 'flutter', 'skill-up')), 'main')
+    assert.match(lineWith(result.stdout, join(machine.root, 'github', 'flutter', 'crux_flutter')) ?? '', /failed to clone: .+/)
+    assert.equal(existsSync(join(machine.root, 'github', 'flutter', 'crux_flutter')), false)
+    assert.equal(checkedOut(join(machine.root, 'github', 'flutter', 'skill-up')), 'main')
   } finally {
     machine.cleanup()
   }
@@ -314,7 +314,7 @@ test('setup reports a tool missing from PATH and exits non-zero', async () => {
 
     assert.equal(result.status, 1)
     assert.match(toolLine(result.stdout, 'agy') ?? '', /agy: not found on PATH/)
-    assert.equal(checkedOut(join(machine.root, 'flutter', 'crux_flutter')), 'main')
+    assert.equal(checkedOut(join(machine.root, 'github', 'flutter', 'crux_flutter')), 'main')
   } finally {
     machine.cleanup()
   }
@@ -347,7 +347,7 @@ test("a Repo's folder that exists but isn't a git clone is left as it is, and re
   const machine = makeMachine()
   try {
     machine.addRepo('crux_flutter', 'flutter')
-    const existing = join(machine.root, 'flutter', 'crux_flutter')
+    const existing = join(machine.root, 'github', 'flutter', 'crux_flutter')
     mkdirSync(existing, { recursive: true })
     writeFileSync(join(existing, 'notes.txt'), 'kept\n')
 
@@ -371,8 +371,8 @@ test('without git, setup says so first and clones nothing', async () => {
 
     assert.equal(result.status, 1)
     assert.ok(result.stdout.indexOf('git: not found on PATH') < result.stdout.indexOf('crux_flutter'), result.stdout)
-    assert.match(lineWith(result.stdout, join(machine.root, 'flutter', 'crux_flutter')) ?? '', /not cloned, since git is missing/)
-    assert.equal(existsSync(join(machine.root, 'flutter', 'crux_flutter')), false)
+    assert.match(lineWith(result.stdout, join(machine.root, 'github', 'flutter', 'crux_flutter')) ?? '', /not cloned, since git is missing/)
+    assert.equal(existsSync(join(machine.root, 'github', 'flutter', 'crux_flutter')), false)
   } finally {
     machine.cleanup()
   }
