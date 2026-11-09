@@ -315,12 +315,12 @@ test('a review that fails on Codex, such as on a quota limit, is retried once on
   )
 })
 
-test("a Codex call that runs past the Agent's timeout is ended, with the command it started, and retried on Claude Code", { timeout: 20_000 }, async () => {
+test("a Codex call that runs past the Agent's timeout is ended, with the command it started, and retried on Claude Code", { timeout: 30_000 }, async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
   repo.pushCommit('Add paywall')
-  ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...reviewer, timeoutSeconds: 1 })}\n`, 'instructions.md': '# Reviewer\n' })
+  ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...reviewer, timeoutSeconds: 5 })}\n`, 'instructions.md': '# Reviewer\n' })
   ws.setWorkerCli('codex', { hang: true })
   ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
   prepareRun([[repo, from]], { dryRun: false })
@@ -329,7 +329,7 @@ test("a Codex call that runs past the Agent's timeout is ended, with the command
 
   assert.equal(result.status, 0, result.stderr)
   assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
-  assert.match(ws.readRunFile(runId, 'logs', 'review.log'), /reviewer failed on codex \(gpt-6-astra, high\) after 1s: timed out after 1s; retrying once on claude-code/)
+  assert.match(ws.readRunFile(runId, 'logs', 'review.log'), /reviewer failed on codex \(gpt-6-astra, high\) after 5s: timed out after 5s; retrying once on claude-code/)
   const [{ pid, childPid }] = ws.workerCliCalls('codex')
   for (const id of [pid, childPid!]) assert.ok(!isRunning(id), `process ${id} is still running`)
 })

@@ -4,7 +4,7 @@
 
 **Blocked by:** 02: Reviewer Agent on the fake Worker
 
-**Status:** done, but for confirming a real review on the Mac (see Notes)
+**Status:** done
 
 - [x] A Codex Worker runs an Agent through non-interactive exec, requests JSON output and, when the Agent has a schema, Codex's schema-checked final answer.
 - [x] A Claude Code Worker runs an Agent through headless print mode with JSON output and its schema option, on Saransh's logged-in subscription (never the minimal mode that ignores that login).
@@ -12,8 +12,9 @@
 - [x] Each Worker enforces the Agent's timeout by ending the process and passes the maximum number of turns where the CLI supports it.
 - [x] A failed, timed-out or quota-limited call is retried once on the fallback Worker, and both attempts are logged in the Run.
 - [x] Command-line tests check, without starting any CLI, that each Worker builds the right command line for a given Agent config.
-- [ ] A real Run reviews at least one changed Repo on Codex and the findings appear in the Brief.
+- [x] A real Run reviews at least one changed Repo on Codex and the findings appear in the Brief.
 
 **Notes:**
 
 - **Checked on 4 November 2026** against the code and its tests, after this issue's status had gone stale: `test/workers.test.ts` covers the command lines and `test/review.test.ts` the timeouts and the fallback. The last box stays open because it can't be checked from the Windows machine: the daily Pipeline runs on the Mac, so no Run of it is here. A Mac Run's Brief with Codex findings closes it. The Reviewer and the daily PM now both run on `gpt-6-astra`.
+- **Confirmed on the Mac on 9 November 2026.** The daily Runs of 1, 3 and 4 November reviewed changed Repos on Codex (`gpt-6-astra`). In the 4 November Run (`data/runs/2026-11-04-0600`, not a dry run), Codex's two medium findings on `inpix-user-service` (`model/plans_page_v5.go:497` and `:270`) appear word for word in its Brief. From 5 November Codex hit its usage limit and each review fell back to Claude Code, as designed.
