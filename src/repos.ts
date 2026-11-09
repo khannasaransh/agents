@@ -4,12 +4,21 @@ import { pathToFileURL } from 'node:url'
 import { agentsRoot } from './paths.ts'
 
 /** In the order the Brief lists them. */
-export const teams = ['flutter', 'android', 'ios', 'backend', 'data', 'frontend', 'other'] as const
+export const teams = ['flutter', 'android', 'ios', 'backend', 'data', 'ai', 'frontend', 'other'] as const
 export type Team = (typeof teams)[number]
+
+/**
+ * The Codebases, as the org wiki's glossary names them: the repos built and run together to serve
+ * one or more Products. Shared holds repos several Codebases use, and company tools.
+ */
+export const codebases = ['Inshorts', 'Public', 'InPix', 'TangyTV', 'AstroHeal', 'InKredible', 'Aurapay', 'Shared'] as const
+export type Codebase = (typeof codebases)[number]
 
 export interface Repo {
   name: string
   team: Team
+  /** The Codebase the Repo belongs to. */
+  codebase: Codebase
   remote: string
   /** The local clone on this Mac. `~` stands for the home folder. */
   folder: string

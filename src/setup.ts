@@ -11,8 +11,11 @@ import { antigravityHomeDir, agentsRoot, workerConfigDir } from './paths.ts'
 import { loadRepos, teams, type Repo, type Team } from './repos.ts'
 import { captureWorkerConfig, installWorkerConfig, workerConfigSecrets, type Secret } from './worker-config.ts'
 
-/** Where setup makes the Team folders unless told otherwise: the folder holding this repo, as on this Mac. */
+/** The folder setup works in unless told otherwise: the folder holding this repo, as on this Mac. */
 export const defaultRoot = resolve(agentsRoot, '..')
+
+/** The Repos' folder inside the root, which holds the Team folders: `<root>/github/<team>/<name>`. */
+export const reposFolder = 'github'
 
 /** What setup found or did for one thing, as the line it prints, and whether that thing is done. */
 interface Outcome {
@@ -23,7 +26,7 @@ interface Outcome {
 /**
  * Sets up the machine, printing what it does as it goes: checks the commands the Pipeline needs,
  * clones each Repo of the selected Teams (all of them when none is named) into
- * `<root>/<team>/<name>` on its production branch, installs the Workers' config into the home
+ * `<root>/github/<team>/<name>` on its production branch, installs the Workers' config into the home
  * folder, and prints the manual checklist. A Repo whose folder exists is left as it is. Returns
  * whether everything setup can do is done: no command is missing, no clone failed and every file
  * of the Workers' config is in place.
@@ -37,10 +40,10 @@ export async function setupMachine({ root, teams: selected }: { root: string; te
   const checks = requiredCommands().map(checkCommand)
   for (const { line } of checks) console.log(`  ${line}`)
 
-  console.log(`\nRepos, in Team folders in ${root}:`)
+  console.log(`\nRepos, in Team folders in ${join(root, reposFolder)}:`)
   const gitFound = checks[0].ok
   const clones = repos.map((repo) => {
-    const folder = join(root, repo.team, repo.name)
+    const folder = join(root, reposFolder, repo.team, repo.name)
     const { ok, line } = gitFound ? cloneRepo(repo, folder) : { ok: false, line: 'not cloned, since git is missing' }
     console.log(`  ${folder}: ${line}`)
     return ok
@@ -77,8 +80,11 @@ function cloneRepo(repo: Repo, folder: string): Outcome {
     return { ok: true, line: `already there, left as it is${existsSync(join(folder, '.git')) ? '' : ', though it is not a git clone'}` }
   }
   // Git may ask for credentials on a new machine, so it has the terminal, and shows its progress
-  // and errors there. A failed clone removes the folder it started.
-  const { status, error } = spawnSync('git', ['clone', '--branch', repo.branch, '--', repo.remote, folder], { stdio: ['inherit', 'ignore', 'inherit'], windowsHide: true })
+  // and errors there. A failed clone removes the folder it started. On Windows the clone gets long
+  // paths, for this clone only, since deep Android and Node paths pass the 260-character limit.
+  const longPaths = process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : []
+  const args = [...longPaths, 'clone', ...(longPaths.length ? ['--config', 'core.longpaths=true'] : []), '--branch', repo.branch, '--', repo.remote, folder]
+  const { status, error } = spawnSync('git', args, { stdio: ['inherit', 'ignore', 'inherit'], windowsHide: true })
   if (error) return { ok: false, line: `failed to clone: ${error.message}` }
   if (status !== 0) return { ok: false, line: `failed to clone: git exited with ${status}, as it says above` }
   return { ok: true, line: `cloned on ${repo.branch}` }

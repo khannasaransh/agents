@@ -32,8 +32,8 @@ const usage = `Usage:
                                             Mac and Task Scheduler on Windows, replacing what an
                                             earlier install wrote; they run with this shell's PATH
   agents setup [--team <team,...>]          Prepare this machine: clone each Repo of the named Teams
-               [--root <folder>]            (all of them by default) into a folder named for its
-                                            Team, in the folder holding this repo unless given one;
+               [--root <folder>]            (all of them by default) into github/<team>/<repo> in
+                                            the folder holding this repo unless given one;
                                             check the tools; install the Workers' config from this
                                             repo, backing up what it replaces; list what's left to
                                             do by hand
