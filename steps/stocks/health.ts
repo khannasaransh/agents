@@ -11,11 +11,14 @@
 // they wait for Saransh's approval (a dry run records none). Failing to record them is recorded too,
 // and fails the Step; a re-run records them again without asking the Agent again. Once they are
 // recorded, the Lake's status is read again as health/status.json, so the Brief lists them as waiting.
+// What the Agent finds out about securities the Lake no longer gets prices for (delistings) is kept
+// in the state area, and given to it again, so a later Run looks each up only once (a dry run keeps none).
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { loadAgent } from '../../src/agent.ts'
 import { ashNewFolder } from '../../src/env.ts'
+import { readDelistings, recordDelistings, type Delisting } from '../../src/delistings.ts'
 import { readJson, writeJson } from '../../src/files.ts'
 import { pdJson, type CorrectionChange, type PdCorrectionsPropose, type PdMarketSmith, type PdStatus } from '../../src/pd.ts'
 import { marketsmithProblems } from '../../src/marketsmith.ts'
@@ -31,6 +34,7 @@ interface HealthAnswer extends WithAdversary {
   fix: string
   evidence: { source: string; shows: string }[]
   corrections: CorrectionChange[]
+  delistings: Delisting[]
 }
 
 /** What became of the Corrections the Agent proposed: what ash_new recorded, why it couldn't, or that a dry run recorded none. */
@@ -102,9 +106,11 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     throw new StepSkipped('The Lake is healthy: the Lake Step succeeded, the Data gate passed, the Health report flags nothing and MarketSmith\'s fetch, if any, went well')
   }
 
-  const inputs = { why, lake: read<LakeResult>('lake.json'), lakeLog: tail(join(runFolder, lakeStep?.log ?? join('logs', 'lake.log')), logLines), status, marketsmith }
-  // What it was given, so a re-run diagnoses again once the Lake Step has been re-run.
-  const fingerprint = createHash('sha256').update(JSON.stringify(inputs)).digest('hex')
+  const inputs = { why, lake: read<LakeResult>('lake.json'), lakeLog: tail(join(runFolder, lakeStep?.log ?? join('logs', 'lake.log')), logLines), status, delistings: readDelistings(), marketsmith }
+  // What it was given, so a re-run diagnoses again once the Lake Step has been re-run. Not the
+  // delistings, which this Step itself adds to once the Agent answers.
+  const { delistings: _known, ...fingerprinted } = inputs
+  const fingerprint = createHash('sha256').update(JSON.stringify(fingerprinted)).digest('hex')
   const earlier = read<HealthResult>('health.json')
   let answer: HealthAnswer
   if (!force && earlier?.status === 'diagnosed' && earlier.inputs === fingerprint) {
@@ -131,8 +137,15 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     }
   }
 
-  const { diagnosis, fix, evidence, corrections, adversary } = answer
+  // A diagnosis an earlier version of this Step recorded has no delistings.
+  const { diagnosis, fix, evidence, corrections, delistings = [], adversary } = answer
+  if (delistings.length) {
+    const counts = (['delisted', 'renamed', 'trading', 'unknown'] as const).map((s) => [s, delistings.filter((d) => d.status === s).length] as const).filter(([, n]) => n)
+    console.log(`Looked up ${delistings.length} securities the Lake no longer gets prices for: ${counts.map(([s, n]) => `${n} ${s}`).join(', ')}`)
+    if (dryRun) console.log("Dry run: what it found isn't kept for later Runs")
+    else recordDelistings(delistings, runId)
+  }
   const proposals = corrections.length ? await propose(corrections, { runId, runFolder, dryRun }) : undefined
-  writeJson(out, { why, inputs: fingerprint, status: 'diagnosed', diagnosis, fix, evidence, corrections, ...(adversary && { adversary }), ...(proposals && { proposals }) } satisfies HealthResult)
+  writeJson(out, { why, inputs: fingerprint, status: 'diagnosed', diagnosis, fix, evidence, corrections, delistings, ...(adversary && { adversary }), ...(proposals && { proposals }) } satisfies HealthResult)
   if (proposals?.status === 'failed') throw new Error(`The Health Agent's Corrections couldn't be recorded in ash_new: ${proposals.error}`)
 })

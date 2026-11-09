@@ -127,6 +127,24 @@ test("the Health Agent's diagnosis and proposed fix come right under the Data ga
   assert.match(html, /Health Agent's diagnosis<\/h2>\n<p class="text">Yahoo rate-limited the price top-up, so both runs of pd daily stopped\nbefore/, 'its line breaks are kept')
 })
 
+test('what the Health Agent found out about securities no longer priced is listed under its fix, each with what became of it and its source', async () => {
+  prepare({ lake: 'failed', health: 'succeeded' })
+  ws.writeRunFile(runId, 'lake.json', lakeResult(false, [1, 1]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.hold.json'))
+  ws.writeRunFile(runId, 'health.json', {
+    ...diagnosis,
+    delistings: [
+      { security_id: 'US:AVB', status: 'renamed', date: '2026-08-17', successor: 'US:VMRK', why: 'Merged into Vivmark Residential', source: 'https://www.sec.gov/vmrk.htm' },
+      { security_id: 'HK:02900', status: 'unknown', date: null, successor: null, why: 'No HKEX notice found', source: 'HKEXnews search' },
+    ],
+  })
+
+  const html = await brief()
+
+  assert.match(text(html), /Proposed fix, not applied .* Securities no longer priced, looked up: 2 Security What became of it Since Why Source US:AVB renamed: now US:VMRK 2026-08-17 Merged into Vivmark Residential source HK:02900 unknown — No HKEX notice found HKEXnews search Evidence it read/)
+  assert.match(html, /<a href="https:\/\/www\.sec\.gov\/vmrk\.htm">source<\/a>/)
+})
+
 test('each Correction waiting for approval is listed with what it would change, then each Quarantine with its flag, by market', async () => {
   prepare()
   ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))

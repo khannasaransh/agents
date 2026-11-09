@@ -1,6 +1,8 @@
 // Command-line tests: each real Worker builds the right command line for an Agent's config. They
 // never start a CLI.
 import assert from 'node:assert/strict'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { test } from 'node:test'
 import reviewer from '../agents/reviewer/config.ts'
@@ -9,7 +11,7 @@ import { antigravityCustomAgent, antigravityCommandLine, antigravityPermissions 
 import { claudeCodeCommandLine } from '../src/workers/claude-code.ts'
 import type { CommandLine } from '../src/workers/cli.ts'
 import { codexCommandLine } from '../src/workers/codex.ts'
-import { cursorCommandLine, jsonObjectFromAnswer } from '../src/workers/cursor.ts'
+import { cursorArgumentLimit, cursorCommandLine, cursorWorker, jsonObjectFromAnswer, withPromptFile } from '../src/workers/cursor.ts'
 
 // Absolute paths as this platform spells them: on Windows, on the current drive.
 const cwd = resolve('/data/worktrees/crux_flutter-x1Yz')
@@ -247,7 +249,7 @@ test("the Antigravity Worker gives the Agent its skills as text in the prompt, w
 const cursorOptions = { cwd, model: 'grok-4.7', effort: 'xhigh' } as const
 
 test('the Cursor Worker runs a read-only Agent through the Cursor CLI in ask mode, on Grok 4.7 at extra high effort, and asks for only the JSON object', () => {
-  const line = cursorCommandLine(agent(), inputs, cursorOptions)
+  const line = cursorCommandLine(agent(), inputs, cursorOptions, 'darwin')
 
   assert.equal(line.command, 'agent')
   assert.equal(line.stdin, '')
@@ -273,6 +275,38 @@ test('the Cursor Worker runs a read-only Agent through the Cursor CLI in ask mod
   assert.match(prompt, /Do not search the web/)
   assert.match(prompt, /Hand back only the JSON object/)
   assert.ok(prompt.includes(JSON.stringify(reviewer.outputSchema, null, 2)), 'Cursor needs the output schema in its prompt')
+})
+
+test("on Windows, where the Cursor CLI has no sandbox and refuses to start with one, a read-only Agent runs in ask mode without it", () => {
+  const onWindows = cursorCommandLine(agent(), inputs, cursorOptions, 'win32')
+  const elsewhere = cursorCommandLine(agent(), inputs, cursorOptions, 'linux')
+
+  assert.ok(!onWindows.args.includes('--sandbox'))
+  assert.deepEqual(valuesOf(onWindows.args, '--mode'), ['ask'])
+  assert.deepEqual(onWindows.args, elsewhere.args.filter((arg, i, all) => arg !== '--sandbox' && all[i - 1] !== '--sandbox'))
+})
+
+test('on Windows the Cursor Worker refuses an Agent that may write, since nothing there would hold its commands', { skip: process.platform !== 'win32' && 'Windows only' }, async () => {
+  await assert.rejects(cursorWorker.call(agent(writer), inputs, cursorOptions), /The Cursor CLI has no sandbox on Windows, so it runs only read-only Agents there/)
+})
+
+test("the Cursor Worker moves a prompt too long for Windows' command line into a file it gives the CLI to read, keeping every other argument", () => {
+  const line = cursorCommandLine(agent(), { ...inputs, commits: 'x'.repeat(cursorArgumentLimit) }, cursorOptions)
+  const prompt = line.args.at(-1)!
+  const folder = mkdtempSync(join(tmpdir(), 'agents-cursor-test-'))
+  try {
+    const moved = withPromptFile(line, folder)
+
+    assert.ok(prompt.length > cursorArgumentLimit)
+    assert.deepEqual(moved.args.slice(0, -3), line.args.slice(0, -1))
+    assert.deepEqual(moved.args.slice(-3, -1), ['--add-dir', folder])
+    const file = join(folder, 'prompt.md')
+    assert.equal(moved.args.at(-1), `Your instructions and inputs are in ${file}: ${prompt.length} characters. Read all of it before you do anything else, in parts if it is long, and then do exactly what it says. Don't change that file.`)
+    assert.equal(readFileSync(file, 'utf8'), prompt)
+    assert.ok(moved.args.join(' ').length < 32_767 - 1_000, 'the command line fits with room for the path')
+  } finally {
+    rmSync(folder, { recursive: true, force: true })
+  }
 })
 
 test('the Cursor Worker reads a JSON object that follows narration the CLI joined in front of it', () => {

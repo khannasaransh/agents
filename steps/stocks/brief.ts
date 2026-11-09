@@ -66,6 +66,7 @@ import type { AnswersResult } from './answers.ts'
 import type { BrokerInboxResult } from './broker-inbox.ts'
 import type { CheckResult } from './check.ts'
 import type { HealthResult, Proposals } from './health.ts'
+import type { Delisting } from '../../src/delistings.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 import type { BookStates } from './plan.ts'
 import type { PortfolioManagerAnswer, PortfolioManagerResult } from './portfolio-manager.ts'
@@ -109,9 +110,19 @@ function diagnosisSection(run: RunRecord, health: HealthResult | null): string {
     `<h3>Proposed fix, not applied</h3>`,
     `<p class="text">${esc(health.fix)}</p>`,
     ...(health.proposals ? [`<p>${proposalsLine(health.proposals, health.corrections.length)}</p>`] : []),
+    ...delistingsPart(health.delistings ?? []),
     ...(evidence.length ? [`<details><summary>Evidence it read: ${plural(evidence.length, 'item')}</summary>\n${list(evidence)}</details>`] : []),
     '</section>',
   ].join('\n')
+}
+
+/** What the Health Agent found out in this Run about securities the Lake no longer gets prices for. */
+function delistingsPart(found: Delisting[]): string[] {
+  if (!found.length) return []
+  const what = (d: Delisting) => (d.status === 'renamed' && d.successor ? `renamed: now ${esc(d.successor)}` : esc(d.status))
+  const source = (d: Delisting) => (/^https?:\/\//.test(d.source) ? `<a href="${esc(d.source)}">source</a>` : esc(d.source))
+  const rows = found.map((d) => [esc(d.security_id), what(d), esc(d.date ?? '—'), esc(d.why), source(d)])
+  return [`<h3>Securities no longer priced, looked up: ${found.length}</h3>`, table(['Security', 'What became of it', 'Since', 'Why', 'Source'], rows)]
 }
 
 /** What became of the Corrections the Health Agent proposed in this Run. */

@@ -314,7 +314,8 @@ test('Health adversarial diagnoses and corrections never enter Portfolio Manager
   ws.setWorkerCli('codex', codexAnswering(answer))
   assert.equal((await step('portfolio-manager')).status, 0)
   for (const call of [...ws.workerCliCalls('claude'), ...ws.workerCliCalls('codex'), ...ws.workerCliCalls('agent')]) {
-    const prompt = call.stdin || call.args.at(-1)!
+    // Cursor is given a prompt this long in a file.
+    const prompt = call.stdin || call.promptFile || call.args.at(-1)!
     const input = prompt.includes('### task:') ? (promptInput(prompt, 'task') as { health: unknown }).health : promptInput(prompt, 'health')
     assert.deepEqual(input, health)
     assert.ok(!prompt.includes('UNRESOLVED_'))

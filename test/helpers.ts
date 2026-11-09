@@ -142,6 +142,8 @@ export interface WorkerCliCall {
   /** The folder it was given as --plugin-dir, and the files in it, by path within it. */
   pluginDir?: string
   pluginFiles?: Record<string, string>
+  /** The prompt file the Cursor CLI was pointed at, for a prompt too long for its command line, as it was then. */
+  promptFile?: string
 }
 
 const workerClis = ['codex', 'claude', 'agy', 'agent'] as const
@@ -593,7 +595,10 @@ const given = existsSync(${behaviorFile})
   ? JSON.parse(readFileSync(${behaviorFile}, 'utf8'))
   : { stderr: '${command} stand-in: this test expects no ${command} call', exitCode: 1 }
 const call = { args: process.argv.slice(2), stdin: readFileSync(0, 'utf8'), cwd: process.cwd(), pid: process.pid, home: process.env.HOME }
-const behavior = Object.entries(given.byPrompt ?? {}).find(([text]) => (call.stdin || call.args.at(-1) || '').includes(text))?.[1] ?? given
+// A prompt too long for the command line comes as a file the last argument points at, which the CLI reads.
+const pointed = /^Your instructions and inputs are in (.+?): \\d+ characters\\./.exec(call.args.at(-1) || '')?.[1]
+if (pointed && existsSync(pointed)) call.promptFile = readFileSync(pointed, 'utf8')
+const behavior = Object.entries(given.byPrompt ?? {}).find(([text]) => (call.stdin || call.promptFile || call.args.at(-1) || '').includes(text))?.[1] ?? given
 try {
   call.cwdChanges = execFileSync('git', ['status', '--porcelain', '--untracked-files=all'], { encoding: 'utf8', windowsHide: true })
 } catch {}

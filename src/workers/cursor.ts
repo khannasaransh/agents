@@ -1,14 +1,22 @@
 // The Cursor Worker: runs an Agent through `agent --print`, the Cursor CLI's headless mode, on
 // Saransh's logged-in Cursor account. Grok 4.7's effort is part of the model id the CLI accepts, as
 // `grok-4.7-xhigh` for extra high. The CLI has no schema flag and no switch that turns web
-// search off, and ask mode is the read-only mode it does have.
+// search off, and ask mode is the read-only mode it does have. It takes its prompt only as an
+// argument, never on stdin, so a prompt too long for a command line goes in a file it is told to read.
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { Agent } from '../agent.ts'
 import type { ProcessResult } from '../process.ts'
 import type { CallOptions, Inputs, Worker } from '../worker.ts'
 import { agentPrompt, jsonResult, lastLine, runCommandLine, writeFolders, type CommandLine } from './cli.ts'
 
-/** The `agent --print` command line for one call of `agent`, with the prompt as its argument. */
-export function cursorCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort }: CallOptions): CommandLine {
+/**
+ * The `agent --print` command line for one call of `agent`, with the prompt as its argument. The
+ * CLI's sandbox exists only on the Mac and Linux, and refuses to start on Windows, so there a call
+ * runs without it, which only a read-only call in ask mode may (`cursorWorker` refuses the rest).
+ */
+export function cursorCommandLine(agent: Agent, inputs: Inputs, { cwd, model, effort }: CallOptions, platform: NodeJS.Platform = process.platform): CommandLine {
   const readOnly = agent.config.permissions === 'read-only'
   return {
     command: 'agent',
@@ -18,13 +26,12 @@ export function cursorCommandLine(agent: Agent, inputs: Inputs, { cwd, model, ef
       'json',
       '--model',
       `${model}-${effort}`,
-      // Headless, in this folder, with command execution sandboxed. Ask mode cannot edit. A call
-      // that may write has to force commands through, or the CLI stops to ask.
+      // Headless, in this folder, with command execution sandboxed where the CLI has a sandbox. Ask
+      // mode cannot edit. A call that may write has to force commands through, or the CLI stops to ask.
       '--trust',
       '--workspace',
       cwd,
-      '--sandbox',
-      'enabled',
+      ...(platform === 'win32' ? [] : ['--sandbox', 'enabled']),
       ...(readOnly ? ['--mode', 'ask'] : ['--force', ...writeFolders(agent, cwd).flatMap((folder) => ['--add-dir', folder])]),
       cursorPrompt(agent, inputs, cwd),
     ],
@@ -49,12 +56,40 @@ function cursorPrompt(agent: Agent, inputs: Inputs, cwd: string): string {
   return `${prompt}\nHand back only the JSON object, with no markdown around it. It must match this JSON Schema:\n${JSON.stringify(agent.config.outputSchema, null, 2)}\n`
 }
 
+/**
+ * The longest prompt given as the CLI's argument. Windows holds a command line to 32,767
+ * characters, the program's path and every other argument among them, and a Book's inputs alone run
+ * to hundreds of thousands.
+ */
+export const cursorArgumentLimit = 24_000
+
+/** What the CLI is given in place of a prompt it reads from `file`. */
+export function promptFilePointer(file: string, length: number): string {
+  return `Your instructions and inputs are in ${file}: ${length} characters. Read all of it before you do anything else, in parts if it is long, and then do exactly what it says. Don't change that file.`
+}
+
+/** `line` with its prompt moved to prompt.md in `folder`, which the CLI is given to read. */
+export function withPromptFile(line: CommandLine, folder: string): CommandLine {
+  const prompt = line.args.at(-1)!
+  const file = join(folder, 'prompt.md')
+  writeFileSync(file, prompt)
+  return { ...line, args: [...line.args.slice(0, -1), '--add-dir', folder, promptFilePointer(file, prompt.length)] }
+}
+
 export const cursorWorker: Worker = {
   name: 'cursor',
   async call(agent, inputs, options) {
     // Its sandbox holds commands, not reads: it can't keep an Agent from a folder, so it refuses a call that denies one.
     if (options.denyRead?.length) throw new Error(`The Cursor CLI can't keep the ${agent.name} Agent from reading ${options.denyRead.join(', ')}, so it isn't run there`)
-    return cursorAnswer(agent, await runCommandLine(cursorCommandLine(agent, inputs, options), options.cwd))
+    if (process.platform === 'win32' && agent.config.permissions !== 'read-only') throw new Error(`The Cursor CLI has no sandbox on Windows, so it runs only read-only Agents there, and the ${agent.name} Agent may write`)
+    const line = cursorCommandLine(agent, inputs, options)
+    if (line.args.at(-1)!.length <= cursorArgumentLimit) return cursorAnswer(agent, await runCommandLine(line, options.cwd))
+    const folder = mkdtempSync(join(tmpdir(), 'agents-cursor-'))
+    try {
+      return cursorAnswer(agent, await runCommandLine(withPromptFile(line, folder), options.cwd))
+    } finally {
+      rmSync(folder, { recursive: true, force: true })
+    }
   },
 }
 

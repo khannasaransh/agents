@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
@@ -46,6 +46,7 @@ const answer = {
     { source: 'data/logs/jobs/482.jsonl', shows: 'The job failed in prices-update after 40 tickers in a row were refused' },
   ],
   corrections: [] as unknown[],
+  delistings: [] as unknown[],
 }
 
 /** The Corrections the Health Agent proposes for the known data issues. */
@@ -301,4 +302,37 @@ test('the Health Step honors --worker without moving its Cursor adversary', asyn
   assert.equal(ws.workerCliCalls('agent').length, 1)
   assert.equal(health().adversary.mainWorker.name, 'claude-code')
   assert.equal(health().adversary.worker.name, 'cursor')
+})
+
+test("what the Health Agent finds out about securities no longer priced is kept, given to a later Run's Agent, and searched for on the web", async () => {
+  prepare({ status: 'status.healthy.json' })
+  const found = [
+    { security_id: 'US:AVB', status: 'renamed', date: '2026-08-17', successor: 'US:VMRK', why: 'Merged with Equity Residential into Vivmark Residential: 2.793 VMRK shares for each AVB share', source: 'https://www.sec.gov/Archives/edgar/data/0000906107/000119312526448699/vmrk-ex99_1.htm' },
+    { security_id: 'US:WBS', status: 'delisted', date: '2026-08-20', successor: null, why: 'Bought by Banco Santander for 2.0548 ADSs and $48.75 a share', source: 'https://www.sec.gov/Archives/edgar/data/0000801337/000087666126000696/ruleprovisionnotice.htm' },
+  ]
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, delistings: found }))
+
+  assert.equal((await step()).status, 0)
+
+  const [first] = ws.workerCliCalls('codex')
+  assert.deepEqual(promptInput(first.stdin, 'delistings'), {}, 'nothing looked up before')
+  assert.ok(first.args.includes('web_search="live"'), 'it may search the web')
+  assert.deepEqual(health().delistings, found)
+  const kept = JSON.parse(readFileSync(join(ws.dataDir, 'state', 'delistings.json'), 'utf8'))
+  assert.deepEqual(kept, Object.fromEntries(found.map((d) => [d.security_id, { ...d, run: runId }])))
+  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /Looked up 2 securities the Lake no longer gets prices for: 1 delisted, 1 renamed/)
+
+  assert.equal((await step('--force')).status, 0)
+  const [, second] = ws.workerCliCalls('codex')
+  assert.deepEqual(promptInput(second.stdin, 'delistings'), kept, 'a later call is told what is known, so it looks each up once')
+})
+
+test('a dry run keeps none of what the Health Agent finds out about securities no longer priced', async () => {
+  prepare({ status: 'status.healthy.json', dryRun: true })
+  ws.writeCannedAnswers({ health: [{ answer: { ...answer, delistings: [{ security_id: 'US:LEG', status: 'delisted', date: '2026-08-26', successor: null, why: 'Bought by Somnigroup', source: 'EDGAR 8-K' }] } }] })
+
+  assert.equal((await step()).status, 0)
+
+  assert.equal(existsSync(join(ws.dataDir, 'state', 'delistings.json')), false)
+  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /Dry run: what it found isn't kept for later Runs/)
 })
