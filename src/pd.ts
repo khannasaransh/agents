@@ -328,6 +328,8 @@ export interface PdStagesCheck {
   books: { book: 'IN' | 'US' | 'HK'; name: string; market: string; today: string; sleeves: PdSleeve[] }[]
   /** The promotions waiting on Saransh (issue 35), oldest first: each Sleeve still in the Stage it was proposed from. */
   proposals: PdStageProposal[]
+  /** The yearly review's proposals waiting on Saransh (issue 45), oldest first: each undecided and of the latest year that proposed its kind for its Book. */
+  yearly: PdYearlyProposal[]
 }
 
 /** A Sleeve's promotion up a Stage, proposed by the Portfolio Manager for Saransh's Answer (issue 35): its item in the Brief is promotion:<id>. */
@@ -470,6 +472,95 @@ export interface PdReview {
   promotions_due: (PdPromotion & { book: 'IN' | 'US' | 'HK'; sleeve: number; strategy_id: string; from: PdStage })[]
   /** With --month (the first Saturday of a month, of the month before): the monthly review; else null. */
   monthly: PdMonthlyReview | null
+  /** With --year (the first Saturday of April): the yearly review; else null. */
+  yearly: PdYearlyReview | null
+}
+
+/** What a yearly review proposes (issue 45): a Book's strategies chosen again, its Sleeves' new weights, where its new money goes, and the split across the Books. */
+export type PdYearlyKind = 'strategies' | 'weights' | 'new_money' | 'split'
+
+/** A yearly review's proposal, waiting on Saransh's Answer or decided: its item in the Brief is yearly:<id>. */
+export interface PdYearlyProposal {
+  id: number
+  year: number
+  /** The Book it is for; null for the split, across the Books. */
+  book: 'IN' | 'US' | 'HK' | null
+  kind: PdYearlyKind
+  /** What it proposes, by kind (as the yearly review gives it). */
+  proposed: {
+    chosen?: string[]
+    joining?: string[]
+    leaving?: { sleeve: number; strategy_id: string; stage: PdStage }[]
+    /** Each Sleeve's share of the paper Book, by its strategy's id, gold's under gold. */
+    shares?: Record<string, number>
+    amount?: number
+    currency?: string
+    parts?: Record<string, number>
+    books?: PdYearlySplitBook[]
+  }
+  why: string
+  by: string
+  at: string
+  decision: 'approved' | 'rejected' | null
+  decided_at: string | null
+  decided_by: string | null
+}
+
+/** A Book in the India/US split, in rupees. */
+export interface PdYearlySplitBook {
+  book: 'IN' | 'US' | 'HK'
+  name: string
+  currency: string
+  /** Rupees a unit of its currency. */
+  rate: number
+  /** Its paper Book's value, in rupees. */
+  value: number
+  /** Its new money for the year, in rupees. */
+  new_money: number
+  share: number | null
+  /** Its share once the year's new money is in. */
+  share_after: number | null
+  /** Its share of the Books' capitals: the split they set. */
+  capital_share: number | null
+}
+
+/** The yearly review (issue 45, `pd review --year`): each figure a proposal Saransh approves with an Answer. */
+export interface PdYearlyReview {
+  year: number
+  books: {
+    book: 'IN' | 'US' | 'HK'
+    name: string
+    currency: string
+    /** The Candidate test re-run for every approved strategy of the Book's market, against its Sleeves from Paper up. */
+    strategies: {
+      status: 'ran' | 'cant_run'
+      why: string | null
+      start: string | null
+      end: string | null
+      chosen: string[]
+      /** Those chosen the Book holds no Sleeve of from Paper up. */
+      joining: string[]
+      /** The Book's Sleeves from Paper up the test didn't choose. */
+      leaving: { sleeve: number; strategy_id: string; stage: PdStage }[]
+      held: string[]
+      tested: { id: string; name: string; version: string; passes: boolean; why: string[] }[]
+      result: { cagr: number; max_drawdown: number; holdout_cagr: number | null; meets_objective: boolean } | null
+    }
+    /** The new Sleeve weights, by the inverse of each strategy's volatility over the year, gold at the Mandate's share. */
+    weights: {
+      status: 'measured' | 'no_sleeve' | 'cant_measure'
+      why: string | null
+      as_of: string | null
+      sleeves: { strategy_id: string; name: string; stage: PdStage; volatility: number | null; now: number | null; proposed: number; real: number }[]
+      gold: { now: number | null; proposed: number }
+    }
+    /** Where the year's new money goes: config/books.yaml's new_money, at the new weights. */
+    new_money: { status: 'proposed' | 'none' | 'cant_share'; why: string | null; amount: number; currency: string; parts: Record<string, number> | null }
+  }[]
+  /** The India/US split: report-only. */
+  split: { currency: 'INR'; value: number; new_money: number; books: PdYearlySplitBook[]; missing: ('IN' | 'US' | 'HK')[]; basis: string }
+  /** The proposals recorded (or found, the review run again); none in a dry run. */
+  proposals: PdYearlyProposal[]
 }
 
 /** A real Book's gap to its paper Book over the week (issue 44): the gap between their returns, split; the split adds up to the gap. */

@@ -9,7 +9,8 @@
 // Saturdays, every Disaster stop not yet marked placed. Then what waits on him: the To-dos the Steps
 // raised; each Correction waiting for approval with what it would change; each Quarantine with its
 // flag; each Candidate waiting for approval into Paper; each promotion the Portfolio Manager
-// proposed, waiting for approval; each early exit the Desk proposed, waiting for approval, and each
+// proposed, waiting for approval; each of the yearly review's proposals (issue 45), waiting for
+// approval; each early exit the Desk proposed, waiting for approval, and each
 // approved one not yet sold; each proposal to move a Judgement mode or change a Playbook's ranges,
 // the narrower ranges the Portfolio Manager proposed in this Run among them. Then what became of the
 // Answers this Run applied; each market's latest session in the Lake against its last finished one;
@@ -23,7 +24,9 @@
 // to its paper Book, split into its fills, skips, expired orders and Stage scaling: issue 44); on a
 // month's first Saturday, the monthly review (the Portfolio Manager's commentary, each paper Book's
 // return over the month attributed to its sources, the correlation between its Sleeves, its drawdown
-// against its limits and the promotions due); each Book's real holdings and value, its latest
+// against its limits and the promotions due); on the first Saturday of April, the yearly review (each
+// Book's Candidate test re-run against its Sleeves, its Sleeves' new weights against what they hold now,
+// where its year's new money goes, and the India/US split); each Book's real holdings and value, its latest
 // Reconciliation's differences and this Run's Broker inbox files; the results and board meetings
 // coming for the Books' holdings in the next 30 days, from the Feeds; each market's Market condition
 // with MarketSmith's outlook beside it and each Book's exposure level; on a day the Data gate fails,
@@ -55,7 +58,7 @@ import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { changeText, decisionText, modeName, proposalText, sentence } from '../../src/judgement.ts'
 import { orderWhat, ownTradeText, stateText } from '../../src/orders.ts'
-import type { PdBook, PdBookState, PdEarlyExit, PdHolding, PdFeeds, PdFillCosts, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrder, PdOrderList, PdOrders, PdPaperBook, PdPaperBooks, PdPlan, PdRealGap, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally } from '../../src/pd.ts'
+import type { PdBook, PdBookState, PdEarlyExit, PdHolding, PdFeeds, PdFillCosts, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrder, PdOrderList, PdOrders, PdPaperBook, PdPaperBooks, PdPlan, PdRealGap, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally, PdYearlyKind, PdYearlyProposal, PdYearlyReview } from '../../src/pd.ts'
 import { analystName, breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -485,6 +488,125 @@ function promotionsSection(waiting: PdStageProposal[], stages: PdStagesCheck | n
     table(['Id', 'Book', 'Strategy', 'Promotion', 'Proposed', 'Why', 'Your Answer'], rows),
     '</section>',
   ].join('\n')
+}
+
+/** Each kind of yearly proposal as the Brief names it. */
+const yearlyKindName: Record<PdYearlyKind, string> = {
+  strategies: 'Strategies chosen again',
+  weights: 'New Sleeve weights',
+  new_money: 'New money',
+  split: 'The India/US split',
+}
+
+/** Each strategy's name by its id, from the Sleeves the Stages Step read and the yearly review's Candidate tests; gold's as Gold. */
+function strategyNames(stages: PdStagesCheck | null, yearly: PdYearlyReview | null | undefined): Map<string, string> {
+  const names = new Map<string, string>([['gold', 'Gold']])
+  for (const b of yearly?.books ?? []) {
+    for (const t of b.strategies.tested) names.set(t.id, t.name)
+    for (const s of b.weights.sleeves) names.set(s.strategy_id, s.name)
+  }
+  for (const s of (stages?.books ?? []).flatMap((b) => b.sleeves)) if (s.name) names.set(s.strategy_id, s.name)
+  return names
+}
+
+/** What a yearly proposal proposes, in a sentence or a list. */
+function yearlyWhat(p: PdYearlyProposal, names: Map<string, string>): string {
+  const name = (sid: string) => names.get(sid) ?? sid
+  const shares = (found: Record<string, number> | undefined, show: (value: number) => string) =>
+    Object.entries(found ?? {})
+      .map(([sid, value]) => `${name(sid)} ${show(value)}`)
+      .join('; ')
+  const { proposed } = p
+  if (p.kind === 'strategies') {
+    const joining = (proposed.joining ?? []).map(name).join(', ') || 'none'
+    const leaving = (proposed.leaving ?? []).map((l) => `${name(l.strategy_id)} (${stageName(l.stage)})`).join(', ') || 'none'
+    return `Join as Candidates: ${joining}. Retire: ${leaving}.`
+  }
+  if (p.kind === 'weights') return shares(proposed.shares, percent)
+  if (p.kind === 'new_money') return `${money(proposed.amount ?? 0, proposed.currency ?? 'INR')}: ${shares(proposed.parts, (part) => money(part, proposed.currency ?? 'INR'))}`
+  return (proposed.books ?? []).map((b) => `${b.name} ${b.share === null ? '—' : percent(b.share)} to ${b.share_after === null ? '—' : percent(b.share_after)}`).join('; ')
+}
+
+/** Each of the yearly review's proposals waiting for Saransh's Answer, with its Approve and Reject buttons; nothing when none waits. */
+function yearlyProposalsSection(stages: PdStagesCheck | null, review: PdReview | null): string {
+  const waiting = stages?.yearly ?? []
+  if (!waiting.length) return ''
+  const names = strategyNames(stages, review?.yearly)
+  const rows = waiting.map((p) => [
+    String(p.id),
+    esc(p.book ? capitalised(bookNames[p.book]?.replace(/^the /, '') ?? p.book) : 'All Books'),
+    esc(yearlyKindName[p.kind]),
+    esc(yearlyWhat(p, names)),
+    esc(p.why),
+    answerButtons(answerItem('yearly', p.id)),
+  ])
+  return [
+    `<section><h2>The yearly review's proposals waiting for your Answer: ${waiting.length}</h2>`,
+    "<p>The yearly review, on the first Saturday of April, is the only time strategies are chosen again, Sleeves re-weighted and new money put in, and none of it happens without your Answer. Approving a Book's strategies records those the Candidate test chose as Candidates, each then waiting for your approval into Paper, and Retires those it didn't choose, which wind down through their own exits. Approved weights and new money take effect at the Book's next Rule plans, its paper Books' and its real Book's. Approving the split changes nothing: a Book never sells to fund another, so the split moves only by the new money set in ash_new's config/books.yaml. Approve or reject each, then Save answers. One you don't answer waits here until next April's review proposes again.</p>",
+    table(['Id', 'Book', 'Proposal', 'What', 'Why', 'Your Answer'], rows),
+    '</section>',
+  ].join('\n')
+}
+
+/** A share as a cell: — for none. */
+const shareCell = (share: number | null) => esc(share === null ? '—' : percent(share))
+
+/** One Book's part of the yearly review: its Candidate test, its new weights and its new money. */
+function yearlyBookPart(book: PdYearlyReview['books'][number], names: Map<string, string>): string {
+  const name = (sid: string) => names.get(sid) ?? sid
+  const s = book.strategies
+  const out = [`<h3>${esc(book.name)}</h3>`]
+  if (s.status !== 'ran') out.push(`<p>${esc(sentence(s.why ?? "The Candidate test didn't run"))}</p>`)
+  else {
+    const chosen = s.chosen.map(name)
+    const joining = s.joining.map(name).join(', ')
+    const leaving = s.leaving.map((l) => name(l.strategy_id)).join(', ')
+    const result = s.result
+      ? ` The Book they make: ${percent(s.result.cagr)} a year, ${percent(s.result.max_drawdown)} at its deepest, ${s.result.holdout_cagr === null ? 'no holdout' : `${percent(s.result.holdout_cagr)} in the holdout`}, ${s.result.meets_objective ? 'meeting' : 'missing'} its objective.`
+      : ''
+    const said = `The Candidate test over ${s.start} to ${s.end} chose ${chosen.length ? chosen.join(' and ') : 'none'}: ${joining ? `joining ${joining}` : 'none joining'}; ${leaving ? `leaving ${leaving}` : 'none leaving'}.${result}`
+    out.push(`<p>${esc(said)}</p>`)
+    if (s.tested.length) out.push(table(['Strategy', 'Chosen', 'Why not'], s.tested.map((t) => [esc(t.name), t.passes ? 'Yes' : 'No', esc(t.why.join('; '))])))
+  }
+  const w = book.weights
+  if (w.status !== 'measured') out.push(`<p class="muted">${esc(sentence(`Its new weights: ${w.why ?? 'not measured'}`))}</p>`)
+  else {
+    const rows = w.sleeves.map((sleeve) => [esc(sleeve.name), esc(stageName(sleeve.stage)), sleeve.volatility === null ? '—' : esc(percent(sleeve.volatility)), shareCell(sleeve.now), esc(percent(sleeve.proposed)), esc(percent(sleeve.real))])
+    rows.push(['Gold', '', '', shareCell(w.gold.now), esc(percent(w.gold.proposed)), esc(percent(w.gold.proposed))])
+    out.push(`<p>${esc(`Its new weights, by the inverse of each strategy's volatility over the year to ${w.as_of}:`)}</p>`)
+    out.push(table(['Sleeve', 'Stage', 'Volatility', 'Now', 'Proposed', 'In the real Book'], rows))
+  }
+  const m = book.new_money
+  if (m.status === 'proposed') out.push(`<p>${esc(`The year's new money: ${money(m.amount, m.currency)}, shared out at the new weights.`)}</p>`)
+  else out.push(`<p class="muted">${esc(sentence(m.why ?? 'No new money'))}</p>`)
+  return out.join('\n')
+}
+
+/**
+ * On the first Saturday of April, the yearly review (issue 45): each Book's Candidate test re-run
+ * against its Sleeves, its new weights against what its Sleeves hold now, where its new money goes,
+ * and the India/US split, under the Portfolio Manager's commentary. Each is a proposal waiting on
+ * Saransh's Answer. Nothing on other days.
+ */
+function yearlySection(review: PdReview | null, stages: PdStagesCheck | null, pm: PortfolioManagerResult | null): string {
+  const yearly = review?.yearly
+  if (!yearly) return ''
+  const commentary = pm?.status === 'answered' ? pm.answer.yearly : null
+  const names = strategyNames(stages, yearly)
+  const split = yearly.split
+  const rows = split.books.map((b) => [esc(b.name), esc(money(b.value, 'INR')), shareCell(b.share), esc(money(b.new_money, 'INR')), shareCell(b.share_after), shareCell(b.capital_share)])
+  return [
+    `<section><h2>Yearly review: ${yearly.year}</h2>`,
+    commentary ? `<p class="text">${esc(commentary)}</p>` : pm?.status === 'failed' ? '<p class="muted">The Portfolio Manager failed, so the yearly review has no commentary.</p>' : '',
+    `<p>${esc(`The only time strategies are chosen again, Sleeves re-weighted and new money put in. ${yearly.proposals.length ? `Each figure is a proposal waiting for your Answer, under "The yearly review's proposals".` : 'A dry run records no proposal.'}`)}</p>`,
+    ...yearly.books.map((b) => yearlyBookPart(b, names)),
+    '<h3>The India/US split</h3>',
+    table(['Book', 'Value in rupees', 'Its share', 'New money', 'After it', 'The split its capital set'], rows),
+    `<p class="muted">${esc(`${split.basis}.${split.missing.length ? ` Left out, without a rate for its currency: ${split.missing.join(', ')}.` : ''} The split moves only by new money: a Book never sells to fund another.`)}</p>`,
+    '</section>',
+  ]
+    .filter(Boolean)
+    .join('\n')
 }
 
 /** The early exits open: those `pd judgement show` read, then those the Desk proposed in this Run, waiting first. */
@@ -1472,6 +1594,7 @@ ${correctionsSection(waiting)}
 ${quarantineSection(waiting)}
 ${candidatesSection(stages)}
 ${promotionsSection(promoting, stages)}
+${yearlyProposalsSection(stages, review)}
 ${exitsSection(exits)}
 ${proposalsSection(proposals, modes)}
 ${lessonsSection(learning, lessons)}
@@ -1480,6 +1603,7 @@ ${marketsSection(status)}
 ${stagesSection(run, stages)}
 ${reviewSection(run, review, pm, narrower)}
 ${monthlySection(review, pm)}
+${yearlySection(review, stages, pm)}
 ${booksSection(run, inbox)}
 ${eventsSection(run, feeds)}
 ${plansSection(run, plan, states)}

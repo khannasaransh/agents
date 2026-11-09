@@ -473,6 +473,8 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
   - new Sleeve weights;
   - where new money goes;
   - the India/US split.
+
+  Nothing applies without his approving Answer, and nothing else re-weights the Sleeves or chooses strategies: the Rule plans no longer weight by the calendar each April as the Book backtest does, and approved weights and new money take effect at the Book's next Rule plans. The split is report-only: approving it changes nothing, since a Book never sells to fund another and the split moves only by the new money Saransh sets (his choice, 9 November 2026; issue 45).
 - **The override scorecard** scores each Override against its counterfactual: what the Rule plan's order would have made, taken from the strategy's own track, until that track closed the position. It is tallied per Lever, per analyst and per Lesson, and each Override is judged on the session its Decision record named when it was made. The scores interact, so their sum isn't the paper Book's gap to its rules-only paper Book. That gap, not the sum, is the gate for moving a real Book to Playbook mode, at a bar fixed before the 3 months start.
 
 ### Agents
@@ -629,7 +631,7 @@ There are two seams, and both are a command with files in and files out.
   - derivatives, short selling, leverage and margin;
   - instruments other than stocks, the gold ETFs and the cash funds.
 - **Tax:** tax filing or reporting, and any tax optimisation beyond tie-breaking and the order in which Legacy holdings are sold.
-- **Moving money between the Books.** Only the yearly review proposes a new split.
+- **Moving money between the Books.** The yearly review shows the split, before and after the year's new money, and moves no money: the split changes only by the new money Saransh sets for each Book (issue 45).
 - **Judgement outside the Playbook:**
   - any addition in a Book that isn't in Playbook mode;
   - names outside the Pool, and sizes above a Lever's range;

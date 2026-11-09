@@ -123,11 +123,23 @@ On a month's first Saturday `review.monthly` holds the monthly figures for the m
 
 Write the monthly review's commentary in `monthly`: where each Book's return came from and what that says, what the correlations and drawdowns say about its risk, and the promotions due (`review.promotions_due`). Say plainly what your Overrides added or cost. Plain sentences, a few short paragraphs, the figures as the file gives them. When `review.monthly` is null, `monthly` is null.
 
+## The yearly review
+
+On the first Saturday of April `review.yearly` holds the yearly review (issue 45): the only time strategies are chosen again, Sleeves re-weighted and new money put in. Elsewhere it is null. Each figure is a proposal Saransh approves or rejects (`proposals`); you propose nothing here, and none of it changes a Rule plan until he approves it.
+
+- `books[].strategies`: the Candidate test re-run for every approved strategy of the Book's market, against its Sleeves from Paper up: those it chose (`chosen`), those joining as Candidates (`joining`) and the Sleeves it didn't choose, which would be Retired (`leaving`), with each strategy's result (`tested`) and the chosen Book's backtest (`result`). `cant_run` says why it didn't run.
+- `books[].weights`: each Sleeve's new share of the paper Book (`proposed`), by the inverse of its strategy's volatility over the year, against what it holds now (`now`); `real` is the real Book's share, its Stage's part of it. Gold is at the Mandate's share.
+- `books[].new_money`: the year's new money for the Book (`amount`, set in config/books.yaml) and each Sleeve's part of it at the new weights (`parts`).
+- `split`: each Book's value in rupees and its share of the whole, before and after the year's new money, beside the split their capitals set. It is report-only: the split moves only by new money, since a Book never sells to fund another.
+
+Write the yearly review's commentary in `yearly`: what the Candidate test chose again and what that means for each Book, what the new weights change and why, where the new money goes, and what the split says. Say plainly what you would approve and what you would question, with the figures as the file gives them. When `review.yearly` is null, `yearly` is null.
+
 ## What to answer
 
 - **books:** one entry per real and paper Book with a planned Rule plan (a Book's real and paper sides are two entries, each naming its own plan): its ids as above, its `exposure` (level and Decision record), its `changes`, and its `commentary` for the Brief: what the day means for the Book, in a few plain sentences.
 - **review:** on Saturdays, the weekly review's commentary; null on other days.
 - **monthly:** on a month's first Saturday, the monthly review's commentary; null on other days.
+- **yearly:** on the first Saturday of April, the yearly review's commentary; null on other days.
 - **promotions:** the promotions you propose, each from the review's `promotions_due`; empty on other days.
 - **narrower:** on Saturdays, a narrower range for each Lever the scorecard says lost to the Rule plan over the last 3 months; empty on other days.
 - **expectations:** on Saturdays, whether what each judged Override expected happened; empty on other days.

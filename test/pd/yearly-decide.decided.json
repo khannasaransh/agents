@@ -1,0 +1,27 @@
+{
+  "changed": false,
+  "why": "It was approved already",
+  "proposal": {
+    "id": 11,
+    "year": 2027,
+    "book": "IN",
+    "kind": "strategies",
+    "proposed": {
+      "chosen": [
+        "in-super30-ok-tuned",
+        "in-cw2-selected"
+      ],
+      "joining": [
+        "in-cw2-selected"
+      ],
+      "leaving": []
+    },
+    "why": "The Candidate test over 2017-04-01 to 2027-03-31 chose in-super30-ok-tuned, in-cw2-selected: joining as Candidates in-cw2-selected; Retired none.",
+    "by": "the yearly review",
+    "at": "2027-04-03T01:42:10.512000+00:00",
+    "decision": "approved",
+    "decided_at": "2027-04-06T01:31:02.004000+00:00",
+    "decided_by": "Saransh"
+  },
+  "applied": null
+}

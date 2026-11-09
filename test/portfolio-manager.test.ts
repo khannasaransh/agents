@@ -18,6 +18,7 @@ const answer = {
   books: example('judgement.answered.json').books,
   review: null,
   monthly: null,
+  yearly: null,
   promotions: [],
   narrower: [],
   expectations: [],
@@ -289,6 +290,20 @@ test("on a month's first Saturday the Portfolio Manager gets the monthly review'
   assert.deepEqual((promptInput(call.stdin, 'review') as { monthly: unknown }).monthly, example('review.monthly.json').monthly)
   assert.match(call.stdin, /The monthly review/)
   assert.equal(result().answer.monthly, monthly)
+})
+
+test('on the first Saturday of April the Portfolio Manager gets the yearly review and writes its commentary', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', example('review.yearly.json'))
+  const yearly = 'The Candidate test chose CW2 to join the India Book: approve it into Paper only after its weights are set.'
+  ws.setWorkerCli('claude', claudeCodeAnswering({ ...answer, review: 'Both Books are inside their tested ranges.', yearly }))
+
+  assert.equal((await step('portfolio-manager')).status, 0)
+
+  const [call] = ws.workerCliCalls('claude')
+  assert.deepEqual((promptInput(call.stdin, 'review') as { yearly: unknown }).yearly, example('review.yearly.json').yearly)
+  assert.match(call.stdin, /The yearly review/)
+  assert.equal(result().answer.yearly, yearly)
 })
 
 test('a weekly review is commented on even on a day the Plan Step failed', async () => {

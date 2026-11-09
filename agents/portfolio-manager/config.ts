@@ -111,7 +111,7 @@ const portfolioManager: AgentConfig = {
     bookStates: `The state each plan was made from (${inputFiles.bookStates}): holdings, cash, open orders and Disaster stops`,
     stages: `Each Book's Sleeves and their Stages (${inputFiles.stages}); null when they couldn't be read`,
     health: `The Health Agent's diagnosis of the Lake in this Run (${inputFiles.health}); null when the Lake was healthy and it didn't run`,
-    review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, each real Book's Reconciliation differences and its gap to its paper Book over the week, split into fills, skips, expired orders and Stage scaling, each broker's fill costs against the open beside the slippage the cost presets assume, and each paper Book's override scorecard (each of your Overrides scored against the Rule plan's order, their tallies by Lever, analyst and Lesson, the Levers that lost over the last 3 months, their sum beside the paper Book's gap to its rules-only paper Book, and the gate for moving its real Book to Playbook mode); on a month's first Saturday also the monthly review of the month before (monthly): each paper Book's return attributed to its sources, the correlation between its Sleeves and its drawdown against its limits; null on other days`,
+    review: `On Saturdays, the weekly review's figures (${inputFiles.review}): each Book's paper Book and each Sleeve from Paper up, by its live record against its backtest's range and its benchmark, the demotions the demotion rule made, the promotions due, each real Book's Reconciliation differences and its gap to its paper Book over the week, split into fills, skips, expired orders and Stage scaling, each broker's fill costs against the open beside the slippage the cost presets assume, and each paper Book's override scorecard (each of your Overrides scored against the Rule plan's order, their tallies by Lever, analyst and Lesson, the Levers that lost over the last 3 months, their sum beside the paper Book's gap to its rules-only paper Book, and the gate for moving its real Book to Playbook mode); on a month's first Saturday also the monthly review of the month before (monthly): each paper Book's return attributed to its sources, the correlation between its Sleeves and its drawdown against its limits; on the first Saturday of April also the yearly review (yearly): each Book's Candidate test re-run against its Sleeves, its Sleeves' new weights, where its new money goes and the India/US split, each a proposal for Saransh; null on other days`,
     desk: "The Desk's views of the names it reviewed (desk.json): each analyst's (Events, Chart, Risk) view of each name (none, a veto, a trim to a size, or an early exit proposed for Saransh), its reasons, the evidence it cites and when it was made (a view reused from an earlier Run keeps its date), and each review that is missing, whose buy waits a session whatever you decide. Null when the Desk didn't review, no analyst being needed or its Step failing",
     journal: 'Your Journal: the Decision records behind your earlier changes, what each was expected to do, and what is still open. Empty when you have none yet',
     lessons: "Your Lessons: the Lessons file (Approved: those Saransh approved, which shape your decisions; Rejected: those he rejected, never to propose again), and those still waiting for his Answer, which shape nothing yet. An empty file when there are none yet",
@@ -120,6 +120,7 @@ const portfolioManager: AgentConfig = {
     books: "Your judgement of each real and paper Book's Rule plan: its exposure level for the day and your changes, each with its Decision record, and the Brief's commentary on it",
     review: "On Saturdays, the weekly review's commentary for the Brief; null on other days",
     monthly: "On a month's first Saturday, the monthly review's commentary for the Brief; null on other days",
+    yearly: "On the first Saturday of April, the yearly review's commentary for the Brief; null on other days",
     promotions: "The promotions you propose for Saransh's Answer: only those the review lists as due",
     narrower: "The narrower Playbook ranges you propose for Saransh's Answer: one for each Lever the override scorecard says lost to the Rule plan over the last 3 months",
     expectations: "Whether what each judged Override's Decision record expected happened, read from its words and the data: apart from whether it beat the Rule plan",
@@ -129,13 +130,17 @@ const portfolioManager: AgentConfig = {
   outputSchema: {
     type: 'object',
     additionalProperties: false,
-    required: ['books', 'review', 'monthly', 'promotions', 'narrower', 'expectations', 'lessons', 'journal'],
+    required: ['books', 'review', 'monthly', 'yearly', 'promotions', 'narrower', 'expectations', 'lessons', 'journal'],
     properties: {
       books: { type: 'array', items: book },
       review: nullable('string', "The weekly review's commentary for the Brief, in a few short paragraphs: how each Book and Sleeve stands against its tested range and its benchmark, the demotions and why, the promotions due, Reconciliation's differences, and what the override scorecard says of your Overrides and the gate. Null when there is no review"),
       monthly: nullable(
         'string',
         "The monthly review's commentary for the Brief, in a few short paragraphs: where each Book's return over the month came from, what the correlation between its Sleeves and its drawdown against its limits say about its risk, and the promotions due. Null when the review has no monthly figures",
+      ),
+      yearly: nullable(
+        'string',
+        "The yearly review's commentary for the Brief, in a few short paragraphs: what the Candidate test chose again and what it means for each Book, what the new weights change, where the year's new money goes, and what the India/US split says. Null when the review has no yearly figures",
       ),
       promotions: {
         type: 'array',

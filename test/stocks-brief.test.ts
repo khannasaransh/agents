@@ -848,6 +848,46 @@ test('on other Saturdays there is no monthly review', async () => {
   assert.doesNotMatch(text(await brief()), /Monthly review/)
 })
 
+test("on the first Saturday of April the yearly review gives each Book's figures, and each of its proposals waits for your Answer", async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.yearly.json')))
+  ws.writeRunFile(runId, 'stages.json', JSON.parse(example('stages-check.yearly.json')))
+  const yearly = 'The Candidate test chose CW2 to join the India Book, beside Super 30.'
+  ws.writeRunFile(runId, 'portfolio-manager.json', { status: 'answered', answer: { books: [], review: null, monthly: null, yearly, promotions: [], journal: { entries: [], open: [] } }, journalRead: '', inputs: [] })
+
+  const html = await brief()
+  const page = text(html)
+
+  // The proposals, each with its Approve and Reject buttons.
+  assert.match(page, /The yearly review's proposals waiting for your Answer: 4 /)
+  assert.match(page, /11 India Book Strategies chosen again Join as Candidates: India CW2, selected\. Retire: none\. The Candidate test over 2017-04-01 to 2027-03-31 chose/)
+  assert.match(page, /12 India Book New Sleeve weights India Super 30 OK, tuned 90%; Gold 10% By the inverse of each strategy's volatility/)
+  assert.match(page, /13 India Book New money ₹5,00,000: India Super 30 OK, tuned ₹4,50,000; Gold ₹50,000 /)
+  assert.match(page, /14 All Books The India\/US split India Book 44\.5% to 46%; US Book 43\.6% to 42\.7%; Hong Kong Book 11\.9% to 11\.3% .* Approving it changes nothing\./)
+  for (const id of [11, 12, 13, 14]) assert.match(html, new RegExp(`data-item="yearly:${id}"><button type="button" data-answer="approve" aria-pressed="false">Approve</button><button type="button" data-answer="reject" aria-pressed="false">Reject</button>`))
+  // The figures.
+  assert.match(page, new RegExp(`Yearly review: 2027 ${yearly} `))
+  assert.match(page, /India Book The Candidate test over 2017-04-01 to 2027-03-31 chose India Super 30 OK, tuned and India CW2, selected: joining India CW2, selected; none leaving\. The Book they make: 17\.1% a year, -16\.2% at its deepest, 22\.4% in the holdout, meeting its objective\./)
+  assert.match(page, /Strategy Chosen Why not India Super 30 OK, tuned Yes India CW2, selected Yes India Swing No its deflated Sharpe doesn't clear 95%/)
+  assert.match(page, /Sleeve Stage Volatility Now Proposed In the real Book India Super 30 OK, tuned Paper 21\.4% 84\.1% 90% 0% Gold 12\.6% 10% 10%/)
+  assert.match(page, /The year's new money: ₹5,00,000, shared out at the new weights\./)
+  assert.match(page, /US Book The Candidate test over 2017-04-01 to 2027-03-31 chose none: none joining; none leaving\. The Book they make: 4\.7% a year, -8\.1% at its deepest, 3% in the holdout, missing its objective\./)
+  assert.match(page, /Hong Kong Book The Candidate test can't run: The lake has no prices for US:BIL in 2017/)
+  assert.match(page, /The India\/US split Book Value in rupees Its share New money After it The split its capital set India Book ₹1,04,12,500 44\.5% ₹5,00,000 46% 43\.5%/)
+  assert.ok(page.indexOf('Weekly review') < page.indexOf('Yearly review: 2027'), 'the yearly review comes after the weekly')
+})
+
+test('on other Saturdays there is no yearly review, nor a proposal of one waiting', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.monthly.json')))
+  ws.writeRunFile(runId, 'stages.json', JSON.parse(example('stages-check.books.json')))
+
+  const page = text(await brief())
+
+  assert.doesNotMatch(page, /Yearly review/)
+  assert.doesNotMatch(page, /The yearly review's proposals/)
+})
+
 test('a demotion the demotion rule made is said, with why, and the Sleeve is shown outside its range', async () => {
   prepare()
   ws.writeRunFile(runId, 'review.json', JSON.parse(example('review.demotion.json')))

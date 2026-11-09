@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { agentsRoot } from '../src/paths.ts'
-import { allowsWakeTimers, launchdEntry, loadSchedules, machineSchedules, monthReviewed, taskSchedulerEntry, type NamedSchedule } from '../src/schedule.ts'
+import { allowsWakeTimers, launchdEntry, loadSchedules, machineSchedules, monthReviewed, taskSchedulerEntry, yearReviewed, type NamedSchedule } from '../src/schedule.ts'
 import { makeWorkspace } from './helpers.ts'
 
 const install = { node: '/opt/homebrew/bin/node', shellPath: '/opt/homebrew/bin:/usr/bin:/bin', dataDir: '/Users/saransh/agents/data' }
@@ -64,6 +64,16 @@ test("a Run on a month's first Saturday reviews the month before; any other Run,
   // The second Saturday, and the first Friday.
   assert.equal(monthReviewed('2026-11-14-0930'), null)
   assert.equal(monthReviewed('2026-11-06-0930'), null)
+})
+
+test('a Run on the first Saturday of April holds the yearly review; any other Run, none', () => {
+  assert.equal(yearReviewed('2027-04-03-0700'), 2027)
+  assert.equal(yearReviewed('2028-04-01-0700'), 2028)
+  // The second Saturday of April, the first of March and of May, and the first Friday of April.
+  assert.equal(yearReviewed('2027-04-10-0700'), null)
+  assert.equal(yearReviewed('2027-03-06-0700'), null)
+  assert.equal(yearReviewed('2027-05-01-0700'), null)
+  assert.equal(yearReviewed('2027-04-02-0700'), null)
 })
 
 test('each machine installs only its own Schedules', async () => {

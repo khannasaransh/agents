@@ -7,10 +7,11 @@ import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
 let ws: Workspace
 afterEach(() => ws.cleanup())
 
-// A Saturday's Run, a Tuesday's, and the first Saturday of November's.
+// A Saturday's Run, a Tuesday's, the first Saturday of November's, and the first Saturday of April's.
 const saturday = '2026-10-31-0930'
 const tuesday = '2026-10-27-0930'
 const firstSaturday = '2026-11-07-0930'
+const aprilSaturday = '2027-04-03-0700'
 const stocksSteps = ['lake', 'review', 'stages', 'brief'].map((name) => ({ name, status: 'pending' }))
 
 function prepare(runId: string, { dryRun = false } = {}) {
@@ -61,6 +62,30 @@ test("on a month's first Saturday it adds the monthly review of the month before
   assert.deepEqual(JSON.parse(ws.readRunFile(firstSaturday, 'review.json')), example('review.monthly.json'))
   assert.match(log(firstSaturday), /India Book in 2026-10: 2\.1% in INR, attributed to its sources/)
   assert.match(log(firstSaturday), /US Book in 2026-10: 2\.3% in INR, attributed to its sources/)
+})
+
+test('on the first Saturday of April it adds the yearly review too: pd review --month --year', async () => {
+  prepare(aprilSaturday)
+  ws.setPd({ review: { example: 'review.yearly.json' } })
+
+  const result = await ws.agents('step', 'review', '--run', aprilSaturday)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.pdCalls().map((call) => call.args), [['review', '--month', '2027-03', '--year']])
+  assert.deepEqual(JSON.parse(ws.readRunFile(aprilSaturday, 'review.json')), example('review.yearly.json'))
+  assert.match(log(aprilSaturday), /The yearly review of 2027: 4 proposals for your Answer/)
+  assert.match(log(aprilSaturday), /India Book: the Candidate test chose in-super30-ok-tuned, in-cw2-selected; joining in-cw2-selected/)
+  assert.match(log(aprilSaturday), /Hong Kong Book: The Candidate test can't run: The lake has no prices for US:BIL in 2017/)
+})
+
+test('on any other Saturday there is no yearly review', async () => {
+  prepare(firstSaturday)
+  ws.setPd({ review: { example: 'review.monthly.json' } })
+
+  await ws.agents('step', 'review', '--run', firstSaturday)
+
+  assert.equal(ws.pdCalls()[0].args.includes('--year'), false)
+  assert.doesNotMatch(log(firstSaturday), /yearly review/)
 })
 
 test('a demotion the demotion rule made is in the log', async () => {

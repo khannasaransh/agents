@@ -1,0 +1,815 @@
+{
+  "reviewed_at": "2027-04-03T01:42:10.512000+00:00",
+  "dry_run": false,
+  "gate": {
+    "verdict": "pass",
+    "reasons": []
+  },
+  "books": [
+    {
+      "book": "IN",
+      "name": "India Book",
+      "market": "IN",
+      "currency": "INR",
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "benchmark": "^CRSLDX",
+      "today": "2026-10-31",
+      "paper": {
+        "status": "measured",
+        "why": null,
+        "record": {
+          "start": "2026-07-30",
+          "end": "2026-10-30",
+          "sessions": 65,
+          "return": 0.0221,
+          "drawdown": -0.0114,
+          "max_drawdown": -0.0352,
+          "window": {
+            "months": 3,
+            "return": 0.0209
+          },
+          "rolling_12m": null,
+          "benchmark": {
+            "return": 0.0187,
+            "max_drawdown": -0.0472
+          }
+        },
+        "backtest": {
+          "start": "2016-07-28",
+          "end": "2026-07-29",
+          "max_drawdown": -0.1934,
+          "rolling_12m": {
+            "min": -0.1139,
+            "p5": -0.0712,
+            "p25": 0.0378,
+            "p50": 0.1468,
+            "p75": 0.269,
+            "p95": 0.3911,
+            "max": 0.5475
+          },
+          "window": {
+            "months": 3,
+            "min": -0.1099,
+            "p5": -0.0687,
+            "p25": -0.0173,
+            "p50": 0.0341,
+            "p75": 0.0778,
+            "p95": 0.1215,
+            "max": 0.1701
+          }
+        },
+        "backtest_why": null,
+        "in_range": true,
+        "outside": []
+      },
+      "sleeves": [
+        {
+          "id": 2,
+          "strategy_id": "in-super30-ok-tuned",
+          "version": "b0a30c3545e3",
+          "stage": "paper",
+          "stage_name": "Paper",
+          "since": "2026-07-29",
+          "name": "India Super 30 OK, tuned",
+          "status": "measured",
+          "why": null,
+          "record": {
+            "start": "2026-07-29",
+            "end": "2026-10-30",
+            "sessions": 66,
+            "return": 0.0412,
+            "drawdown": -0.0215,
+            "max_drawdown": -0.0634,
+            "window": {
+              "months": 3,
+              "return": 0.0388
+            },
+            "rolling_12m": null,
+            "benchmark": {
+              "return": 0.0187,
+              "max_drawdown": -0.0472
+            }
+          },
+          "backtest": {
+            "start": "2016-07-28",
+            "end": "2026-07-28",
+            "max_drawdown": -0.2871,
+            "rolling_12m": {
+              "min": -0.2147,
+              "p5": -0.1342,
+              "p25": 0.0436,
+              "p50": 0.2215,
+              "p75": 0.4171,
+              "p95": 0.6127,
+              "max": 0.8578
+            },
+            "window": {
+              "months": 3,
+              "min": -0.1768,
+              "p5": -0.1105,
+              "p25": -0.0296,
+              "p50": 0.0512,
+              "p75": 0.1202,
+              "p95": 0.1893,
+              "max": 0.265
+            }
+          },
+          "backtest_why": null,
+          "in_range": true,
+          "outside": [],
+          "demotion": null,
+          "promotion": {
+            "to": "real_small",
+            "to_name": "Real-small",
+            "due": "2026-10-29",
+            "due_now": true,
+            "why": null,
+            "outside_range": []
+          }
+        }
+      ],
+      "reconciliation": {
+        "as_of": "2026-10-30",
+        "matched": 11,
+        "differences": [
+          {
+            "kind": "quantity",
+            "security_id": "IN:TATAMOTORS",
+            "isin": "INE155A01022",
+            "symbol": null,
+            "name": "Tata Motors Ltd",
+            "ledger_qty": 40,
+            "broker_qty": 80,
+            "ratio": "2 for 1"
+          }
+        ],
+        "file": "Holdings_2026-10-30.csv",
+        "reconciled_at": "2026-10-31T01:05:12+00:00"
+      },
+      "scorecard": {
+        "status": "scored",
+        "why": null,
+        "currency": "INR",
+        "last": "2026-10-30",
+        "overrides": [
+          {
+            "id": 4,
+            "kind": "drop",
+            "lever": "selection",
+            "session": "2026-08-04",
+            "security_id": "IN:RATEGAIN",
+            "name": "Rategain Travel Technologies",
+            "analysts": [
+              "events"
+            ],
+            "lessons": [],
+            "expected": "It lags the Sleeve into its results",
+            "judged_on": "2026-09-01",
+            "status": "judged",
+            "valued_to": "2026-09-01",
+            "value": 3120.5,
+            "bps": 31.2,
+            "beat_rule_plan": true
+          },
+          {
+            "id": 7,
+            "kind": "wait",
+            "lever": "timing",
+            "session": "2026-09-15",
+            "security_id": "IN:STOVEKRAFT",
+            "name": "Stove Kraft",
+            "analysts": [
+              "chart"
+            ],
+            "lessons": [],
+            "expected": "It comes back to its base within 3 sessions",
+            "judged_on": "2026-10-13",
+            "status": "judged",
+            "valued_to": "2026-10-13",
+            "value": -1840.0,
+            "bps": -18.1,
+            "beat_rule_plan": false
+          },
+          {
+            "id": 9,
+            "kind": "wait",
+            "lever": "timing",
+            "session": "2026-10-20",
+            "security_id": "IN:KPIGREEN",
+            "name": "KPI Green Energy",
+            "analysts": [],
+            "lessons": [],
+            "expected": "A cheaper entry after the gap",
+            "judged_on": "2026-11-17",
+            "status": "open",
+            "valued_to": "2026-10-30",
+            "value": -420.0,
+            "bps": -4.1,
+            "beat_rule_plan": null
+          }
+        ],
+        "tallies": {
+          "lever": [
+            {
+              "key": "selection",
+              "count": 1,
+              "open": 0,
+              "hits": 1,
+              "hit_rate": 1.0,
+              "value": 3120.5,
+              "bps": 31.2
+            },
+            {
+              "key": "timing",
+              "count": 1,
+              "open": 1,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "value": -1840.0,
+              "bps": -18.1
+            }
+          ],
+          "analyst": [
+            {
+              "key": "events",
+              "count": 1,
+              "open": 0,
+              "hits": 1,
+              "hit_rate": 1.0,
+              "value": 3120.5,
+              "bps": 31.2
+            },
+            {
+              "key": "chart",
+              "count": 1,
+              "open": 0,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "value": -1840.0,
+              "bps": -18.1
+            },
+            {
+              "key": "none",
+              "count": 0,
+              "open": 1,
+              "hits": 0,
+              "hit_rate": null,
+              "value": 0.0,
+              "bps": 0.0
+            }
+          ],
+          "lesson": []
+        },
+        "lost_levers": {
+          "start": "2026-07-31",
+          "end": "2026-10-30",
+          "levers": [
+            {
+              "key": "selection",
+              "count": 1,
+              "open": 0,
+              "hits": 1,
+              "hit_rate": 1.0,
+              "value": 3120.5,
+              "bps": 31.2,
+              "lost": false
+            },
+            {
+              "key": "timing",
+              "count": 1,
+              "open": 0,
+              "hits": 0,
+              "hit_rate": 0.0,
+              "value": -1840.0,
+              "bps": -18.1,
+              "lost": true
+            }
+          ]
+        },
+        "sum_and_gap": {
+          "start": "2026-08-03",
+          "from_start": true,
+          "end": "2026-10-30",
+          "overrides": 3,
+          "sum_bps": 9.0,
+          "gap_bps": 14.6,
+          "note": "The Overrides interact: cash a veto leaves funds another buy, and a cut changes what later caps allow. So the sum of their scores isn't the paper Book's gap to its rules-only paper Book, which is what the judgement added, and the gate"
+        },
+        "gate": {
+          "status": "too_soon",
+          "start": "2026-07-31",
+          "end": "2026-10-30",
+          "why": "The two paper Books have closes together only from 2026-08-03: the gate needs the 3 months from 2026-07-31"
+        }
+      },
+      "real_gap": {
+        "status": "measured",
+        "why": null,
+        "from": "2026-10-23",
+        "to": "2026-10-30",
+        "paper_return": 0.0213,
+        "real_return": 0.0141,
+        "split": {
+          "gap": 0.0072,
+          "fills": 0.0004,
+          "skips": 0.0011,
+          "expired": 0.0009,
+          "stages": 0.0048
+        }
+      }
+    },
+    {
+      "book": "US",
+      "name": "US Book",
+      "market": "US",
+      "currency": "USD",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "benchmark": "^GSPC",
+      "today": "2026-10-31",
+      "paper": {
+        "status": "not_started",
+        "why": "It has no two closes filled yet",
+        "record": null,
+        "backtest": null,
+        "backtest_why": null,
+        "in_range": null,
+        "outside": []
+      },
+      "sleeves": [],
+      "reconciliation": null,
+      "scorecard": {
+        "status": "not_started",
+        "why": "Its paper Book hasn't started",
+        "currency": "USD",
+        "last": null,
+        "overrides": [],
+        "tallies": {
+          "lever": [],
+          "analyst": [],
+          "lesson": []
+        },
+        "lost_levers": null,
+        "sum_and_gap": null,
+        "gate": null
+      },
+      "real_gap": {
+        "status": "not_measured",
+        "why": "Its paper Book has no close filled in the week",
+        "from": null,
+        "to": null,
+        "paper_return": null,
+        "real_return": null,
+        "split": null
+      }
+    },
+    {
+      "book": "HK",
+      "name": "Hong Kong Book",
+      "market": "HK",
+      "currency": "HKD",
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "benchmark": "^HSI",
+      "today": "2026-10-31",
+      "paper": {
+        "status": "not_started",
+        "why": "It has no two closes filled yet",
+        "record": null,
+        "backtest": null,
+        "backtest_why": null,
+        "in_range": null,
+        "outside": []
+      },
+      "sleeves": [],
+      "reconciliation": null,
+      "scorecard": {
+        "status": "not_started",
+        "why": "Its paper Book hasn't started",
+        "currency": "HKD",
+        "last": null,
+        "overrides": [],
+        "tallies": {
+          "lever": [],
+          "analyst": [],
+          "lesson": []
+        },
+        "lost_levers": null,
+        "sum_and_gap": null,
+        "gate": null
+      },
+      "real_gap": {
+        "status": "not_measured",
+        "why": "Its paper Book has no close filled in the week",
+        "from": null,
+        "to": null,
+        "paper_return": null,
+        "real_return": null,
+        "split": null
+      }
+    }
+  ],
+  "demotions": [],
+  "promotions_due": [
+    {
+      "book": "IN",
+      "sleeve": 2,
+      "strategy_id": "in-super30-ok-tuned",
+      "from": "paper",
+      "to": "real_small",
+      "to_name": "Real-small",
+      "due": "2026-10-29",
+      "due_now": true,
+      "why": null,
+      "outside_range": []
+    }
+  ],
+  "fill_costs": [
+    {
+      "broker": "icici_direct",
+      "broker_name": "ICICI Direct",
+      "books": [
+        "IN"
+      ],
+      "fills": [
+        {
+          "book": "IN",
+          "order": "IN-2026-10-29-001",
+          "day": "2026-10-29",
+          "security_id": "IN:DELHIVERY",
+          "name": "Delhivery Ltd",
+          "side": "BUY",
+          "qty": 50,
+          "price": 472.75,
+          "value": 23637.5,
+          "open": 470.0,
+          "cost_bps": 58.51,
+          "assumed_bps": 20.0,
+          "why": null
+        },
+        {
+          "book": "IN",
+          "order": "IN-2026-10-28-002",
+          "day": "2026-10-28",
+          "security_id": "IN:RATEGAIN",
+          "name": "Rategain Travel Technologies Ltd",
+          "side": "SELL",
+          "qty": 100,
+          "price": 519.0,
+          "value": 51900.0,
+          "open": 520.0,
+          "cost_bps": 19.23,
+          "assumed_bps": 20.0,
+          "why": null
+        }
+      ],
+      "value": 75537.5,
+      "cost_bps": 31.52,
+      "assumed_bps": 20.0,
+      "costs_more": true
+    },
+    {
+      "broker": "moomoo",
+      "broker_name": "moomoo",
+      "books": [
+        "US",
+        "HK"
+      ],
+      "fills": [],
+      "value": 0.0,
+      "cost_bps": null,
+      "assumed_bps": null,
+      "costs_more": false
+    }
+  ],
+  "monthly": null,
+  "yearly": {
+    "year": 2027,
+    "books": [
+      {
+        "book": "IN",
+        "name": "India Book",
+        "currency": "INR",
+        "strategies": {
+          "status": "ran",
+          "why": null,
+          "start": "2017-04-01",
+          "end": "2027-03-31",
+          "chosen": [
+            "in-super30-ok-tuned",
+            "in-cw2-selected"
+          ],
+          "joining": [
+            "in-cw2-selected"
+          ],
+          "leaving": [],
+          "held": [
+            "in-super30-ok-tuned"
+          ],
+          "tested": [
+            {
+              "id": "in-super30-ok-tuned",
+              "name": "India Super 30 OK, tuned",
+              "version": "b0a30c3545e3",
+              "passes": true,
+              "why": []
+            },
+            {
+              "id": "in-cw2-selected",
+              "name": "India CW2, selected",
+              "version": "9c41d27e8b05",
+              "passes": true,
+              "why": []
+            },
+            {
+              "id": "in-swing-v1",
+              "name": "India Swing",
+              "version": "c09be6a3f114",
+              "passes": false,
+              "why": [
+                "its deflated Sharpe doesn't clear 95%"
+              ]
+            }
+          ],
+          "result": {
+            "cagr": 0.171,
+            "max_drawdown": -0.162,
+            "holdout_cagr": 0.224,
+            "meets_objective": true
+          }
+        },
+        "weights": {
+          "status": "measured",
+          "why": null,
+          "as_of": "2027-04-02",
+          "sleeves": [
+            {
+              "strategy_id": "in-super30-ok-tuned",
+              "name": "India Super 30 OK, tuned",
+              "stage": "paper",
+              "volatility": 0.214,
+              "now": 0.841,
+              "proposed": 0.9,
+              "real": 0.0
+            }
+          ],
+          "gold": {
+            "now": 0.126,
+            "proposed": 0.1
+          }
+        },
+        "new_money": {
+          "status": "proposed",
+          "why": null,
+          "amount": 500000.0,
+          "currency": "INR",
+          "parts": {
+            "in-super30-ok-tuned": 450000.0,
+            "gold": 50000.0
+          }
+        }
+      },
+      {
+        "book": "US",
+        "name": "US Book",
+        "currency": "USD",
+        "strategies": {
+          "status": "ran",
+          "why": null,
+          "start": "2017-04-01",
+          "end": "2027-03-31",
+          "chosen": [],
+          "joining": [],
+          "leaving": [],
+          "held": [],
+          "tested": [
+            {
+              "id": "us-investor-v1-next-open",
+              "name": "US Investor, next open",
+              "version": "5be0d2a7c391",
+              "passes": false,
+              "why": [
+                "adding it doesn't improve the Book"
+              ]
+            }
+          ],
+          "result": {
+            "cagr": 0.047,
+            "max_drawdown": -0.081,
+            "holdout_cagr": 0.03,
+            "meets_objective": false
+          }
+        },
+        "weights": {
+          "status": "no_sleeve",
+          "why": "It has no Sleeve from Paper up",
+          "as_of": null,
+          "sleeves": [],
+          "gold": {
+            "now": null,
+            "proposed": 0.1
+          }
+        },
+        "new_money": {
+          "status": "none",
+          "why": "No new money is set for the year: config/books.yaml's new_money is 0",
+          "amount": 0.0,
+          "currency": "USD",
+          "parts": null
+        }
+      },
+      {
+        "book": "HK",
+        "name": "Hong Kong Book",
+        "currency": "HKD",
+        "strategies": {
+          "status": "cant_run",
+          "why": "The Candidate test can't run: The lake has no prices for US:BIL in 2017",
+          "start": null,
+          "end": null,
+          "chosen": [],
+          "joining": [],
+          "leaving": [],
+          "held": [],
+          "tested": [],
+          "result": null
+        },
+        "weights": {
+          "status": "no_sleeve",
+          "why": "It has no Sleeve from Paper up",
+          "as_of": null,
+          "sleeves": [],
+          "gold": {
+            "now": null,
+            "proposed": 0.1
+          }
+        },
+        "new_money": {
+          "status": "none",
+          "why": "No new money is set for the year: config/books.yaml's new_money is 0",
+          "amount": 0.0,
+          "currency": "HKD",
+          "parts": null
+        }
+      }
+    ],
+    "split": {
+      "currency": "INR",
+      "value": 23404500.0,
+      "new_money": 500000.0,
+      "books": [
+        {
+          "book": "IN",
+          "name": "India Book",
+          "currency": "INR",
+          "rate": 1.0,
+          "value": 10412500.0,
+          "new_money": 500000.0,
+          "share": 0.4449,
+          "share_after": 0.4597,
+          "capital_share": 0.4348
+        },
+        {
+          "book": "US",
+          "name": "US Book",
+          "currency": "USD",
+          "rate": 95.84,
+          "value": 10207000.0,
+          "new_money": 0.0,
+          "share": 0.4361,
+          "share_after": 0.4271,
+          "capital_share": 0.4348
+        },
+        {
+          "book": "HK",
+          "name": "Hong Kong Book",
+          "currency": "HKD",
+          "rate": 12.22,
+          "value": 2785000.0,
+          "new_money": 0.0,
+          "share": 0.119,
+          "share_after": 0.1132,
+          "capital_share": 0.1304
+        }
+      ],
+      "missing": [],
+      "basis": "Each paper Book's value on its last close filled (its capital before its first)"
+    },
+    "proposals": [
+      {
+        "id": 11,
+        "year": 2027,
+        "book": "IN",
+        "kind": "strategies",
+        "proposed": {
+          "chosen": [
+            "in-super30-ok-tuned",
+            "in-cw2-selected"
+          ],
+          "joining": [
+            "in-cw2-selected"
+          ],
+          "leaving": []
+        },
+        "why": "The Candidate test over 2017-04-01 to 2027-03-31 chose in-super30-ok-tuned, in-cw2-selected: joining as Candidates in-cw2-selected; Retired none.",
+        "by": "the yearly review",
+        "at": "2027-04-03T01:42:10.512000+00:00",
+        "decision": null,
+        "decided_at": null,
+        "decided_by": null
+      },
+      {
+        "id": 12,
+        "year": 2027,
+        "book": "IN",
+        "kind": "weights",
+        "proposed": {
+          "shares": {
+            "in-super30-ok-tuned": 0.9,
+            "gold": 0.1
+          }
+        },
+        "why": "By the inverse of each strategy's volatility over the year to 2027-04-02: in-super30-ok-tuned 90.0% (now 84.1%); gold 10.0% (now 12.6%).",
+        "by": "the yearly review",
+        "at": "2027-04-03T01:42:10.512000+00:00",
+        "decision": null,
+        "decided_at": null,
+        "decided_by": null
+      },
+      {
+        "id": 13,
+        "year": 2027,
+        "book": "IN",
+        "kind": "new_money",
+        "proposed": {
+          "amount": 500000.0,
+          "currency": "INR",
+          "shares": {
+            "in-super30-ok-tuned": 0.9,
+            "gold": 0.1
+          },
+          "parts": {
+            "in-super30-ok-tuned": 450000.0,
+            "gold": 50000.0
+          }
+        },
+        "why": "500,000 INR of new money for 2027, shared out at the new weights.",
+        "by": "the yearly review",
+        "at": "2027-04-03T01:42:10.512000+00:00",
+        "decision": null,
+        "decided_at": null,
+        "decided_by": null
+      },
+      {
+        "id": 14,
+        "year": 2027,
+        "book": null,
+        "kind": "split",
+        "proposed": {
+          "books": [
+            {
+              "book": "IN",
+              "name": "India Book",
+              "currency": "INR",
+              "rate": 1.0,
+              "value": 10412500.0,
+              "new_money": 500000.0,
+              "share": 0.4449,
+              "share_after": 0.4597,
+              "capital_share": 0.4348
+            },
+            {
+              "book": "US",
+              "name": "US Book",
+              "currency": "USD",
+              "rate": 95.84,
+              "value": 10207000.0,
+              "new_money": 0.0,
+              "share": 0.4361,
+              "share_after": 0.4271,
+              "capital_share": 0.4348
+            },
+            {
+              "book": "HK",
+              "name": "Hong Kong Book",
+              "currency": "HKD",
+              "rate": 12.22,
+              "value": 2785000.0,
+              "new_money": 0.0,
+              "share": 0.119,
+              "share_after": 0.1132,
+              "capital_share": 0.1304
+            }
+          ]
+        },
+        "why": "The Books' shares of their value in rupees: India Book 44.5% (46.0% after its new money); US Book 43.6% (42.7% after its new money); Hong Kong Book 11.9% (11.3% after its new money). Approving it changes nothing.",
+        "by": "the yearly review",
+        "at": "2027-04-03T01:42:10.512000+00:00",
+        "decision": null,
+        "decided_at": null,
+        "decided_by": null
+      }
+    ]
+  }
+}

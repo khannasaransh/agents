@@ -31,6 +31,7 @@ const answer = (lessons: unknown[]) => ({
   books: example('judgement.answered.json').books,
   review: null,
   monthly: null,
+  yearly: null,
   promotions: [],
   narrower: [],
   expectations: [],

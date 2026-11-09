@@ -1,0 +1,23 @@
+{
+  "changed": true,
+  "why": null,
+  "proposal": {
+    "id": 12,
+    "year": 2027,
+    "book": "IN",
+    "kind": "weights",
+    "proposed": {
+      "shares": {
+        "in-super30-ok-tuned": 0.9,
+        "gold": 0.1
+      }
+    },
+    "why": "By the inverse of each strategy's volatility over the year to 2027-04-02: in-super30-ok-tuned 90.0% (now 84.1%); gold 10.0% (now 12.6%).",
+    "by": "the yearly review",
+    "at": "2027-04-03T01:42:10.512000+00:00",
+    "decision": "approved",
+    "decided_at": "2027-04-06T01:31:02.112000+00:00",
+    "decided_by": "Saransh"
+  },
+  "applied": null
+}

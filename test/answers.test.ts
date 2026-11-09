@@ -348,6 +348,34 @@ test('an Answer on a promotion approves it through pd stages promote, or rejects
   ])
 })
 
+test("an Answer on a yearly review's proposal approves it through pd yearly approve, or rejects it through pd yearly reject", async () => {
+  ws = makeWorkspace()
+  ws.prepareRun(briefRun, { pipeline: 'stocks', steps: [{ name: 'stages', status: 'succeeded' }, { name: 'brief', status: 'pending' }] })
+  ws.writeRunFile(briefRun, 'stages.json', JSON.parse(readFileSync(join(pdExamples, 'stages-check.yearly.json'), 'utf8')))
+  assert.equal((await ws.agents('step', 'brief', '--run', briefRun)).status, 0)
+  const items: AnswerItem[] = JSON.parse(ws.readRunFile(briefRun, 'brief.html').match(/<script type="application\/json" id="answer-items">([\s\S]*?)<\/script>/)![1])
+  // After the Candidate, each of the yearly review's proposals, oldest first.
+  assert.deepEqual(
+    items.map((i) => i.item),
+    ['candidate:3', 'yearly:11', 'yearly:12', 'yearly:13', 'yearly:14'],
+  )
+  assert.deepEqual(items[1].answers, ['approve', 'reject'])
+  save(answersFile(briefRun, items, { 'yearly:12': { answer: 'approve' }, 'yearly:11': { answer: 'reject' } }, '2027-04-03T03:10:00.000Z'))
+  prepareRun(nextRun)
+  ws.setPd({ yearly: [{ example: 'yearly-decide.approved.json' }, { example: 'yearly-decide.weights.json' }] })
+
+  assert.equal((await step(nextRun)).status, 0)
+
+  assert.deepEqual(pdCallArgs(), [
+    ['yearly', 'reject', '11'],
+    ['yearly', 'approve', '12'],
+  ])
+  assert.deepEqual(outcomes(nextRun), [
+    ['yearly:11', 'reject', 'applied'],
+    ['yearly:12', 'approve', 'applied'],
+  ])
+})
+
 test("an Answer on a real Book's order or Disaster stop is applied with when it was saved, and a late one is recorded but ignored", async () => {
   ws = makeWorkspace()
   prepareRun(nextRun)

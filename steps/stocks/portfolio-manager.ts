@@ -4,7 +4,8 @@
 // Brief's commentary on each Book, and its Journal's new entries. On Saturdays it also writes the
 // weekly review's commentary, proposes the promotions the review lists as due, and proposes a
 // narrower range for each Lever the override scorecard (issue 40) says lost to the Rule plan over the
-// last 3 months; on a month's first Saturday it writes the monthly review's commentary. It runs
+// last 3 months; on a month's first Saturday it writes the monthly review's commentary, and on the
+// first Saturday of April the yearly review's (issue 45). It runs
 // read-only in the Run folder, on Claude Code with Codex as fallback, given the Rule plans, the Book
 // states, the Stages, the Health Agent's diagnosis, the review's figures (null on other days), the
 // Desk's views (issue 39; null when the Desk didn't review), its Journal and its Lessons (issue 41:
@@ -39,6 +40,8 @@ export interface PortfolioManagerAnswer {
   review: string | null
   /** On a month's first Saturday, the monthly review's commentary; null on other days. */
   monthly: string | null
+  /** On the first Saturday of April, the yearly review's commentary; null on other days (missing from a Run before issue 45). */
+  yearly?: string | null
   /** The promotions it proposes, each by its Sleeve's id. */
   promotions: { sleeve: number; why: string }[]
   /** The narrower Playbook ranges it proposes, each for a Lever that lost to the Rule plan over the last 3 months. */

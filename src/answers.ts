@@ -18,6 +18,9 @@ const kinds = {
   judgement: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['judgement', answer, id] },
   // A Sleeve's promotion up a Stage, which the Portfolio Manager proposed: approving it moves the Sleeve.
   promotion: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['stages', answer === 'approve' ? 'promote' : 'reject', id] },
+  // A yearly review's proposal (issue 45): approving a Book's strategies records those chosen as Candidates and
+  // Retires those not; its weights and new money take effect at its next Rule plan; the split changes nothing.
+  yearly: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['yearly', answer, id] },
   // An early exit the Desk proposed (issue 39): approving it sells the holding on the paper Book's next Rule plan.
   exit: { answers: ['approve', 'reject'], pd: (id: string, answer: string) => ['exits', answer, id] },
   // A real Book's order (issue 42): placed or skipped at the broker. An Answer saved once its session is
@@ -84,7 +87,8 @@ export function legacyToAnswer(states: PdBookState[]): (PdHolding & { legacy_id:
 /**
  * The items waiting on Saransh: each real Book's order still to place and Disaster stop to place or
  * raise, then each Legacy holding to keep or sell, then each waiting Correction and each Quarantine in
- * the Lake's status, then each Candidate, then each promotion, then each early exit, then each proposal
+ * the Lake's status, then each Candidate, then each promotion, then each of the yearly review's proposals
+ * (the Stages Step's), then each early exit, then each proposal
  * to move a Judgement mode or change a Playbook's ranges (but a Lesson's, which its Lesson's Answer
  * decides), then each Lesson (by its id).
  */
@@ -97,6 +101,7 @@ export function waitingItems(status: PdStatus | null, stages: PdStagesCheck | nu
     ...(status?.quarantines ?? []).map((q) => answerItem('quarantine', q.id)),
     ...waitingCandidates(stages).map((s) => answerItem('candidate', s.id)),
     ...promotions.map((p) => answerItem('promotion', p.id)),
+    ...(stages?.yearly ?? []).map((p) => answerItem('yearly', p.id)),
     ...exits.filter((e) => e.decision === null).map((e) => answerItem('exit', e.id)),
     ...(judgement?.proposals ?? []).filter((p) => !lessons.some((l) => l.judgement === p.id)).map((p) => answerItem('judgement', p.id)),
     ...lessons.map((l) => answerItem('lesson', l.id)),

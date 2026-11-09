@@ -27,6 +27,15 @@ export function monthReviewed(runId: string): string | null {
   return `${before.getFullYear()}-${String(before.getMonth() + 1).padStart(2, '0')}`
 }
 
+/** The month the yearly review is held in: April, on its first Saturday. */
+const yearlyMonth = 4
+
+/** The year a Run's yearly review is of, when the Run started on the first Saturday of April (issue 45); else null. */
+export function yearReviewed(runId: string): number | null {
+  const [year, month, day] = runId.split('-').map(Number)
+  return runWeekday(runId) === 'saturday' && month === yearlyMonth && day <= 7 ? year : null
+}
+
 /** The machines Schedules run on: the Mac, which installs them into launchd, and the Windows machine, into Task Scheduler. */
 const machines = { mac: 'darwin', windows: 'win32' } as const
 export type Machine = keyof typeof machines

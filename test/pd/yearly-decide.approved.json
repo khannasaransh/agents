@@ -1,0 +1,54 @@
+{
+  "changed": true,
+  "why": null,
+  "proposal": {
+    "id": 11,
+    "year": 2027,
+    "book": "IN",
+    "kind": "strategies",
+    "proposed": {
+      "chosen": [
+        "in-super30-ok-tuned",
+        "in-cw2-selected"
+      ],
+      "joining": [
+        "in-cw2-selected"
+      ],
+      "leaving": []
+    },
+    "why": "The Candidate test over 2017-04-01 to 2027-03-31 chose in-super30-ok-tuned, in-cw2-selected: joining as Candidates in-cw2-selected; Retired none.",
+    "by": "the yearly review",
+    "at": "2027-04-03T01:42:10.512000+00:00",
+    "decision": "approved",
+    "decided_at": "2027-04-06T01:31:02.004000+00:00",
+    "decided_by": "Saransh"
+  },
+  "applied": {
+    "recorded": [],
+    "known": [
+      {
+        "id": 3,
+        "book": "IN",
+        "strategy_id": "in-cw2-selected",
+        "name": "India CW2, selected",
+        "version": "9c41d27e8b05",
+        "current_version": "9c41d27e8b05",
+        "stage": "candidate",
+        "since": "2026-10-28",
+        "launch_date": null,
+        "history": [
+          {
+            "from": null,
+            "stage": "candidate",
+            "date": "2026-10-28",
+            "at": "2026-10-28T01:30:00+00:00",
+            "by": "the Candidate test of 2026-10-23",
+            "why": "Chosen by the Candidate test over 2016-10-24 to 2026-10-23 on 2026-10-23.70c27d24c7a7"
+          }
+        ]
+      }
+    ],
+    "refused": [],
+    "retired": []
+  }
+}
