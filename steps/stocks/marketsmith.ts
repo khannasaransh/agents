@@ -1,12 +1,15 @@
-// MarketSmith: on Saturdays, fetches MarketSmith's data for the Books' markets (India, the US and
-// Hong Kong) through ash_new
-// (`pd marketsmith`) before the Lake Step refreshes, so the fundamentals it builds and MarketSmith's
-// snapshot are never more than a week old. ash_new writes the raw store and keeps the fetch as a
-// dated snapshot; this Step records what it printed as marketsmith.json. It skips itself on other
-// days and in a dry run. A cookie MarketSmith rejected skips the Step, with a To-do naming the cookie
-// (pd exits 78), and never fails the Run: the cookies are in ash_new's env file, which only
-// `pd marketsmith` reads, so this Step never handles them. Run again in the same Run, it fetches only
-// the regions not yet fetched, unless forced, since a full fetch takes hours.
+// MarketSmith: on Wednesdays and Saturdays (Saransh, 9 November 2026), fetches MarketSmith's data for
+// the Books' markets (India, the US and Hong Kong) through ash_new (`pd marketsmith --mode auto`)
+// before the Lake Step refreshes. auto is a latest fetch (the symbols with results in the last 15
+// days, the new ones and the stalest), and once a year, from 1 July, a full one of every symbol.
+// ash_new writes the raw store, checks it whole before keeping it, keeps the one it replaced as a
+// backup and the store as a dated snapshot; this Step records what it printed as marketsmith.json. It
+// skips itself on other days and in a dry run. A cookie MarketSmith rejected skips the Step, with a
+// To-do naming the cookie (pd exits 78), and never fails the Run: the cookies are in ash_new's env
+// file, which only `pd marketsmith` reads, so this Step never handles them. A results calendar that
+// couldn't be read raises a To-do too. Run again in the same Run, it fetches only the regions not yet
+// fetched, unless forced, since a fetch can take hours. The Health Step looks into a fetch, or a
+// backup, that went wrong (marketsmithProblems).
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { readJson, writeJson } from '../../src/files.ts'
@@ -23,6 +26,10 @@ type Region = PdMarketSmith['regions'][number]
 // A full fetch is every symbol, paced as MarketSmith allows: hours for each region, fetched at once.
 const fetchMs = Number(process.env.AGENTS_MARKETSMITH_TIMEOUT_SECONDS ?? 14 * 60 * 60) * 1000
 
+/** The days MarketSmith is fetched, and the day each year auto fetches every symbol (MM-DD). */
+export const fetchDays = ['wednesday', 'saturday']
+export const fullFetchOn = '07-01'
+
 /** One To-do per cookie MarketSmith rejected, naming it and the regions it left unfetched. */
 function cookieTodos(regions: Region[]): string[] {
   const rejected = regions.filter((r) => r.status === 'cookie_rejected')
@@ -30,13 +37,20 @@ function cookieTodos(regions: Region[]): string[] {
     const these = rejected.filter((r) => r.cookie === cookie)
     const names = these.map((r) => regionName(r.region)).join(' and ')
     const command = ['uv run pd marketsmith', ...these.map((r) => `--region ${r.region}`)].join(' ')
-    return `${cookie} didn't work, so ${names} wasn't fetched this Saturday (${these[0].error}). Put a fresh one in ash_new's .env as ${cookie}, then run \`${command}\` in ash_new.`
+    return `${cookie} didn't work, so ${names} wasn't fetched in this Run (${these[0].error}). Put a fresh one in ash_new's .env as ${cookie}, then run \`${command}\` in ash_new.`
   })
+}
+
+/** One To-do per region whose results calendar couldn't be read, so its latest fetch took only its new and stale symbols. */
+function calendarTodos(regions: Region[]): string[] {
+  return regions
+    .filter((r) => r.calendar?.status === 'failed')
+    .map((r) => `MarketSmith's latest fetch of ${regionName(r.region)} couldn't read its results calendar (${r.calendar?.why}), so it fetched only its new and stale symbols. Check ash_new's pdash.marketsmith.results against the calendar's page.`)
 }
 
 await runAsStep(async ({ runId, runFolder, force }) => {
   const day = runWeekday(runId)
-  if (day !== 'saturday') throw new StepSkipped(`MarketSmith is fetched on Saturdays, and this Run started on a ${capitalised(day)}`)
+  if (!fetchDays.includes(day)) throw new StepSkipped(`MarketSmith is fetched on Wednesdays and Saturdays, and this Run started on a ${capitalised(day)}`)
   if (readRun(runId).dryRun) throw new StepSkipped('Dry run: MarketSmith is not fetched')
   const out = join(runFolder, 'marketsmith.json')
   // What an earlier run of this Step fetched is kept, and only the rest asked for again.
@@ -46,11 +60,10 @@ await runAsStep(async ({ runId, runFolder, force }) => {
     console.log('MarketSmith was already fetched in this Run, skipping')
     return
   }
-  const args = ['marketsmith', ...(left.length ? left : bookRegions).flatMap((region) => ['--region', region])]
+  const args = ['marketsmith', '--mode', 'auto', '--full-on', fullFetchOn, ...(left.length ? left : bookRegions).flatMap((region) => ['--region', region])]
 
-  const { code, stdout, stderr, timedOut } = await runPd(args, { cwd: runFolder, timeoutMs: fetchMs })
-  // pd marketsmith logs on stderr as it goes, and prints its JSON on stdout.
-  if (stderr) console.error(stderr.trimEnd())
+  // pd marketsmith logs on stderr as it goes, which reaches the Step's log as it comes, and prints its JSON on stdout.
+  const { code, stdout, stderr, timedOut } = await runPd(args, { cwd: runFolder, timeoutMs: fetchMs, echo: { stderr: true } })
   if (timedOut) throw new Error(`pd marketsmith timed out after ${Math.round(fetchMs / 60_000)} minutes`)
   let fetched: PdMarketSmith
   try {
@@ -62,7 +75,7 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   // Each region as it last ended, in the first run's order.
   if (earlier.length) fetched = { ...fetched, regions: earlier.map((r) => (left.includes(r.region) && fetched.regions.find((f) => f.region === r.region)) || r) }
   writeJson(out, fetched)
-  writeTodos(runFolder, 'marketsmith', cookieTodos(fetched.regions))
+  writeTodos(runFolder, 'marketsmith', [...cookieTodos(fetched.regions), ...calendarTodos(fetched.regions)])
   if (code === skippedExitCode) throw new StepSkipped('MarketSmith rejected a cookie; see the To-dos')
   if (code !== 0) throw new Error(`pd marketsmith exited with ${code}`)
 })

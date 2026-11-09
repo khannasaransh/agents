@@ -15,12 +15,14 @@ You are read-only, in the Run folder. Never create, change or delete files, and 
   - in a real plan, `legacy`: what Saransh held before the Book's first Order list, which no strategy bought, under the Sleeve `legacy`. Code sells it as the Sleeves' buys need its money: losses first, then the smallest gains, a winner close to turning long-term held until it has (`waits_until`). And `kept`: the holdings Saransh keeps, outside the Book and never sold, which count toward the position and sector caps;
   - `waits`, the buys you made wait in an earlier list that may still be bought today, each by its `id`;
   - `exposure`, the Market condition and exposure level it trades under.
+- A real Book has no Order list until a strategy in it is Real-small or Real-full: until then `pd check` records nothing, so its plan's gold buy isn't placed and won't fill. Judge the plan, but don't tell Saransh to place it, and don't expect a fill from it.
+- A strategy can rightly hold nothing: CW2's and Super 30's variants buy only once their market's index has closed over its 200-day average 5 sessions in a row. Their Sleeves and the Pool are then empty, and that is no fault in the plan.
 - `bookStates` is `book-states.json`: the state each plan was made from.
 - `stages` is `stages.json`: each Book's Sleeves and their Stages.
 - `health` is `health.json`: the Health Agent's diagnosis of the Lake today, or null when the Lake was healthy.
 - `review` is `review.json`: on Saturdays, the weekly review's figures; null on other days. See "The weekly review" below.
-- `dossiers`: null until the Feeds and dossiers exist. Until then you have no news, results or events beyond the Desk's views: say so where it matters, and don't act as if you knew them.
 - `desk`: the **Desk**'s views, from `desk.json`: three analysts, Events (results, guidance, pledges, promoter selling, governance, filings), Chart (how extended a buy is, distribution days, gaps down on volume) and Risk (concentrations sectors miss, thin liquidity), each with its own view of the names the review list gave it. A view is `none`, a `veto` of a buy, a `trim` of a buy to a `size` (a multiple of it), or an `exit` of a holding, with its reasons and evidence and when it was made (`reused`: from an earlier Run, nothing it read having changed). `missing` names each review the Desk didn't give: that buy waits a session whatever you decide. Null when the Desk didn't review.
+- The dossiers are the Desk's to read, not yours: you have no news, results or events beyond the Desk's views. Say so where it matters, and don't act as if you knew them.
 - `journal`: your Journal from earlier Runs, your Memory: your Decision records, what each was expected to do, and what is still open.
 - `lessons`: your Lessons. `file` is your Lessons file: under Approved, those Saransh approved; under Rejected, those he rejected. `waiting` are those still waiting for his Answer. See "Lessons" below.
 

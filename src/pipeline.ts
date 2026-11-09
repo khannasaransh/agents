@@ -3,6 +3,7 @@ import { closeSync, existsSync, mkdirSync, openSync, writeSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import type { WorkerName } from './agent.ts'
+import { keepAwake } from './awake.ts'
 import { acquireLock } from './lock.ts'
 import { agentsRoot, runDir } from './paths.ts'
 import { recordProcess, stopRecordedProcesses } from './processes.ts'
@@ -27,10 +28,12 @@ export async function loadPipeline(name: string): Promise<Pipeline> {
 /**
  * Starts a Run of the named Pipeline and runs every Step in order, even after one fails.
  * Refuses to start while another Run is active. A dry run runs every Agent Step on the fake Worker.
+ * The machine is kept awake while it runs, since sleep would freeze a Run that takes hours.
  */
 export async function runPipeline(name: string, { dryRun = false, worker }: { dryRun?: boolean; worker?: WorkerName } = {}): Promise<RunRecord> {
   const pipeline = await loadPipeline(name)
   const release = acquireLock()
+  const sleepAgain = keepAwake()
   try {
     const run = createRun(name, pipeline.steps, { dryRun, worker })
     try {
@@ -45,16 +48,19 @@ export async function runPipeline(name: string, { dryRun = false, worker }: { dr
       throw error
     }
   } finally {
+    sleepAgain()
     release()
   }
 }
 
-/** Runs one Step inside an existing Run, as `agents step` does. Refuses while a Run is active. */
+/** Runs one Step inside an existing Run, as `agents step` does, keeping the machine awake. Refuses while a Run is active. */
 export async function runSingleStep(runId: string, name: string, options: { force?: boolean } = {}): Promise<StepRecord> {
   const release = acquireLock()
+  const sleepAgain = keepAwake()
   try {
     return await runStep(runId, name, options)
   } finally {
+    sleepAgain()
     release()
   }
 }

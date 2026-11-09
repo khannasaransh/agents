@@ -6,7 +6,7 @@
 
 **Blocked by:** 28: Book backtest: caps, breakers and the order-size guard
 
-**Status:** done, but for MarketSmith's outlook, which no fetch records yet (see "Not done")
+**Status:** done, but for the US's and Hong Kong's MarketSmith outlook, and the Hang Seng's members (see "Not done")
 
 **Waiting on Saransh:** the Market condition's thresholds and the exposure levels. Until then the placeholders are 100%, 80% and 40% for Uptrend, Under pressure and Correction.
 
@@ -53,5 +53,6 @@
   - **The objective:** with the exposure level, that Book's holdout CAGR is 15.6%, under the 20% objective it met in issue 30's Candidate report (21.9%). The report was made without the level; running the Candidate test again would choose under it.
   - **The thresholds and levels:** the condition is Under pressure or a Correction on 63% of the ten years' sessions at these placeholders. Thresholds that call fewer of them would trade the drawdown it saves for less of the return it costs.
 - **Not done:**
-  - **MarketSmith's outlook:** no fetch records it, so each snapshot's is null and the Brief says "not in its snapshot". Recording it means finding which of MarketSmith's responses carries it, in `pd marketsmith`.
-  - The Hang Seng's members aren't in the Lake, so Hong Kong's breadth is the whole market's.
+  - **MarketSmith's outlook in the US and Hong Kong:** India's is recorded (below), but their responses carry no such card, and the Global site's homepage was checked on 4 November 2026 and names no endpoint for one. Their snapshots' outlook is null, and the Brief says "not in its snapshot". India's first shows once the real Lake has a snapshot: the Saturday Run of 7 November.
+  - **The Hang Seng's members** aren't in the Lake, so Hong Kong's breadth is the whole market's. The Nifty 500's and the S&P 500's come with a history of who was in the index when (`pipeline.indices`); there is no such source here for the Hang Seng, and a list of today's members alone would change the reading only from today.
+- **MarketSmith's outlook, 4 November 2026:** India's stocks each carry a Market Direction card in `wisdom.json` (`itemValue`: "Uptrend Under Pressure", "Rally Attempt"). A snapshot records it as `market_outlook` (`marketsmith.snapshots.market_outlook`), from the security fetched last, since a fetch takes hours and the reading can change during it. In the raw store's India fetch, the 600 stocks checked read Uptrend Under Pressure on 586 and Rally Attempt on 14.

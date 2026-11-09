@@ -1,0 +1,8 @@
+{
+  "fetched_at": "2026-11-11T02:58:40.120000+00:00",
+  "regions": [
+    {"region": "IN", "status": "fetched", "cookie": "PDASH_MS_INDIA_AUTH", "run_id": "2026-11-11T01-31-02Z", "universe": 2632, "ok": 712, "skipped": 5, "failed": 0, "snapshot": "IN:2026-11-11", "error": null, "mode": "latest", "chosen": {"results": 214, "new": 3, "stale": 500}, "calendar": {"status": "fetched", "why": null}, "left_out": 0, "backups": {"kept": ["2026-10-31T01-31-02Z", "2026-11-08T16-40-27Z"], "removed": []}},
+    {"region": "US", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-11-11T01-31-02Z", "universe": 5971, "ok": 500, "skipped": 0, "failed": 0, "snapshot": "US:2026-11-11", "error": null, "mode": "latest", "chosen": {"results": 0, "new": 0, "stale": 500}, "calendar": {"status": "failed", "why": "NASDAQ's earnings calendar couldn't be read: 2026-10-27 (answered 403)"}, "left_out": 0, "backups": {"kept": ["2026-11-09T02-28-57Z"], "removed": []}},
+    {"region": "HK", "status": "fetched", "cookie": "PDASH_MS_GLOBAL_COOKIE", "run_id": "2026-11-11T01-31-02Z", "universe": 2818, "ok": 47, "skipped": 0, "failed": 0, "snapshot": "HK:2026-11-11", "error": null, "mode": "latest", "chosen": {"results": 41, "new": 3, "stale": 3}, "calendar": {"status": "fetched", "why": null}, "left_out": 3, "backups": {"kept": [], "removed": [{"id": "2026-11-09T02-28-57Z", "why": "not whole: 00700/summary.json is cut short"}]}}
+  ]
+}

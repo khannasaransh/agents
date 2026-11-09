@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
-import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
+import { makeWorkspace, pdExamples, until, type Workspace } from './helpers.ts'
 
 let ws: Workspace
 afterEach(() => ws.cleanup())
@@ -189,4 +189,18 @@ test('the Lake Step runs once per Run unless forced, but again after it failed',
 
   assert.equal((await ws.agents('step', 'lake', '--run', runId, '--force')).status, 0)
   assert.equal(ws.pdCalls().filter((call) => call.args[0] === 'daily').length, 4)
+})
+
+test("pd daily's output reaches the Step's log as it comes, so a Run that dies mid-refresh still shows how far it got", async () => {
+  prepare()
+  ws.setPd({ 'clear-refresh': { example: 'clear-refresh.nothing.json' }, daily: { stdout: 'IN panels: 2,606 securities\n', stderr: 'Stale backtests: running 120\n', hang: true } })
+  const log = join(ws.dataDir, 'runs', runId, 'logs', 'lake.log')
+
+  const cli = ws.start('step', 'lake', '--run', runId)
+  try {
+    await until(() => existsSync(log) && /Stale backtests: running 120/.test(readFileSync(log, 'utf8')) && /IN panels/.test(readFileSync(log, 'utf8')), 15_000)
+  } finally {
+    cli.killAll()
+    await cli.result
+  }
 })

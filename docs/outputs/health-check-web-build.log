@@ -1,0 +1,54 @@
+
+> web@0.1.0 build
+> next build
+
+▲ Next.js 16.3.8 (Turbopack)
+✓ Running next.config.ts took 82ms
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 7.4s
+  Running TypeScript ...
+  Finished TypeScript in 16.1s ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/14) ...
+  Generating static pages using 15 workers (3/14) 
+  Generating static pages using 15 workers (6/14) 
+  Generating static pages using 15 workers (10/14) 
+✓ Generating static pages using 15 workers (14/14) in 493ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ƒ /
+├ ƒ /_not-found
+├ ƒ /api/v1/[...path]
+├ ƒ /compare
+├ ƒ /create
+├ ƒ /create/basket
+├ ƒ /create/rule
+├ ƒ /data
+├ ƒ /discover
+├ ƒ /portfolio/[id]
+├ ƒ /portfolio/[id]/allocation
+├ ƒ /portfolio/[id]/closed
+├ ƒ /portfolio/[id]/dividends
+├ ƒ /portfolio/[id]/import
+├ ƒ /portfolio/[id]/performance
+├ ƒ /portfolio/[id]/transactions
+├ ƒ /portfolios
+├ ƒ /screener
+├ ƒ /security/[id]
+├ ƒ /settings
+├ ƒ /strategy/[id]
+├ ƒ /strategy/[id]/allocation
+├ ƒ /strategy/[id]/constituents
+├ ƒ /strategy/[id]/edit
+├ ƒ /strategy/[id]/performance
+├ ƒ /strategy/[id]/rebalances
+├ ƒ /strategy/[id]/robustness
+├ ƒ /strategy/[id]/simulator
+├ ƒ /strategy/[id]/versions
+└ ƒ /watchlist
+
+
+ƒ  (Dynamic)  server-rendered on demand
+

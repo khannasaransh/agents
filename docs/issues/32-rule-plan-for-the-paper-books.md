@@ -6,7 +6,7 @@
 
 **Blocked by:** 31: Stages, promotions and launching; 20: Corrections and Quarantine; 46: Market condition and the exposure level; 47: One Book end to end, in shadow
 
-**Status:** done, but for a plan on the real Lake, which still has no prices for the Books' ETFs (see issue 47's "On the real Lake")
+**Status:** done
 
 - [x] `pd plan` makes each paper Book's Rule plan as of each market's last session. It applies the Data gate and Quarantines, then runs the Book engine's next session from the paper Book's state (all cash at first), as issue 47 does for the India Book. That session includes:
   - the strategies' live-track orders at their Sleeves' weights;
@@ -51,7 +51,11 @@
 - **The stand-in `pd`:** `plan.normal.json`, `plan.hold.json`, `plan.shut.json`, `plan.cant-plan.json`, `book-state.india.json` and `book-state.paper.json`, from the fixture run renamed to real securities. `plan.shadow.json` is gone into `plan.normal.json`.
 - **On issue 30's copy of the Lake, 27 October 2026:** the Data gate fails (no Health report, and the copy three sessions behind), so every plan is in Hold mode. The India paper Book holds only gold: no strategy is in Paper on this machine yet (`in-super30-ok-tuned` is a Candidate waiting for your approval). Hong Kong has no panels in the copy, so its paper Book can't plan.
 - **Found on the way:** `pd status` fails on the real app database, on the Correction of kind `bar` proposed in issue 26 (`CorrectionChange` doesn't accept `bar`), so the Pipeline's Lake Step can't read the Lake's status there. `pd plan` reads the gate without the Corrections, so it isn't affected. This needs fixing in ash_new's Corrections, apart from this issue.
+- **On the real Lake, 4 November 2026 (Run `2026-11-04-1930`):** the Data gate passed and every plan was made. The US paper Book's Rule plan buys 17 stocks and gold, in 19 orders. The India and Hong Kong paper Books buy only gold, and that is right:
+  - **Why they buy only gold:** CW2's and Super 30's variants may buy only once their market's index has closed over its 200-day average 5 sessions in a row, read on the close before (`engine.trading`), and they sell everything `regime_exit`% under it. So their Sleeves and Pools are empty.
+  - **The Nifty 500** closed 0.03% over its average on 4 November, 1 of the 5 sessions it needs. It last qualified on 8 September.
+  - **The Hang Seng** closed 5.4% under its average, far enough to sell everything. It last qualified on 5 August.
+  - **The S&P 500** closed 3.8% over its average, so the US's strategies may buy.
 - **Not done:**
-  - Recording the paper plans' orders and filling them is issue 33's: until then each paper plan starts from all cash.
+  - A plan doesn't say why a strategy holds nothing. The Portfolio Manager's first Journal called it a reason the plan doesn't give, so its instructions now explain it, but neither the plan nor the Brief shows the index against the gate.
   - A Retired Sleeve whose version isn't its strategy's current one is left out rather than wound down: with all cash, it holds nothing to wind down; once paper Books hold stocks (issue 33), it needs a track per version.
-  - The real Books' Rule plans from their own Stages (a Paper strategy holding nothing, a Real-small one a quarter) wait for issue 42; the India Book's real plan is still issue 47's shadow plan.

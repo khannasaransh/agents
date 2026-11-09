@@ -3,7 +3,7 @@
 // contract between the two repos, described by the schemas in ash_new's contract folder.
 import { delimiter, join } from 'node:path'
 import { ashNewFolder, secContact } from './env.ts'
-import { runProcess, type ProcessResult } from './process.ts'
+import { runProcess, type Echo, type ProcessResult } from './process.ts'
 
 /** What `pd status` prints (ash_new's contract/status.schema.json): how fresh and healthy the Lake is. */
 export interface PdStatus {
@@ -107,9 +107,19 @@ export interface PdMarketSmith {
     skipped: number
     /** Symbols whose fetch failed: each keeps its last fetch. */
     failed: number
-    /** The fetch's dated snapshot, as a dossier names it: IN:2026-10-31. */
+    /** The fetch's dated snapshot of the whole store, as a dossier names it: IN:2026-10-31. */
     snapshot: string | null
     error: string | null
+    /** full: every symbol of the universe; latest: only `chosen`'s. */
+    mode: 'full' | 'latest' | null
+    /** A latest fetch's symbols, by why each was chosen; null for a full one. */
+    chosen: { results: number; new: number; stale: number } | null
+    /** How a latest fetch's results calendar went; null for a full one. */
+    calendar: { status: 'fetched' | 'partial' | 'failed'; why: string | null } | null
+    /** Symbols of the last fetch whose files weren't whole, so fetched again. */
+    left_out: number
+    /** The store's backups after the fetch: those kept, and each removed with why (not whole, or a later one of its month kept). */
+    backups: { kept: string[]; removed: { id: string; why: string }[] } | null
   }[]
 }
 
@@ -1260,11 +1270,11 @@ export interface PdPaperBooks {
  * on PATH, else the one in ash_new's own environment, so a `pd` put first on PATH (the tests'
  * stand-in) wins. The SEC's User-Agent contact from the env file goes with it as PDASH_SEC_CONTACT.
  */
-export function runPd(args: string[], { cwd, timeoutMs }: { cwd: string; timeoutMs: number }): Promise<ProcessResult> {
+export function runPd(args: string[], { cwd, timeoutMs, echo }: { cwd: string; timeoutMs: number; echo?: Echo }): Promise<ProcessResult> {
   const pathKey = Object.keys(process.env).find((key) => key.toUpperCase() === 'PATH') ?? 'PATH'
   const scripts = join(ashNewFolder(), '.venv', process.platform === 'win32' ? 'Scripts' : 'bin')
   const contact = secContact()
-  return runProcess('pd', args, { cwd, timeoutMs, env: { [pathKey]: [process.env[pathKey], scripts].filter(Boolean).join(delimiter), ...(contact ? { PDASH_SEC_CONTACT: contact } : {}) } })
+  return runProcess('pd', args, { cwd, timeoutMs, echo, env: { [pathKey]: [process.env[pathKey], scripts].filter(Boolean).join(delimiter), ...(contact ? { PDASH_SEC_CONTACT: contact } : {}) } })
 }
 
 /**

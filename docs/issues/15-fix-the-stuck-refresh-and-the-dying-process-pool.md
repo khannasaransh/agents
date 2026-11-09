@@ -6,7 +6,7 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
 - [x] The cause of the 16 Oct refresh's `BrokenProcessPool: A process in the process pool was terminated abruptly` is found, written up, and fixed. Where it can be reproduced, a test reproduces it.
 - [x] A `pd` command clears a refresh job marked running whose process no longer exists. It marks the job failed with a reason, frees the refresh lock, and writes its result as JSON. While the job's process is alive, it refuses.

@@ -1,0 +1,4 @@
+{"case":"lake-status-retry","first":1,"retry":0,"statusExists":false,"calls":[["clear-refresh"],["daily"],["status"]]}
+{"case":"health-worker-override","exit":0,"requested":"codex","claudeCalls":1,"codexCalls":0}
+{"case":"stale-health-status","briefExit":0,"latestLakeCorrections":0,"staleCorrectionRendered":true}
+{"case":"proposal-failure-diagnosis","diagnosisVisible":false,"proposalErrorVisible":false,"incorrectlySaysNoDiagnosis":true}

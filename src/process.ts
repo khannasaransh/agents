@@ -15,6 +15,12 @@ export interface ProcessResult {
   timedOut: boolean
 }
 
+/** Which of a command's outputs are also written to this process's own, as they arrive. */
+export interface Echo {
+  stdout?: boolean
+  stderr?: boolean
+}
+
 /** How long a timed-out process gets to stop what it started before everything left is killed. */
 const graceMs = 5000
 /** How long after a command exits its output may stay open before, on Windows, what it left running is looked for. */
@@ -25,12 +31,13 @@ const leftOpenMs = 200
  * `timeoutMs` passes, it asks the command and everything it started to stop, then kills whatever
  * is left a few seconds later. Whatever the command started is killed as soon as the command
  * exits, timed out or not. Rejects only when the command can't start. An `env` value of undefined
- * removes that variable.
+ * removes that variable. What `echo` names is also written to this process's own output as it
+ * arrives, so a Step's log has it even when the Step dies before the command ends.
  */
 export function runProcess(
   command: string,
   args: string[],
-  { cwd, env = {}, stdin = '', timeoutMs }: { cwd: string; env?: Record<string, string | undefined>; stdin?: string; timeoutMs: number },
+  { cwd, env = {}, stdin = '', timeoutMs, echo = {} }: { cwd: string; env?: Record<string, string | undefined>; stdin?: string; timeoutMs: number; echo?: Echo },
 ): Promise<ProcessResult> {
   return new Promise((resolve, reject) => {
     const fullEnv = { ...process.env, ...env }
@@ -75,8 +82,14 @@ export function runProcess(
       record.ended()
       resolve({ code, stdout, stderr, timedOut })
     }
-    child.stdout.on('data', (d) => (stdout += d))
-    child.stderr.on('data', (d) => (stderr += d))
+    child.stdout.on('data', (d) => {
+      stdout += d
+      if (echo.stdout) process.stdout.write(d)
+    })
+    child.stderr.on('data', (d) => {
+      stderr += d
+      if (echo.stderr) process.stderr.write(d)
+    })
     // A command that exits without reading its input closes the pipe; how it ended says why.
     child.stdin.on('error', () => {})
     child.stdin.end(stdin)

@@ -100,7 +100,6 @@ await runAsStep(async ({ runId, runFolder }) => {
     stages: read(inputFiles.stages),
     health: healthOf(read<HealthResult>(inputFiles.health)),
     review,
-    dossiers: null,
     desk: deskOf(read<DeskResult>('desk.json')),
     journal,
     lessons,

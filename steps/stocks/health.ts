@@ -1,8 +1,11 @@
-// Health: when the Lake Step failed or the Lake isn't healthy, runs the read-only Health Agent in
-// ash_new's folder to work out why, and records its diagnosis, the fix it proposes (never applied)
-// and the evidence it read as health.json in the Run folder, for the Brief. The Lake isn't healthy
-// when its status couldn't be read, the Data gate failed, or the Health report isn't ok or flags
-// anything. A healthy Lake skips the Step. A Health Agent that fails on both Workers is recorded as
+// Health: when the Lake Step failed or the Lake isn't healthy, or this Run's MarketSmith fetch went
+// wrong, runs the read-only Health Agent in ash_new's folder to work out why, and records its
+// diagnosis, the fix it proposes (never applied) and the evidence it read as health.json in the Run
+// folder, for the Brief. The Lake isn't healthy when its status couldn't be read, the Data gate
+// failed, or the Health report isn't ok or flags anything. The fetch went wrong when a region's fetch
+// failed, a results calendar couldn't be read, or a fetch or a backup wasn't whole
+// (marketsmithProblems): ash_new keeps neither, and the Agent checks what was kept. Otherwise the
+// Step skips itself. A Health Agent that fails on both Workers is recorded as
 // failed, and fails the Step.
 // The Corrections the Agent proposes are recorded in ash_new with `pd corrections propose`, where
 // they wait for Saransh's approval (a dry run records none). Failing to record them is recorded too,
@@ -14,7 +17,8 @@ import { join } from 'node:path'
 import { loadAgent } from '../../src/agent.ts'
 import { ashNewFolder } from '../../src/env.ts'
 import { readJson, writeJson } from '../../src/files.ts'
-import { pdJson, type CorrectionChange, type PdCorrectionsPropose, type PdStatus } from '../../src/pd.ts'
+import { pdJson, type CorrectionChange, type PdCorrectionsPropose, type PdMarketSmith, type PdStatus } from '../../src/pd.ts'
+import { marketsmithProblems } from '../../src/marketsmith.ts'
 import { readRun, type RunRecord } from '../../src/run.ts'
 import { runAsStep, StepSkipped } from '../../src/step.ts'
 import type { AdversaryResult, WithAdversary } from '../../src/adversary.ts'
@@ -90,14 +94,15 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   const read = <T>(file: string) => (existsSync(join(runFolder, file)) ? readJson<T>(join(runFolder, file)) : null)
   const lakeStep = run.steps.find((s) => s.name === 'lake')
   const status = read<PdStatus>(join('lake', 'status.json'))
-  const why = reasons(lakeStep, status)
+  const marketsmith = read<PdMarketSmith>('marketsmith.json')
+  const why = [...reasons(lakeStep, status), ...marketsmithProblems(marketsmith)]
   if (!why.length) {
     // A diagnosis an earlier run of this Step made is about a Lake that has since been refreshed.
     rmSync(out, { force: true })
-    throw new StepSkipped('The Lake is healthy: the Lake Step succeeded, the Data gate passed and the Health report flags nothing')
+    throw new StepSkipped('The Lake is healthy: the Lake Step succeeded, the Data gate passed, the Health report flags nothing and MarketSmith\'s fetch, if any, went well')
   }
 
-  const inputs = { why, lake: read<LakeResult>('lake.json'), lakeLog: tail(join(runFolder, lakeStep?.log ?? join('logs', 'lake.log')), logLines), status }
+  const inputs = { why, lake: read<LakeResult>('lake.json'), lakeLog: tail(join(runFolder, lakeStep?.log ?? join('logs', 'lake.log')), logLines), status, marketsmith }
   // What it was given, so a re-run diagnoses again once the Lake Step has been re-run.
   const fingerprint = createHash('sha256').update(JSON.stringify(inputs)).digest('hex')
   const earlier = read<HealthResult>('health.json')

@@ -6,7 +6,7 @@
 
 **Blocked by:** 32: Rule plan for the paper Books
 
-**Status:** done, but for fills on the real Lake: no strategy is in Paper there yet, and the Lake has no prices for the Books' ETFs (see issue 47's "On the real Lake")
+**Status:** done, but for the first fills on the real Lake, which the next daily chains make (see "On the real Lake")
 
 - [x] Each Book has two paper portfolios in ash_new, fed by Order lists:
   - its paper Book, which trades the final Order list;
@@ -55,6 +55,15 @@
 - **The Brief:** after each paper Book's plan, its rules-only paper Book's (one line while it makes the same orders), then the Order lists the Check Step recorded (or why none was), then a Paper Books section: each Book's paper Book against its rules-only one, its drawdown against its breakers, its Sleeves and Stages, its riskiest Disaster stops, and the Books together in rupees. A paper Book's state shows its last close filled, the orders waiting and its Disaster stops. The Brief's `render` now takes its inputs as one object (issue 32's review noted its 12 parameters).
 - **The contract:** `contract/check.schema.json` and `contract/paper-books.schema.json` are new; `plan.schema.json` adds `kind: rules_only` and `engine`; `book-state.schema.json` adds `rules_only`, `as_of` and `engine`. The stand-in `pd` has `check.recorded.json`, `check.dry-run.json`, `paper-books.json` and `book-state.rules-only.json`, and each plan example now has the rules-only plans.
 - **On issue 30's copy of the Lake, 27 October 2026** (with a copy of the app database): the Data gate fails (no Health report, the copy three sessions behind), so every plan is in Hold mode and `pd check` records nothing, each paper Book waiting for its first plan outside Hold mode; Hong Kong has no panels there. `pd paper-books` gives each Book its capital in cash, ₹2.25 crore together at the copy's rates.
+- **On the real Lake, 4 November 2026 (Run `2026-11-04-1930`):** `pd check` started all six paper Books and recorded their first Order lists:
+
+  | Book | Session | Paper Book's orders | Rules-only paper Book's | Capital |
+  |---|---|---|---|---|
+  | India | 5 November | 1: 8,472 `IN:GOLD1` | the same | ₹1,00,00,000 |
+  | US | 4 November | 18: 17 of stocks and 29 `US:GLD` | 19: 18 of stocks and gold | $105,000 |
+  | Hong Kong | 5 November | 1: 8 `US:GLD` | the same | HK$247,000 |
+
+  The US's two differ by the Portfolio Manager's changes (issue 34). `pd paper-books` gives ₹2.29 crore together. Nothing has filled yet: the US's list fills in the next daily chain after its session, and India's and Hong Kong's in the one after theirs. Until then each value is its capital.
 - **ash_new's web app:** the Data page names the new daily chain step ("Paper Books"); its API types are regenerated.
 - **Tests:**
   - **ash_new:** `tests/test_paper_fill.py` (the engine: fills at the open, sales before buys and a buy cut to its Sleeve's cash, a buy over its limit, a Disaster stop hit on paper, a session without a list, no bar, the plan's money moved); `tests/test_paper_books.py` (recording each paper Book's list and its rules-only one's, a second list superseding the first with no order twice, a stale state not recorded, a dry run, each paper Book filling from its own list at the next open, fills waiting for a passing Health report, the next plan running on from the filled state, and `pd paper-books`). The fixture lake moved to `tests/plan_lake.py`.
@@ -66,6 +75,6 @@
   - Left as judgement calls: near-duplicate code (summing Sleeves' holdings, reading a paper Book's state, the unfilled lists), the plan kinds as strings beside `PaperBookKind`, the many `fill` names, `OrderState.PROPOSED` and `SKIPPED` unused until issue 42, and superseded orders keeping their ids beside the new ones (only placed orders fill).
   - **Not fixed, for you to weigh:** outside the daily chain (`pd paper-fill`, or a refresh without its checks), fills read the latest Health report on disk, which may be older than the prices being filled.
 - **Not done:**
-  - The Portfolio Manager's changes, and the final check of the whole Book, are issue 34's: until then the paper Book and its rules-only paper Book trade the same plans, so their gap is nothing.
+  - **The first fills** (above). The tests fill on the fixture Lake; no order has filled on the real one.
   - New money for a paper Book comes only at a weighting, as in the Book backtest; money Saransh adds between weightings isn't modelled.
   - A strategy promoted into Paper after a paper Book has started gets money only at the next April's weighting, as the Book engine shares money out.

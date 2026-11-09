@@ -159,6 +159,8 @@ export interface PdAnswer {
   stdout?: string
   stderr?: string
   exitCode?: number
+  /** It writes its output, then keeps running until it is killed, as a refresh that never ends. */
+  hang?: boolean
 }
 
 /** A call the stand-in `pd` received, with the PDASH_ settings in its environment. */
@@ -658,6 +660,7 @@ const answer = given === undefined
 process.stdout.write(answer.example ? readFileSync(join(${JSON.stringify(pdExamples)}, answer.example), 'utf8') : answer.stdout ?? '')
 process.stderr.write(answer.stderr ?? '')
 process.exitCode = answer.exitCode ?? 0
+if (answer.hang) setTimeout(() => {}, 60_000)
 `,
   )
 }

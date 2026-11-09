@@ -4,10 +4,14 @@
 
 **Blocked by:** 03: Real Workers: Codex and Claude Code
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] An Antigravity Worker runs an Agent through print mode with JSON output and its schema option.
-- [ ] Its timeout is enforced by ending the process, since its print mode can report success while a command it started is still running.
-- [ ] Skills reach it as prompt text; its permissions are mapped to its sandbox and allowlist, noting that print mode currently ignores the allowlist.
-- [ ] Config validation rejects Antigravity as an Agent's main Worker and accepts it as a fallback.
-- [ ] Command-line tests cover the Antigravity Worker.
+- [x] An Antigravity Worker runs an Agent through print mode with JSON output and its schema option.
+- [x] Its timeout is enforced by ending the process, since its print mode can report success while a command it started is still running.
+- [x] Skills reach it as prompt text; its permissions are mapped to its sandbox and allowlist, noting that print mode currently ignores the allowlist.
+- [x] Config validation rejects Antigravity as an Agent's main Worker and accepts it as a fallback.
+- [x] Command-line tests cover the Antigravity Worker.
+
+**Notes:**
+
+- **Checked on 4 November 2026** against the code and its tests, after this issue's status had gone stale: `test/workers.test.ts` and `test/review.test.ts` cover the Worker, its timeout and its fallback. `src/agent.ts` rejects Antigravity as a main Worker and as an adversary.

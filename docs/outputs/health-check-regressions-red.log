@@ -1,0 +1,102 @@
+✖ Health respects the worker selected for the Run (1283.3757ms)
+✖ a healthy Lake rerun drops the earlier post-proposal status from its brief (1097.3986ms)
+✖ retrying a status failure reads status again without refreshing an already refreshed Lake (1641.6717ms)
+✖ the Portfolio Manager respects the worker selected for the Run (1302.9976ms)
+✖ what became of the Corrections the Health Agent proposed is said under its diagnosis (1356.0443ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 0
+ℹ fail 5
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2642.9157
+
+✖ failing tests:
+
+test at test\health.test.ts:63:1
+✖ Health respects the worker selected for the Run (1283.3757ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Saransh/agents/test/health.test.ts:69:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\health.test.ts:72:1
+✖ a healthy Lake rerun drops the earlier post-proposal status from its brief (1097.3986ms)
+  AssertionError [ERR_ASSERTION]: The expression evaluated to a falsy value:
+  
+    assert.ok(!ws.readRunFile(runId, 'brief.html').includes('STALE_CORRECTION_MARKER'))
+  
+      at TestContext.<anonymous> (file:///D:/Saransh/agents/test/health.test.ts:79:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+
+test at test\lake.test.ts:22:1
+✖ retrying a status failure reads status again without refreshing an already refreshed Lake (1641.6717ms)
+  Error: ENOENT: no such file or directory, open 'C:\Users\khann\AppData\Local\Temp\agents-test-oZeEM8\data\runs\2026-10-27-0930\lake\status.json'
+      at readFileSync (node:fs:624:20)
+      at Object.readRunFile (file:///D:/Saransh/agents/test/helpers.ts:546:14)
+      at TestContext.<anonymous> (file:///D:/Saransh/agents/test/lake.test.ts:27:34)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    errno: -4058,
+    code: 'ENOENT',
+    syscall: 'open',
+    path: 'C:\\Users\\khann\\AppData\\Local\\Temp\\agents-test-oZeEM8\\data\\runs\\2026-10-27-0930\\lake\\status.json'
+  }
+
+test at test\portfolio-manager.test.ts:14:1
+✖ the Portfolio Manager respects the worker selected for the Run (1302.9976ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  1 !== 0
+  
+      at TestContext.<anonymous> (file:///D:/Saransh/agents/test/portfolio-manager.test.ts:20:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: 1,
+    expected: 0,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\stocks-brief.test.ts:161:1
+✖ what became of the Corrections the Health Agent proposed is said under its diagnosis (1356.0443ms)
+  AssertionError [ERR_ASSERTION]: The input did not match the regular expression /It proposed 1 Correction, but they couldn't be recorded in ash_new: pd corrections propose exited with 1: no database/. Input:
+  
+  " Stocks Brief 2026-10-27-0930 Data gate: pass. India's and the US's data are as of their last finished sessions, and the Health report fails neither. Health Agent The Health Agent failed before it recorded a diagnosis. See its log: logs/health.log To-dos Nothing is waiting on you. Corrections waiting for your approval: 1 Nothing is applied until you approve it. Approve or reject each, then Save answers: the next Run records your Answers in ash_new before it refreshes the Lake. An approved Correction joins the Corrections file and that refresh applies it, running again the backtests it affects; a rejected one is dropped. Id Security Correction What it would change Why Proposed by Your Answer 7 IN:BHAGYAPROP Bhagyanagar India <Ltd> No dividend on 2025-03-12 The dividend on 2025-03-12 dropped: the total-return index's move that day goes from +122.4% to -0.1% A 12.00 dividend on a 9.80 close: BSE's corporate actions list no dividend that year, so Yahoo's is a <mistake> the Health Agent, Run 2026-10-26-0930 2026-10-26 01:52 UTC Approve Reject Quarantine: 5 securities A security the Health report flagged is held out of every Book, neither bought nor sold on a signal while its Disaster stop stays, until its Correction is approved or you dismiss its flag as a false alarm: Dismiss it, then Save answers. Hong Kong: 1 security Id Security Name Flag Date Detail Since Your Answer 5 HK:0083 stale 2026-10-16 6 sessions behind 2026-10-27 Dismiss India: 3 securities Id Security Name Flag Date Detail Since Your Answer 4 IN:BHAGYAPROP Bhagyanagar India <Ltd> dividend 2025-03-12 A dividend of 12.00 on a close of 9.80 2026-10-27 Dismiss 1 IN:DBEIL Deepak Builders & Engineers India Ltd cross_source 2026-08-18 MarketSmith closed at 178.08, Yahoo at 6.68 (+2565.9%) 2026-10-27 Dismiss 2 IN:MBECL Mcnally Bharat Engr.Co cross_source 2026-08-27 MarketSmith closed at 3.27, Yahoo at 65.40 (-95.0%) 2026-10-27 Dismiss United States: 1 security Id Security Name Flag Date Detail Since Your Answer 3 US:NFE New Fortress Energy Inc jump 2026-10-22 Rose 46.2% in a day with no split recorded 2026-10-27 Dismiss Markets Market Latest session in the Lake Last finished session India 2026-10-26 2026-10-26 Up to date United States 2026-10-26 2026-10-26 Up to date Hong Kong 2026-10-23 2026-10-27 1 session behind (not gated) The Lake Refreshed with pd daily on the first try. The last refresh, job 481, succeeded at 2026-10-27 01:40 UTC. Health report of 2026-10-27: ok Market Verdict Data as of Flags Problems India ok 2026-10-26 cross_source 2, dividend 1 United States ok 2026-10-26 jump 1 Hong Kong warn 2026-10-23 stale 1 The data is 1 session behind its last finished session, 2026-10-27 India: 3 flags Security Name Check Date Detail IN:DBEIL Deepak Builders & Engineers India Ltd cross_source 2026-08-18 MarketSmith closed at 178.08, Yahoo at 6.68 (+2565.9%) IN:MBECL Mcnally Bharat Engr.Co cross_source 2026-08-27 MarketSmith closed at 3.27, Yahoo at 65.40 (-95.0%) IN:BHAGYAPROP Bhagyanagar India <Ltd> dividend 2025-03-12 A dividend of 12.00 on a close of 9.80 United States: 1 flag Security Name Check Date Detail US:NFE New Fortress Energy Inc jump 2026-10-22 Rose 46.2% in a day with no split recorded Hong Kong: 1 flag Security Name Check Date Detail HK:0083 stale 2026-10-16 6 sessions behind Run health Run 2026-10-27-0930 of the stocks Pipeline. health: failed. Log: logs/health.log No Answer chosen yet. Save answers "
+  
+      at TestContext.<anonymous> (file:///D:/Saransh/agents/test/stocks-brief.test.ts:175:10)
+      at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: " Stocks Brief 2026-10-27-0930 Data gate: pass. India's and the US's data are as of their last finished sessions, and the Health report fails neither. Health Agent The Health Agent failed before it recorded a diagnosis. See its log: logs/health.log To-dos Nothing is waiting on you. Corrections waiting for your approval: 1 Nothing is applied until you approve it. Approve or reject each, then Save answers: the next Run records your Answers in ash_new before it refreshes the Lake. An approved Correction joins the Corrections file and that refresh applies it, running again the backtests it affects; a rejected one is dropped. Id Security Correction What it would change Why Proposed by Your Answer 7 IN:BHAGYAPROP Bhagyanagar India <Ltd> No dividend on 2025-03-12 The dividend on 2025-03-12 dropped: the total-return index's move that day goes from +122.4% to -0.1% A 12.00 dividend on a 9.80 close: BSE's corporate actions list no dividend that year, so Yahoo's is a <mistake> the Health Agent, Run 2026-10-26-0930 2026-10-26 01:52 UTC Approve Reject Quarantine: 5 securities A security the Health report flagged is held out of every Book, neither bought nor sold on a signal while its Disaster stop stays, until its Correction is approved or you dismiss its flag as a false alarm: Dismiss it, then Save answers. Hong Kong: 1 security Id Security Name Flag Date Detail Since Your Answer 5 HK:0083 stale 2026-10-16 6 sessions behind 2026-10-27 Dismiss India: 3 securities Id Security Name Flag Date Detail Since Your Answer 4 IN:BHAGYAPROP Bhagyanagar India <Ltd> dividend 2025-03-12 A dividend of 12.00 on a close of 9.80 2026-10-27 Dismiss 1 IN:DBEIL Deepak Builders & Engineers India Ltd cross_source 2026-08-18 MarketSmith closed at 178.08, Yahoo at 6.68 (+2565.9%) 2026-10-27 Dismiss 2 IN:MBECL Mcnally Bharat Engr.Co cross_source 2026-08-27 MarketSmith closed at 3.27, Yahoo at 65.40 (-95.0%) 2026-10-27 Dismiss United States: 1 security Id Security Name Flag Date Detail Since Your Answer 3 US:NFE New Fortress Energy Inc jump 2026-10-22 Rose 46.2% in a day with no split recorded 2026-10-27 Dismiss Markets Market Latest session in the Lake Last finished session India 2026-10-26 2026-10-26 Up to date United States 2026-10-26 2026-10-26 Up to date Hong Kong 2026-10-23 2026-10-27 1 session behind (not gated) The Lake Refreshed with pd daily on the first try. The last refresh, job 481, succeeded at 2026-10-27 01:40 UTC. Health report of 2026-10-27: ok Market Verdict Data as of Flags Problems India ok 2026-10-26 cross_source 2, dividend 1 United States ok 2026-10-26 jump 1 Hong Kong warn 2026-10-23 stale 1 The data is 1 session behind its last finished session, 2026-10-27 India: 3 flags Security Name Check Date Detail IN:DBEIL Deepak Builders & Engineers India Ltd cross_source 2026-08-18 MarketSmith closed at 178.08, Yahoo at 6.68 (+2565.9%) IN:MBECL Mcnally Bharat Engr.Co cross_source 2026-08-27 MarketSmith closed at 3.27, Yahoo at 65.40 (-95.0%) IN:BHAGYAPROP Bhagyanagar India <Ltd> dividend 2025-03-12 A dividend of 12.00 on a close of 9.80 United States: 1 flag Security Name Check Date Detail US:NFE New Fortress Energy Inc jump 2026-10-22 Rose 46.2% in a day with no split recorded Hong Kong: 1 flag Security Name Check Date Detail HK:0083 stale 2026-10-16 6 sessions behind Run health Run 2026-10-27-0930 of the stocks Pipeline. health: failed. Log: logs/health.log No Answer chosen yet. Save answers ",
+    expected: /It proposed 1 Correction, but they couldn't be recorded in ash_new: pd corrections propose exited with 1: no database/,
+    operator: 'match',
+    diff: 'simple'
+  }

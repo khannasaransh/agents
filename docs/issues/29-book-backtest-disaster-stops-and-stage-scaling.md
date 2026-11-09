@@ -6,7 +6,7 @@
 
 **Blocked by:** 27: Book backtest: Sleeves, gold and the cash fund
 
-**Status:** done, but for a run on the real Lake, which still has no prices for the Books' ETFs (see issue 27's "Not run on the real Lake")
+**Status:** done
 
 - [x] Every new position gets a Disaster stop at twice its strategy's stop distance, or 15% below entry where the strategy has no stop.
 - [x] Each week's last session raises the stop to the same distance below that session's close. A stop is never lowered.
@@ -42,7 +42,16 @@
 - **`BOOK_ENGINE_VERSION` is 3.** The caveats now say how the stops are tested and that Stages are held over the range; only the exposure level (issue 46) is still missing.
 - **The breakers' tests run without Disaster stops.** Their stocks fall 30%, which would sell them at the 15% stop before the breakers act.
 - **The stand-in `pd`'s example** (`test/pd/book-backtest.india.json`) is regenerated from the fixture run, with the Stages and `rules.disaster_stops`.
-- **Not run on the real Lake,** for the reason issues 27 and 28 give: it still has no prices for the Books' ETFs.
+- **On the real Lake, 4 November 2026** (the paper Books of issue 27's table), each against the same Book without it, in points of CAGR and of max drawdown:
+
+  | | India | US | Hong Kong |
+  |---|---|---|---|
+  | Disaster stops sold | 54, 7 gapped through | 58, 17 gapped | 6, 1 gapped |
+  | Their effect | −7.1 / +4.5 | +2.6 / +4.1 | −2.0 / −0.9 |
+  | The exposure level's effect (issue 46) | −1.1 / +0.9 | +0.9 / +3.2 | −7.3 / +1.9 |
+
+  **For Saransh:** India's stops cost the most, 7.1 points of CAGR for a fall 4.5 points shallower, and Hong Kong's cost return and don't make its fall shallower. The Mandate is unchanged.
+- **Stage scaling on the real Lake:** India with `in-cw2-selected:real-small` and `in-super30-ok-tuned:paper` weighs them at 11.2% (a quarter of its 44.8%) and 0%, beside gold's 10%: 7.7% a year with a −1.8% max drawdown, nearly all of it in the cash fund.
 - **Known limits, small enough to leave:**
   - A stop fills at exactly its price when the low reaches it. In a fast fall a real stop order can fill lower. Only the preset's slippage is paid.
   - A daily bar can't say when in the session the low came. A position bought at the open and stopped the same day is assumed bought first, as the open comes first.

@@ -6,9 +6,7 @@
 
 **Blocked by:** 37: India Feeds and the dossiers
 
-**Waiting on Saransh:** the contact for the SEC's required User-Agent.
-
-**Status:** done, but for EDGAR on the real endpoints: it waits on the contact for the SEC's User-Agent (see "Not done")
+**Status:** done
 
 - [x] `pd feeds` fetches SEC EDGAR filings (8-K, 10-Q, 10-K, Form 4) for the US names.
   - It sends the User-Agent contact Saransh sets. The agents repo's env file passes it to `pd`, and it isn't filled in by default.
@@ -34,5 +32,4 @@
   - **What they cover:** EDGAR's forms filed since a day, their titles, kinds and links; Yahoo's earnings date and a range; the contact sent as the User-Agent to the tickers and the submissions; the skip without it, even with every name fetched lately; the contact read from the environment; and the pacer's interval.
   - **agents:** the To-do, and the contact passed to `pd` (`test/feeds.test.ts`).
 - **On real data, 30 October 2026:** Yahoo gave AAPL's 3 November earnings date, and EDGAR skipped itself, the contact not being set.
-- **Not done:**
-  - **EDGAR on the real endpoints:** never fetched, waiting on the contact (**for Saransh**: set `SEC_CONTACT`). Its parser follows the SEC's documented shape. Check the first Run's `feeds.json` after setting it.
+- **On the real endpoints, 4 November 2026 (Run `2026-11-04-1930`):** with `SEC_CONTACT` set, EDGAR fetched all 17 US names on the review list: 187 new events, 49 filings and 138 Form 4s, each with its form, an 8-K's items and a link to the filing. Yahoo fetched the same 17 and gave 12 earnings dates. The dossiers carry both. So the parser holds on the SEC's real responses, though the test fixtures are still written from its documented shapes.

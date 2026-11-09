@@ -329,9 +329,12 @@ export function bookAmounts(plan: PdPlan | null, states: { states: PdBookState[]
   return found
 }
 
-/** The amounts of Saransh's Books a search query carries: each number in it, but a year, that is one of `amounts`. */
+/** The SEC's form names a search may carry: their digits are no amount. */
+const secForms = /\b(?:8-K|10-K|10-Q|13[DFG]|Form\s+\d+)\b/gi
+
+/** The amounts of Saransh's Books a search query carries: each number in it, but a year or an SEC form's name, that is one of `amounts`. */
 export function amountsIn(query: string, amounts: Set<string>): string[] {
-  const numbers = query.match(/\d[\d,]*(\.\d+)?/g) ?? []
+  const numbers = query.replace(secForms, '').match(/\d[\d,]*(\.\d+)?/g) ?? []
   return numbers.filter((n) => {
     const value = Number(n.replaceAll(',', ''))
     const year = Number.isInteger(value) && value >= 1990 && value <= 2100

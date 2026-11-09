@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { afterEach, test } from 'node:test'
+import { amountsIn } from '../src/desk.ts'
 import { makeWorkspace, pdExamples, type Workspace, type WorkerCliCall } from './helpers.ts'
 
 let ws: Workspace
@@ -258,6 +259,13 @@ test("an analyst that fails on both Workers fails the Step, and the buys it had 
   assert.deepEqual(kept.refused.map((r: any) => [r.analyst, r.security_id, r.why]), [['events', 'IN:RATEGAIN', 'It cites the web without the link of its source']])
   assert.deepEqual(kept.views.map((v: any) => v.analyst), ['risk', 'risk'])
   assert.match(log(), /The Chart analyst failed, so the buys it had to review wait a session/)
+})
+
+test("an SEC form's name in a search isn't an amount, but the same number beside it is", () => {
+  const amounts = new Set(['8', '10', '13', '4'])
+  assert.deepEqual(amountsIn('PTC merger agreement 8-K', amounts), [])
+  assert.deepEqual(amountsIn('Visa 10-Q 10-K Form 4 13F', amounts), [])
+  assert.deepEqual(amountsIn('PTC 8-K 8 shares', amounts), ['8'])
 })
 
 test("an analyst's inputs carry none of the Books' shares or amounts, and a web search that does raises a To-do", async () => {

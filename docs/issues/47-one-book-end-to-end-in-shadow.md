@@ -6,7 +6,7 @@
 
 **Blocked by:** 23: Broker inbox: ICICI Direct into the India real Book, with Reconciliation; 25: CW2's selected variant and the ash ports; 27: Book backtest: Sleeves, gold and the cash fund
 
-**Status:** done, but for a plan on the real Lake, which still has no prices for the Books' ETFs (see "On the real Lake")
+**Status:** done. Issue 42's real plans have since replaced the shadow plan
 
 - [x] `pd book-state` writes a Book's state as JSON, with a JSON Schema and an id:
   - its holdings and cash, replayed from its ledger;
@@ -50,7 +50,7 @@
 - **The Brief** shows each plan as "India Book in shadow: its Rule plan for …, not for placing", after the real Books: the state (its cash and where it comes from, its Legacy holdings, what is unsettled), what the plan was made from, the Sleeves' shares, each order with its signal and cut and "Not for placing" in its row, the orders stopped by a rule, the Disaster stops and the Legacy holdings. A plan ash_new couldn't make says why.
 - **The stand-in `pd`** has `book-state.india.json`, `plan.shadow.json` (both from the fixture run, renamed to real securities) and `plan.cant-plan.json`.
 - **On the real Lake, 29 October 2026:** `pd book-state IN` gives the India Book's state: no ledger recorded on this machine yet, so ₹10 lakh in cash (`08c1ddde44df`). `pd plan` says it can't plan: the Lake still has no price for `IN:GOLD1` (issue 27's "Not run on the real Lake"). On issue 30's copy of the Lake, which has the ETFs' prices, it plans 26 October: CW2's selected variant holds nothing (its market-trend filter sold everything on 12 October), so the plan is gold's 10%, 852 shares of `IN:GOLD1` at a limit of ₹120.45.
+- **On the real Lake, 4 November 2026 (Run `2026-11-04-1930`):** `pd plan` makes each real Book's plan (issue 42 replaced the shadow plan with these, and `shadow_strategy` is gone). `pd book-state IN` gives ₹1 crore in cash with nothing in its ledger (`375a3efb5cbb`). Both strategies are at Paper and hold nothing in the real Book, so the plan is gold's 10%: 8,472 shares of `IN:GOLD1` at ₹117.65, with a limit of ₹121.18. `pd check` records no real list until a strategy is Real-small or Real-full (issue 42), so it is not for placing yet.
 - **For Saransh:** the real Book's cash is its capital with its ledger's money, a stand-in until a cash balance is recorded. Set each Book's capital (`config/books.yaml`) to the money that is the Book's.
 - **Not done:**
-  - The real US and Hong Kong Books have no shadow plan: only the India Book names a `shadow_strategy`.
   - A limit price is the last close plus the tolerance to four decimals, not rounded to the market's tick.

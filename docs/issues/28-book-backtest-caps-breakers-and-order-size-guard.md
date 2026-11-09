@@ -6,7 +6,7 @@
 
 **Blocked by:** 27: Book backtest: Sleeves, gold and the cash fund
 
-**Status:** done in ash_new, but for a run on the real Lake, which still has no prices for the Books' ETFs (see issue 27's "Not run on the real Lake")
+**Status:** done
 
 **Waiting on Saransh:** nothing. He set each Book's limit tolerance at 3% above the last close on 31 October 2026.
 
@@ -55,6 +55,17 @@
   The breakers are switched off together. The holdout is run with every rule but isn't broken down. On the fixture Lake, two Sleeves of two stocks each, the position cap acted 38 times. It cost 4.6 points of CAGR and made the max drawdown 1.3 points shallower. A Book backtest runs seven Book simulations: the Book, once without each rule, and the holdout. On the fixture Lake it takes about 3 seconds.
 - **`BOOK_ENGINE_VERSION` is 2.** The result's caveats now name what isn't in it yet (the exposure level, Disaster stops, Stage scaling), the tolerance's placeholder, the Sleeves' order for the caps' room, cut buys not bought later, and today's sectors.
 - **The stand-in `pd`'s example** (`test/pd/book-backtest.india.json`) is regenerated from the fixture run, with `rules`.
+- **On the real Lake, 4 November 2026** (the paper Books of issue 27's table). How often each rule acted, and its effect on the Book's CAGR and max drawdown in points, against the same Book run without it. Above 0, it added return or made the fall shallower:
+
+  | Rule | India | US | Hong Kong |
+  |---|---|---|---|
+  | Breakers | 5 events, −0.7 / +1.0 | 6, +1.4 / +8.5 | 6, −3.3 / +7.3 |
+  | Position cap | 0, none | 2, −0.0 / 0 | 1, 0 / 0 |
+  | Sector cap | 8, −0.1 / 0 | 32, +0.6 / +0.8 | 3, +0.0 / −0.1 |
+  | Order-size guard | 183, −3.2 / −0.7 | 0, none | 0, none |
+  | Limit price | 13, +1.9 / −2.1 | 7, +0.2 / −0.0 | 9, −1.2 / +0.6 |
+
+  **For Saransh:** at India's ₹1 crore, the order-size guard costs 3.2 points of CAGR a year and leaves the fall a little deeper. The other Books never meet it.
 - **Known limits, small enough to leave:**
   - Sharing the caps' room by the Sleeves' order rather than pro rata favours the first named strategy when two want the same stock or sector.
   - The selling-down while halved trims a little every session the stocks rise above half the Book, paying costs each time. A band would trade less, but the Mandate gives no number for one.

@@ -37,10 +37,9 @@ const refreshMs = Number(process.env.AGENTS_LAKE_TIMEOUT_SECONDS ?? 3 * 60 * 60)
 
 async function refresh(runFolder: string): Promise<RefreshAttempt> {
   const startedAt = new Date().toISOString()
-  const { code, stdout, stderr, timedOut } = await runPd(['daily'], { cwd: runFolder, timeoutMs: refreshMs })
-  // pd daily reports as it goes; its output goes to the Step's log, which the Health Agent reads.
-  if (stdout) console.log(stdout.trimEnd())
-  if (stderr) console.error(stderr.trimEnd())
+  // pd daily reports as it goes; its output goes to the Step's log as it comes, which the Health
+  // Agent reads, so a refresh that never ends still leaves how far it got.
+  const { code, timedOut } = await runPd(['daily'], { cwd: runFolder, timeoutMs: refreshMs, echo: { stdout: true, stderr: true } })
   if (timedOut) console.error(`pd daily timed out after ${Math.round(refreshMs / 60_000)} minutes`)
   return { startedAt, endedAt: new Date().toISOString(), exitCode: code, timedOut }
 }

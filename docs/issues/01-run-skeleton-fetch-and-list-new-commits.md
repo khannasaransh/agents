@@ -4,17 +4,21 @@
 
 **Blocked by:** None (can start immediately)
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `agents run daily` creates a Run whose folder name starts with the local date (year-month-day) followed by hour and minute, and runs Fetch then Brief.
-- [ ] `agents step <name> --run <id>` runs one Step inside an existing Run, skips work whose output already exists, and redoes it with `--force`.
-- [ ] Each Run keeps a record of the Pipeline, each Step's status, start and end times and log location; the Run ends as succeeded, partial or failed.
-- [ ] A second Run refuses to start while one is active.
-- [ ] Every Step exits non-zero on failure and reads and writes only the Run folder and state.
-- [ ] The Repo list holds the 29 Repos from the PRD with Team, remote, local folder and production branch, including the skill-up, inshortsapp and flutter_payment exceptions.
-- [ ] Fetch fetches each Repo's production branch and never pulls, checks out, or changes the working tree or current branch.
-- [ ] Fetch never prompts for credentials and times out a hung fetch; a failing Repo is recorded and the others continue, leaving the Run partial.
-- [ ] On a Repo's first Run, Fetch records its current head as the starting point instead of listing history.
-- [ ] The Brief lists, per Team and Repo, the new commits since the last recorded commit, and a Run health section naming failed or skipped Steps.
-- [ ] Run data and state live in a git-ignored data area and are never deleted automatically.
-- [ ] Step tests use Node's built-in test runner against temporary git repos with a local remote, and assert only on files, exit codes and git state.
+- [x] `agents run daily` creates a Run whose folder name starts with the local date (year-month-day) followed by hour and minute, and runs Fetch then Brief.
+- [x] `agents step <name> --run <id>` runs one Step inside an existing Run, skips work whose output already exists, and redoes it with `--force`.
+- [x] Each Run keeps a record of the Pipeline, each Step's status, start and end times and log location; the Run ends as succeeded, partial or failed.
+- [x] A second Run refuses to start while one is active.
+- [x] Every Step exits non-zero on failure and reads and writes only the Run folder and state.
+- [x] The Repo list holds the 29 Repos from the PRD with Team, remote, local folder and production branch, including the skill-up, inshortsapp and flutter_payment exceptions.
+- [x] Fetch fetches each Repo's production branch and never pulls, checks out, or changes the working tree or current branch.
+- [x] Fetch never prompts for credentials and times out a hung fetch; a failing Repo is recorded and the others continue, leaving the Run partial.
+- [x] On a Repo's first Run, Fetch records its current head as the starting point instead of listing history.
+- [x] The Brief lists, per Team and Repo, the new commits since the last recorded commit, and a Run health section naming failed or skipped Steps.
+- [x] Run data and state live in a git-ignored data area and are never deleted automatically.
+- [x] Step tests use Node's built-in test runner against temporary git repos with a local remote, and assert only on files, exit codes and git state.
+
+**Notes:**
+
+- **Checked on 4 November 2026** against the code and its tests, after this issue's status had gone stale: `test/run.test.ts`, `test/step.test.ts`, `test/lock.test.ts` and `test/fetch.test.ts` cover each box. `repos.ts` holds the 29 Repos, with the exceptions' production branches (inshortsapp's is master).

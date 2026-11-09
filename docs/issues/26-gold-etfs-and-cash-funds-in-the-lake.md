@@ -8,12 +8,12 @@
 
 **Blocked by:** 15: Fix the stuck refresh and the dying process pool
 
-**Status:** done, but for the real Lake's first refresh with them
+**Status:** done
 
 **The Hong Kong Book holds the US Book's gold ETF and cash fund** (Saransh, 26 October 2026; issue 48), in dollars: nothing is chosen for Hong Kong. Its backtest values them in Hong Kong dollars at each day's rate (the peg keeps the rate within 7.75–7.85), and its cash fund earns the US's risk-free rate.
 
 - [x] Each Book's gold ETF and cash fund are chosen for the longest clean price history, and the choices are recorded in ash_new's config.
-- [ ] Their prices are in the Lake, and the daily chain refreshes them. The daily chain refreshes them; the real Lake has them once the next `pd daily` runs (see "The real Lake doesn't have them yet").
+- [x] Their prices are in the Lake, and the daily chain refreshes them.
 - [x] A backtest can hold them. In a backtest the cash fund earns the region's risk-free rate, since a liquid ETF's price doesn't show its return.
 - [x] Tests: the instruments are refreshed with the rest, and a backtest holding the cash fund earns the risk-free rate.
 
@@ -46,7 +46,16 @@
   - Each session sees the last US bar dated before it, since the US's bars for a day close after Hong Kong's. It trades only on a session with a new bar.
   - They are valued at each day's rate. BIL's 4.0000% in dollars came to 4.11% a year in Hong Kong dollars from 2016, as the rate moved from 7.75 to 7.85.
   - A basket can't hold another region's security, so only the Book backtest will hold them.
-- **The real Lake doesn't have them yet.** Its prices end on 23 October, and `pd status` fails on a proposed Correction of kind `bar`, which the corrections code doesn't know. So no refresh was run from here. The next `pd daily` adds them.
+- **In the real Lake since 4 November 2026.** The daily chain fetched their whole histories and refreshes them:
+
+  | Security | Bars | From | To |
+  |---|---|---|---|
+  | `IN:GOLD1` | 4,538 | 17 April 2008 | 4 November 2026 |
+  | `IN:LIQUIDBEES` | 4,386 | 2 January 2009 | 4 November 2026 |
+  | `US:GLD` | 5,524 | 18 November 2004 | 3 November 2026 |
+  | `US:BIL` | 4,890 | 30 May 2007 | 3 November 2026 |
+
+  The US's end a day earlier because its 4 November session hadn't finished.
 - **For Saransh: the risk-free rate is one figure for the whole history.** It is the settings' `risk_free` (India 7%, the US 4%). So BIL earns 4% a year through 2011–2016 and 2020–21, when T-bills paid close to nothing, and a Book's 2013–2016 holdout CAGR and Sharpe come out too high. A rate by date (each region's T-bill or overnight rate) would fix it. That is a decision for issue 27, not made here.
 - **For issue 27: a Book's panels have a data version of their own.** It is the market's panels' version and the instruments' columns hashed together, so `book_panels(settings, book, data_version)` takes the market's version, not its own. A Book run that stores its version must keep the market's too, for `book_panels` and for the stale check.
 - **A strategy's market leaves the ETFs out.** Its exchanges are those of the securities it can hold, so India's runs keep their ids, though the preset charges by exchange.

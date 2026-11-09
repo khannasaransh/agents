@@ -10,7 +10,7 @@
 
 **The Hong Kong Book holds the US Book's gold ETF and cash fund** (Saransh, 26 October 2026; issue 48), in dollars: nothing is chosen for Hong Kong. Its backtest values them in Hong Kong dollars at each day's rate (the peg keeps the rate within 7.75–7.85), and its cash fund earns the US's risk-free rate.
 
-**Status:** done, but for a run on the real Lake, which has no prices for the Books' ETFs yet (see "Not run on the real Lake")
+**Status:** done
 
 - [x] The India and US Books are declared in ash_new's config, each with:
   - market, currency, broker and benchmark (the Nifty 500 TRI; the S&P 500 total return);
@@ -71,7 +71,15 @@
   - **A benchmark without total-return levels** in the Lake over the range is compared as its price index (`benchmark.basis`), and a caveat says so. That is always the case for Hong Kong's.
   - **It refuses** a strategy of another market, a strategy it doesn't know, and a Book whose gold ETF or cash fund has no price by its start. Holding cash in their place would be quietly wrong.
 - **The stand-in `pd`** here has an example of its output (`test/pd/book-backtest.india.json`), which the tests check against ash_new's schema.
-- **Not run on the real Lake.** The Lake still has no prices for `IN:GOLD1`, `IN:LIQUIDBEES`, `US:GLD` or `US:BIL`, since no `pd daily` has run since issue 26. So every Book backtest on it is refused. No refresh was run from here: `pd status` still fails on the proposed Correction of kind `bar` that issue 26 found. After the next `pd daily`, `pd book-backtest IN --strategy in-cw2-selected` runs.
+- **On the real Lake, 4 November 2026:** `pd book-backtest` runs for all three Books. Each paper Book, every strategy at its full share (`--paper`), over the ten years to its last session:
+
+  | Book | CAGR | Max drawdown | Sharpe | Benchmark's CAGR | Benchmark's max drawdown | Holdout's CAGR | Benchmark's in the holdout |
+  |---|---|---|---|---|---|---|---|
+  | India | 15.6% | −12.7% | 0.96 | Nifty 500, 12.1% | −38.3% | 18.9% | 13.9% |
+  | US | 11.3% | −11.8% | 0.80 | S&P 500, 15.6% | −33.8% | 4.6% | 14.2% |
+  | Hong Kong | 8.1% | −13.5% | 0.64 | Hang Seng, 0.6% | −55.7% | 1.5% | −0.5% |
+
+  The Nifty 500 and the Hang Seng are compared as price indexes, the S&P 500 as its total return. The cash fund earns the constant rates Saransh set (6%, 3%, 3%), so the caveat below about the years bills paid next to nothing still holds.
 - **Known limits, small enough to leave:**
   - A Sleeve resized while a holding has no bar at that open keeps that holding's shares. So gold, say, can miss its 10% until the next weighting.
   - The Hong Kong Book's gold ETF pays the US preset's per-share FINRA TAF, and its minimum and maximum, in Hong Kong dollars without conversion. That makes it about 7.8 times too small: cents.

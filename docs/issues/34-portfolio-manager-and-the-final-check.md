@@ -6,7 +6,7 @@
 
 **Blocked by:** 33: Paper Books trade their Order lists; 46: Market condition and the exposure level
 
-**Status:** done, but for the dossiers (issue 37) among the Portfolio Manager's inputs, and its first Run on real data: no strategy is in Paper yet (see "Not done")
+**Status:** done
 
 **Waiting on Saransh:** the Playbook's ranges. Until then the placeholders are exposure floors of 80%, 50% and 0%, sizes from 0.5× to 1×, timing up to 5 sessions and rebalance under 2% of the Book.
 
@@ -14,7 +14,7 @@
 - [x] Each Book has a Judgement mode (plan only, subtract only or Playbook), kept in the app database with every change, its date and the Answer that approved it. Real Books start in subtract only, paper Books in Playbook.
 - [x] `pd plan` writes each Book's Pool: the names any strategy with a Sleeve in it bought or signalled to buy in the last 2 months, from their live tracks.
 - [x] A Portfolio Manager Agent runs on Claude Code, with Codex as fallback, read-only in the Run folder. Its inputs are:
-  - the Rule plans and the dossiers;
+  - the Rule plans and the Desk's views (issue 39), as the PRD now has it: the dossiers are the Desk's to read;
   - each Book's Playbook, Judgement mode, Market condition, exposure level and Pool;
   - the Data gate's verdict and the Health Agent's diagnosis;
   - the Stages and its Journal.
@@ -64,8 +64,11 @@
   - **Spec:** a swap of gold's buy could buy a stock in gold's Sleeve, outside the exposure level's count; gold's buy can't be swapped now. A resize multiplied any buy's shares, though the size Lever is a multiple of the strategy's size: only a new position's buy (role `entry`) is resized now. The figure lookup was loose: a rounded figure matched far from its value (a cited 1 matched 0.55), a Book's code matched any of its orders' prices, and a cited `true` matched 1; now a number must be within 1% too, a security's figures are found only under its own id, and a boolean only as a boolean. The exposure level's Decision record went unchecked when the level was kept; now its gaps are said in the Brief (the plan's level stands). A judgement not in its schema's shape raised in `pd check`; now that Book's Rule plan goes out, with why.
   - **Standards:** the Brief's header comment had overlong lines; `Recorded.list_id` (a row id) shared its name with the list's id string (now `order_list_id`); ash_new's glossary now says a buy made to wait isn't a Waiting order; the Lever list is one constant; the Portfolio Manager Step formats its log with `percent`; an unused Override query and an unused flag are gone; the three order shapes the final check makes are one helper.
   - Left as judgement calls: "skip" and "drop" beside the glossary's skipped orders and vetoes, the plan kinds and change kinds as strings, the bare `paper` flag for a Judgement mode's side, the long parameter lists of `judging`, `final_list` and `_not_current`, and the whole-Book check holding the position and sector caps only for what the list buys (as the Book engine does: a holding grown over its cap by its price isn't sold, so the Rule plan never fails on it), and the exposure level only when the list buys stocks.
+- **On real data, 4 November 2026 (Run `2026-11-04-1930`):** the Portfolio Manager judged all six Books on Claude Code, with the Desk's views and with no adversary. It kept each exposure level. In the US paper Book it made 4 changes, each following the Desk's views: it dropped Option Care, and halved Okta, Doximity and PTC. The final check accepted all 4, dropped none and held back no buy, and they are recorded as Overrides. The first is judged on 10 November. It changed nothing in the other five.
+- **Fixed after that Run:**
+  - **It told Saransh to place gold that no list carries.** Its commentary on the three real Books said "for Saransh to place", but `pd check` starts a real Book only with a strategy at Real-small or Real-full (issue 42), so no such list was recorded. Its instructions now say so. Its Journal's open item expecting all six gold buys to fill was written before this.
+  - **The empty `dossiers` input is gone**, with its stale "until the Feeds and dossiers exist". Its instructions say the dossiers are the Desk's to read.
+  - **Its Journal asked why India and Hong Kong hold nothing.** Its instructions now give the strategies' market-trend gate (issue 32's notes).
 - **Not done:**
-  - The dossiers (issue 37): the Portfolio Manager is told it has none, and the Desk's views (issue 39) aren't among its inputs. A buy whose required Desk review is missing doesn't wait a session yet.
-  - Early exits, promotions and Lessons the Portfolio Manager proposes are issues 35, 41 and later; its output has none yet.
-  - The real Books' Judgement mode is kept but unused until they have Order lists (issue 42).
-  - No strategy is in Paper on the real Lake yet, so the Portfolio Manager hasn't judged a real plan.
+  - The real Books' Judgement mode isn't tested on a recorded list: none exists until a strategy is Real-small or Real-full (issue 42).
+  - The Brief still heads each real Book's plan "for placing" while its Order lists section says none was recorded. Only the second is what Saransh acts on.

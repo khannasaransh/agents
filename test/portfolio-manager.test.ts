@@ -78,7 +78,6 @@ test('the Portfolio Manager runs on Claude Code, read-only in the Run folder, gi
   assert.deepEqual(promptInput(call.stdin, 'bookStates'), { states: [example('book-state.paper.json')] })
   assert.deepEqual(promptInput(call.stdin, 'stages'), example('stages-check.books.json'))
   assert.equal(promptInput(call.stdin, 'health'), null, 'the Lake was healthy, so there is no diagnosis')
-  assert.equal(promptInput(call.stdin, 'dossiers'), null)
   assert.equal(promptInput(call.stdin, 'desk'), null, "the Desk didn't review in this Run")
   assert.match(promptInput(call.stdin, 'journal') as string, /Watch Stove Kraft/)
   // Its answer is kept with the Journal it read and the files its Decision records may cite.

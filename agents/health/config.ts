@@ -7,10 +7,11 @@ const health: AgentConfig = {
   adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   permissions: 'read-only',
   inputs: {
-    why: 'Why you were called: the Lake Step failed, its status couldn\'t be read, the Data gate failed, or the Health report flags something',
+    why: 'Why you were called: the Lake Step failed, its status couldn\'t be read, the Data gate failed, the Health report flags something, or this Run\'s MarketSmith fetch went wrong (a region failed, a results calendar couldn\'t be read, or a fetch or a backup wasn\'t whole)',
     lake: 'What the Lake Step did in this Run: the refreshes it cleared, each run of pd daily with its exit code, and whether one succeeded; null when it recorded nothing',
     lakeLog: "The end of the Lake Step's log in this Run, which holds pd daily's output",
     status: "The Lake's status as `pd status` printed it after the refresh: each market's latest session, the last refresh job, the Health report's verdict and flags, the Data gate's verdict with its reasons, the open Quarantines and the Corrections waiting for approval; null when it couldn't be read",
+    marketsmith: "What this Run's MarketSmith Step fetched (pd marketsmith's JSON): each region's mode (full or latest), the symbols a latest fetch chose and why, its results calendar, the symbols of the last fetch that weren't whole, and the backups kept and removed; null when MarketSmith wasn't fetched in this Run",
   },
   outputs: {
     diagnosis: 'What went wrong and why, in plain words',

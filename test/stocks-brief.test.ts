@@ -82,7 +82,7 @@ test('a Hold mode day shows why the Data gate failed, and the Lake Step that fai
   assert.match(page, /lake: failed\. Log: logs\/lake\.log/)
 })
 
-test("on a Saturday the Brief says what MarketSmith's fetch brought, region by region, and says nothing of it on other days", async () => {
+test("on a Wednesday or Saturday the Brief says what MarketSmith's fetch brought, region by region, and says nothing of it on other days", async () => {
   prepare()
   ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))
   ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
@@ -90,7 +90,7 @@ test("on a Saturday the Brief says what MarketSmith's fetch brought, region by r
 
   const page = text(await brief())
 
-  assert.match(page, /MarketSmith India wasn't fetched: MarketSmith India answered 403: the token has expired, or this IP is blocked\. The US: fetched 5969 of 5971, snapshot US:2026-10-31; 2 failed\. Hong Kong: fetched 2440 of 2447, snapshot HK:2026-10-31; 7 MarketSmith has nothing for\. The Lake/)
+  assert.match(page, /MarketSmith India wasn't fetched: MarketSmith India answered 403: the token has expired, or this IP is blocked\. The US: fetched 5969 of 5971 \(full\), snapshot US:2026-10-31; 2 failed\. Hong Kong: fetched 2440 of 2447 \(full\), snapshot HK:2026-10-31; 7 MarketSmith has nothing for\. The Lake/)
 
   ws.cleanup()
   prepare()

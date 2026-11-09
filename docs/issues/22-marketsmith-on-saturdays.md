@@ -1,20 +1,22 @@
 # 22: MarketSmith on Saturdays
 
+**Since 9 November 2026** MarketSmith is fetched on Wednesdays and Saturdays, a latest fetch with a full one once a year, and each fetch's replaced store is kept as a backup: issue 50.
+
 **What to build:** MarketSmith's fetch moves from ash_backend into ash_new, and each Saturday's Run uses it before the Lake refresh, so fundamentals are never more than a week old. Each fetch is kept as a dated snapshot, so a Decision record that cites a rating can be checked later. An expired cookie costs a To-do, never a failed Run. ash_backend's Portfolio Manager and Sash's `PM_BUY` alerts are turned off. See the stocks Pipeline PRD's MarketSmith Step and "ash_backend".
 
 **Repos:** ash_new, ash_backend, agents · **Mirror:** none: like issues 17, 20 and 21, it lives only here
 
 **Blocked by:** 17: Stocks Pipeline skeleton: the Lake Step and a data-status Stocks Brief
 
-**Status:** done, but for the dossier, which is issue 37's, and two steps of Saransh's: the cookies' move and ash_backend's deploy (see Notes)
+**Status:** done, but for its first full Saturday: the Global site's cookie had expired on 7 November (see "Cookies")
 
 - [x] `pd marketsmith` fetches MarketSmith's India and US data, as ash_backend's `fetch` job kind does, and writes the raw store that ash_new already reads. It exits 78 when MarketSmith rejects a cookie.
-- [ ] Each fetch is also kept as a dated snapshot of the ratings, flags and estimates, and a dossier names the snapshot its figures came from. This takes up what ash_new's parked ticket 49 deferred.
-- [ ] MarketSmith's cookies move to ash_new's env file. Only `pd marketsmith` reads them.
+- [x] Each fetch is also kept as a dated snapshot of the ratings, flags and estimates, and a dossier names the snapshot its figures came from. This takes up what ash_new's parked ticket 49 deferred.
+- [x] MarketSmith's cookies move to ash_new's env file. Only `pd marketsmith` reads them.
 - [x] A MarketSmith Step runs before the Lake Step on Saturdays, and skips itself on other days.
 - [x] An expired cookie skips the Step and gives a To-do naming the cookie.
 - [x] The Saturday refresh builds fundamentals from the new fetch.
-- [ ] Deploy the change that turns off ash_backend's Portfolio Manager agent and Sash's `PM_BUY` alerts. Sash remains (31 October decision); keep its backend data dependencies until replacements work. Separate managed paper watchlists and real portfolios have a new sync implementation in agents, currently disabled at Saransh's request. The alarm decision remains open; do not archive ash_backend just because Sash's destination is decided.
+- [x] Deploy the change that turns off ash_backend's Portfolio Manager agent and Sash's `PM_BUY` alerts. Sash remains (31 October decision); keep its backend data dependencies until replacements work. Separate managed paper watchlists and real portfolios have a new sync implementation in agents, currently disabled at Saransh's request. The alarm decision remains open; do not archive ash_backend just because Sash's destination is decided.
 - [x] Tests:
   - **ash_new:** a fetch parsed from recorded responses, never the network, writes the raw store and a dated snapshot; a rejected cookie exits 78.
   - **agents:** the Step skips itself on a weekday; a stand-in `pd marketsmith` that exits 78 becomes a skip with a To-do; a successful fetch is recorded.
@@ -40,7 +42,7 @@
     - India's red flags (the `getRedFlags` names set to 1);
     - India's estimates: the consensus, the ratings' counts, the target and each fiscal year's EPS and sales.
 
-    `snapshots.snapshot_of(settings, security_id, on)` gives a security's entry in the latest snapshot on or before a day, with the snapshot's id. That is what issue 37's dossier will call to name its snapshot. The dossier itself is issue 37's, so this box stays open until then. Ticket 49 records what it took up.
+    `snapshots.snapshot_of(settings, security_id, on)` gives a security's entry in the latest snapshot on or before a day, with the snapshot's id. Issue 37's dossier (`pipeline/dossiers.py`) calls it to name its snapshot. Ticket 49 records what it took up.
   - The snapshot keeps the ratings, flags and estimates this issue names. Shareholding, news and the O'Neil checklist, which the PRD's dossier also reads, are still read from the latest fetch only.
   - **The cookies** are `PDASH_MS_INDIA_AUTH` (MarketSmith India's `ms-auth=...` token) and `PDASH_MS_GLOBAL_COOKIE` (marketsmith.hk's session cookie, for the US and Hong Kong), in ash_new's `.env`.
     - They are read by `pdash.marketsmith.cookies.Cookies`, never by `Settings`, so the Settings page and every other command never see them.
@@ -69,8 +71,8 @@
   - `check_alerts` never trips or pushes a `PM_BUY` alert.
   - Its last regime no longer tightens the portfolio stops.
   - The rest of `run_all_latest` keeps the Sash app's data, and ash_backend's MarketSmith cookies stay in its own `.env` for that.
-- **Waiting on Saransh:**
-  - Copy MarketSmith's cookies into ash_new's `.env` as `PDASH_MS_INDIA_AUTH` and `PDASH_MS_GLOBAL_COOKIE`. The Pipeline never reads them, so it can't move them.
-  - Deploy ash_backend to its VM. Until then, the VM's timer still runs the Portfolio Manager.
+- **Cookies, 9 November 2026:** the 7 November Run fetched India (snapshot `IN:2026-11-08`, 2,626 of 2,632 symbols), but the Global site rejected its cookie (`_sys_status 403`), so the US and Hong Kong weren't fetched and the Step skipped itself with a To-do. Saransh replaced the cookie. On a read-only check the same day, the new cookie lists the US's and Hong Kong's boards and reads a symbol's cards in each (`_sys_status 0`); without it the site answers 403. This machine's IP isn't blocked: Cloudflare answers every request with 200 and data, and MarketSmith India answers too.
+- **Cookies, 4 November 2026:** both are in ash_new's `.env`, and MarketSmith India and the Global site both accepted them on a one-symbol read. The two Runs of 31 October fetched nothing (India's failed in the second, every other region's cookie was rejected), so the real Lake has no snapshot yet. The first is the Saturday Run of 7 November, which fetches for hours.
+- **No deploy (Saransh, 9 November 2026):** ash_backend runs only locally, from its working tree; its VM and `deploy.sh` were built but never used. So the change is in force the next time ash_backend is started here: `PM_ENABLED` is off by default. Nothing ran ash_backend on 9 November (no process, no scheduled task). The change is still uncommitted in ash_backend (`PM_ENABLED`, `tests/test_pm_off.py`, whose 4 tests pass).
 - **Found:** ash_backend's error records hold MarketSmith India's token in their URL (`raw/MS/IN/latest/*/summary.json` has some, ACEVECTOR's among them). Each `pd marketsmith` fetch of India replaces them. The tokens are likely long expired.
 

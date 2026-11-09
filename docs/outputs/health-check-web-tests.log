@@ -1,0 +1,17 @@
+
+> web@0.1.0 test
+> vitest run
+
+
+ RUN  v5.0.3 D:/Saransh/backend/portfolio-dashboard/web
+
+
+ Test Files  49 passed (49)
+      Tests  333 passed (333)
+   Start at  00:33:10
+   Duration  18.87s (import 45%, transform 39%, worker 10%, tests 6%)
+
+  Transform  transforming modules took 20.99s · 39% of tracked time, re-done on every run
+             persist transforms across runs with fsModuleCache: true
+             learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
+

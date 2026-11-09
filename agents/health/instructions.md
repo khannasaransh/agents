@@ -6,7 +6,7 @@ You are read-only. Never create, change or delete files, and never run a command
 
 ## What you can read
 
-- `why`, `lake`, `lakeLog` and `status`, your inputs. `lakeLog` is the end of the Lake Step's log: `pd daily`'s output and how each run of it ended.
+- `why`, `lake`, `lakeLog`, `status` and `marketsmith`, your inputs. `lakeLog` is the end of the Lake Step's log: `pd daily`'s output and how each run of it ended. `marketsmith` is what this Run's MarketSmith fetch did, or null when there was none.
 - ash_new's code, in `src/pdash/`. Its glossary is `docs/CONTEXT.md`, and its decisions are in `docs/adr/` and `docs/decisions/`.
 - The data issues looked into by hand, in `docs/data/issues.md`: what is wrong, the evidence, and the fix.
 - The Corrections file, `config/corrections.yaml` (it may not exist yet): the Corrections Saransh approved, which every refresh applies. What each kind does is in `src/pdash/lake/corrections.py`.
@@ -21,6 +21,22 @@ You are read-only. Never create, change or delete files, and never run a command
 2. Work out the cause, not just the symptom. A refresh that stopped on a rate limit, a source that changed its format, a bug in ash_new's code and a bad bar from a source are different problems with different fixes.
 3. For flags, say which look like errors in the data, such as a split or dividend recorded wrongly, and which look like real moves. There can be many: group them by cause, and name the securities that need Saransh's attention.
 4. Propose a Correction for each corporate action Yahoo got wrong behind a flag, and for each issue in `docs/data/issues.md` a Correction can fix while it is still flagged. Each flagged security is in Quarantine, held out of every Book, until its Correction is approved or Saransh dismisses the flag.
+
+## MarketSmith's fetch and its backups
+
+When `why` names MarketSmith's fetch, check what it left. Its raw store is ash_backend's data folder, `raw/MS/<region>/` (where the settings' `ash_data_dir` points), as `src/pdash/marketsmith/store.py` lays it out:
+
+- `latest/`, the fetch in use: `_manifest.json` lists each symbol with its files, status and when it was fetched. A latest fetch fetches only some symbols; the rest keep their last fetch, with its time.
+- `backups/<run id>/`, each `latest/` a fetch replaced. Every backup of the current month is kept, and the last whole one of each month before.
+- `results_calendar.json`, the Hong Kong results dates AAStocks announced ahead.
+
+ash_new checks a fetch whole before keeping it, and removes a backup that isn't whole, so a half fetch or a half backup is never kept. Your part is to say what went wrong and whether what is kept can be trusted:
+
+1. For a region whose fetch failed, say why from its error and the code that raised it. `latest/` should be as it was: check its manifest's run id against the last fetch that succeeded.
+2. For a backup removed as not whole, or symbols the last fetch left not whole, say which and what that suggests: a fetch stopped part way through, a disk problem, or a bug in the store's code. Then check that each month before the current one still has a backup in `backups/`. Say which month has none left.
+3. For a results calendar that couldn't be read, say whether its site changed (look at the error and `src/pdash/marketsmith/results.py`). A calendar that fails leaves the latest fetch to its new and stale symbols, so the results it missed wait for the next fetch.
+
+Read the folders. Don't run anything to check them: you are read-only.
 
 ## What to answer
 

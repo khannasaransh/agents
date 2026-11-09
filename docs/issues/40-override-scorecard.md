@@ -1,12 +1,14 @@
 # 40: Override scorecard
 
+**Decision, 4 November 2026:** Saransh accepted the follow-up's item 13: `came_true` is now `beat_rule_plan`, the Portfolio Manager judges apart whether what each Override expected happened (`expectations`), and he alone may widen a range against the scorecard (`pd judgement propose ... --despite-scorecard`). See [the follow-up](../review/decisions-follow-up-2026-10-31.md). The notes below written before it say `came_true`.
+
 **What to build:** Every Override is scored against what the Rule plan alone would have done, and the weekly review shows the tally by Lever. A Lever's range and the Desk's say widen only on evidence, and a Lever that keeps losing is proposed for a narrower range. Whether a real Book moves to Playbook mode is decided by its paper Book's gap to its rules-only paper Book, since the Overrides' own scores interact and don't add up (ADR 0004). See the stocks Pipeline PRD's "Reviews".
 
 **Repos:** ash_new, agents
 
 **Blocked by:** 39: The Desk; 35: Weekly review, promotions and demotions
 
-**Status:** done, but for a scorecard on real data: no paper Book has started, so there is no Override yet (see "Not done")
+**Status:** done, but for the first Override judged on real data: 10 November 2026 (see "On real data, 4 November")
 
 **Waiting on Saransh:** what counts as a paper Book matching its rules-only paper Book. Until then the placeholder is at least its return over the 3 months, with no deeper max drawdown.
 
@@ -51,6 +53,7 @@
   - Which bar judged is given with the verdict (`bar`, with its `fixed_on`). Nothing stops an existing bar in config/books.yaml being edited in place; adding a new one with its own day is the convention.
 - **The Brief:** each paper Book in the weekly review gets an "Override scorecard": the gate, the sum beside the gap with why they differ, each Override open or judged recently, the tallies, and each Lever that lost with the narrower range proposed for it (or why not). The judgement proposals waiting include those Save state made in this Run. The Review Step logs each Book's count, the Levers that lost and the gate.
 - **On a copy of the real app database, 30 October 2026:** `pd review --dry-run` runs and validates against its schema; no paper Book has started, so each Book's scorecard is `not_started`.
+- **On real data, 4 November 2026:** the US paper Book has its first 4 Overrides, each `open`, valued at nothing until a close is filled: Doximity judged on 10 November, Okta on 18 November, Option Care and PTC on 4 December. `pd review --dry-run` lists them, and each Book's gate is `too_soon` until its two paper Books have filled a close together. The gate's 3 months end in February 2027 at the earliest.
 - **Tests:**
   - **ash_new:**
     - `tests/test_scorecard_rules.py`, against a fixture track and hand-made prices: a veto (a gain given up until the track sold; a loss avoided to the session it is judged on), judged on its own session and open before it, a buy over its limit, a trim, an early exit (judged once the track sold, open while it holds), a wait bought later or dropped (a release after its session left out), a swap, a size change, an exposure cut, a skipped rebalance, a release scored with its wait; the tallies by Lever, analyst and Lesson; a Lever that lost over 3 months; the sum beside the gap; the gate from a fixture pair of paper Books (passed, failed on drawdown, too soon, a bar fixed too late, the last bar fixed before); which Levers a Playbook change widens.
@@ -67,8 +70,5 @@
   - a tally's `key` as a string (a Lever, an analyst or a Lesson), and the analyst read from an early exit's proposer (`by`), as the Desk Step words it;
   - the Desk's say: the analysts only subtract, so there is nothing of theirs to widen; the per-analyst tally is its evidence.
 - **Not done:**
-  - **On real data:** no strategy is in Paper, so no paper Book has started and there is no Override to score.
-  - **For Saransh:**
-    - the bar for the gate (the placeholder above), and whether one bar serves all three Books;
-    - "came true" read as beating the Rule plan by the review session;
-    - a widening refused for Saransh's own `pd judgement propose` too, unless the scorecard supports it.
+  - **The first Override judged**, above.
+  - **For Saransh:** the bar for the gate (the placeholder above), and whether one bar serves all three Books. He deferred this on 31 October 2026.

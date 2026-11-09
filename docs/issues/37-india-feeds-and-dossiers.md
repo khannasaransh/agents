@@ -6,7 +6,7 @@
 
 **Blocked by:** 32: Rule plan for the paper Books
 
-**Status:** done, but for a review list on real data: no strategy is in Paper yet, so no paper Book has a buy (see "Not done")
+**Status:** done, but for an Indian name on a real review list: India's strategies aren't buying yet (see "On real data, 4 November")
 
 - [x] `pd plan` lists the names the Desk reviews: the Rule plan's buys and sales, plus the holdings with results or another event in the next 5 sessions. For each name it says which analysts it needs, and why:
   - Events, for a name with results or another event in the next 5 sessions, or with a new event since its last view;
@@ -90,6 +90,10 @@
     - from Yahoo, AAPL's 3 November earnings date;
     - EDGAR skipped itself without the contact.
   - BSE answered `pd`'s requests, though it refused curl's (403).
+- **On real data, 4 November 2026 (Run `2026-11-04-1930`):**
+  - The review list named 17 US buys, each needing Chart, and Risk for the US paper Book. Each has a dossier: 252 bars, fundamentals, its events and its orders. Their MarketSmith part is empty until Saturday's first snapshot (issue 22).
+  - India's four sources were called with no name, as India has no buy (issue 32's notes). Their last real fetch is still the 30 October one above.
+  - **Feeds after the plan cost this Run the Events analyst.** The feeds cache had nothing on these names when the plan read it, so no name asked for Events, though the Desk's Risk analyst reports PTC and Paycom with results on 5 November and Doximity, Halozyme and Mettler Toledo on 6 November. Risk read the events for its own purpose, and the Portfolio Manager halved Doximity on them, but no analyst was asked to judge results, guidance or filings. The next Run's review list sees them, so this bites only on a name's first day.
 - **Tests:**
   - **ash_new:**
     - `tests/test_feeds.py`:
@@ -120,11 +124,11 @@
   - the name-and-holders shape is spelled out in both the review list and the Feeds;
   - `rule_plans` builds the review list too, so `pd plan` prints it as the Plan Step asks.
 - **Not done:**
-  - **On real data:** no review list or dossier has been made. No strategy is in Paper (`in-super30-ok-tuned` waits for your approval as a Candidate), so no paper Book has a buy.
+  - **An Indian name on a real review list:** none yet, as above.
   - **The dossier's MarketSmith part:** it has what issue 22's snapshot keeps (ratings, red flags, estimates), not the shareholding, news or O'Neil checklist the PRD lists. Those are in the raw store but not in the dated snapshot, so adding them is a change to issue 22's snapshot.
   - **NSE's cookies:** nothing primes them. If NSE starts refusing requests without them, its sources fail with a To-do until `pdash.feeds` gets a cookie jar.
   - **For Saransh**, three choices made here:
-    - Feeds after the plan, so the review list lags a Run behind a results date first fetched that day;
+    - Feeds after the plan, so the review list lags a Run behind a results date first fetched that day (**Saransh, 9 November 2026:** keep it; Events needn't review a name on its first day);
     - without a last view, "new" means dated in the 5 sessions before the Run's day;
     - the Brief shows the next 30 days.
 

@@ -37,7 +37,7 @@
 // review missing), and each Book's Judgement modes; the Order lists the Check Step recorded, or why
 // none was; how each paper Book stands (its value and its gap to its rules-only paper Book, its
 // drawdown against its breakers, its Sleeves and Stages, the Disaster stops that would lose more than
-// 1% of it, and the Books together in rupees); on Saturdays, what MarketSmith's fetch brought; how
+// 1% of it, and the Books together in rupees); on Wednesdays and Saturdays, what MarketSmith's fetch brought; how
 // this Run's Lake Step went and how ash_new's last refresh ended; the Health report's verdict and
 // flags; and the Run's health. It runs even when earlier Steps failed, and says when the Lake's
 // status is missing. Each item waiting on Saransh has its id and buttons for its Answers. The Save
@@ -1299,7 +1299,7 @@ function paperBooksSection(run: RunRecord, standing: PdPaperBooks | null): strin
     .join('\n')
 }
 
-/** What MarketSmith's fetch brought, on a Saturday: nothing on other days, when the Step skips itself. */
+/** What MarketSmith's fetch brought, on a Wednesday or Saturday: nothing on other days, when the Step skips itself. */
 function marketSmithSection(fetched: PdMarketSmith | null): string {
   if (!fetched) return ''
   const lines = fetched.regions.map((r) => `${esc(fetchLine(r))}.`)

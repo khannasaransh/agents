@@ -211,9 +211,15 @@ test("the stocks Schedule's Task Scheduler entry starts a scheduled Run of the s
   assert.deepEqual(elements(entry.xml, 'StartBoundary'), ['2026-10-25T09:30:00'])
   assert.deepEqual(elements(entry.xml, 'DaysOfWeek'), ['<Tuesday /><Wednesday /><Thursday /><Friday /><Saturday />'])
   assert.deepEqual(elements(entry.xml, 'WeeksInterval'), ['1'])
-  assert.deepEqual(elements(entry.xml, 'Command'), ['C:\\Program Files\\nodejs\\node.exe'])
   assert.deepEqual(elements(entry.xml, 'WorkingDirectory'), [agentsRoot.replace(/[\\/]$/, '')])
   assert.equal(entry.args.slice(0, 4).join(' '), `${join(agentsRoot, 'src', 'cli.ts')} run stocks --scheduled`)
+})
+
+test('a Task Scheduler entry starts node under a headless console host, so no console window opens that closing would end the Run', async () => {
+  const { xml } = taskSchedulerEntry(await stocksSchedule(), windowsInstall)
+
+  assert.deepEqual(elements(xml, 'Command'), ['C:\\WINDOWS\\System32\\conhost.exe'])
+  assert.match(unescape(elements(xml, 'Arguments')[0]), /^--headless "C:\\Program Files\\nodejs\\node\.exe" /)
 })
 
 test('a Task Scheduler entry wakes the machine, starts a missed time once it is available, and runs only while Saransh is logged on', async () => {
@@ -245,9 +251,10 @@ test("a Task Scheduler entry's arguments reach the agents command as they were g
   try {
     const printer = join(folder, 'argv.js')
     writeFileSync(printer, 'console.log(JSON.stringify(process.argv.slice(2)))')
-    const [line] = elements(xml, 'Arguments')
+    // The console host starts node with the rest of its command line, as it was given.
+    const line = unescape(elements(xml, 'Arguments')[0]).replace(/^--headless "[^"]*" /, '')
 
-    const printed = spawnSync(process.execPath, [`"${printer}"`, unescape(line)], { argv0: `"${process.execPath}"`, windowsVerbatimArguments: true, encoding: 'utf8' })
+    const printed = spawnSync(process.execPath, [`"${printer}"`, line], { argv0: `"${process.execPath}"`, windowsVerbatimArguments: true, encoding: 'utf8' })
 
     assert.equal(printed.status, 0, printed.stderr)
     assert.deepEqual(JSON.parse(printed.stdout), args)

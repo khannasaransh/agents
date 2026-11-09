@@ -1,0 +1,76 @@
+...................................F
+================================== FAILURES ===================================
+________ test_what_happens_after_a_signal_day_never_changes_its_picks _________
+  + Exception Group Traceback (most recent call last):
+  |   File "D:\Saransh\backend\portfolio-dashboard\tests\test_backtest_engine.py", line 583, in test_what_happens_after_a_signal_day_never_changes_its_picks
+  |     @given(
+  |             
+  |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\hypothesis\core.py", line 2295, in wrapped_test
+  |     raise the_error_hypothesis_found
+  | ExceptionGroup: Hypothesis found 2 distinct failures. (2 sub-exceptions)
+  +-+---------------- 1 ----------------
+    | Traceback (most recent call last):
+    |   File "D:\Saransh\backend\portfolio-dashboard\tests\test_backtest_engine.py", line 742, in test_what_happens_after_a_signal_day_never_changes_its_picks
+    |     np.testing.assert_allclose(by_rebalance["weight"].sum(), by_rebalance.size() / 3, rtol=1e-6)
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\numpy\testing\_private\utils.py", line 1780, in assert_allclose
+    |     assert_array_compare(compare, actual, desired, err_msg=str(err_msg),
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\numpy\testing\_private\utils.py", line 894, in assert_array_compare
+    |     val = comparison(x, y)
+    |           ^^^^^^^^^^^^^^^^
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\numpy\testing\_private\utils.py", line 1771, in compare
+    |     return np._core.numeric.isclose(x, y, rtol=rtol, atol=atol,
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\numpy\_core\numeric.py", line 2447, in isclose
+    |     result |= isnan(x) & isnan(y)
+    |               ^^^^^^^^
+    | TypeError: ufunc 'isnan' not supported for the input types, and the inputs could not be safely coerced to any supported types according to the casting rule ''safe''
+    | Failing test case: test_what_happens_after_a_signal_day_never_changes_its_picks(
+    |     seed=17733,
+    |     which=1.0,
+    |     criteria='momentum',
+    |     weighting={'scheme': 'equal'},
+    |     realism={'rebalance': {'execution': 'same_close'},
+    |      'overlays': [{'type': 'regime_filter',
+    |        'rule': {'above_sma': 20},
+    |        'when_bearish': 'exit_per_strategy_no_new'}]},
+    |     costly=False,
+    | )
+    +---------------- 2 ----------------
+    | Traceback (most recent call last):
+    |   File "D:\Saransh\backend\portfolio-dashboard\tests\test_backtest_engine.py", line 708, in test_what_happens_after_a_signal_day_never_changes_its_picks
+    |     pd.testing.assert_frame_equal(
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\pandas\util\_decorators.py", line 220, in wrapper
+    |     return func(*args, **kwargs)
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\pandas\_testing\asserters.py", line 1347, in assert_frame_equal
+    |     assert_series_equal(
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\pandas\util\_decorators.py", line 193, in wrapper
+    |     return func(*args, **kwargs)
+    |            ^^^^^^^^^^^^^^^^^^^^^
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\pandas\_testing\asserters.py", line 1029, in assert_series_equal
+    |     assert_attr_equal("dtype", left, right, obj=f"Attributes of {obj}")
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\pandas\_testing\asserters.py", line 448, in assert_attr_equal
+    |     raise_assert_detail(obj, msg, left_attr, right_attr)
+    |   File "D:\Saransh\backend\portfolio-dashboard\.venv\Lib\site-packages\pandas\_testing\asserters.py", line 619, in raise_assert_detail
+    |     raise AssertionError(msg)
+    | AssertionError: Attributes of DataFrame.iloc[:, 0] (column name="security_id") are different
+    | 
+    | Attribute "dtype" are different
+    | [left]:  object
+    | [right]: <StringDtype(na_value=nan)>
+    | Failing test case: test_what_happens_after_a_signal_day_never_changes_its_picks(
+    |     seed=17733,
+    |     which=0.0,
+    |     criteria='momentum',
+    |     weighting={'scheme': 'equal'},
+    |     realism={'rebalance': {'execution': 'same_close'},
+    |      'overlays': [{'type': 'regime_filter',
+    |        'rule': {'above_sma': 20},
+    |        'when_bearish': 'exit_per_strategy_no_new'}]},
+    |     costly=False,
+    | )
+    +------------------------------------
+=========================== short test summary info ===========================
+FAILED tests/test_backtest_engine.py::test_what_happens_after_a_signal_day_never_changes_its_picks
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed, 35 passed in 6.40s

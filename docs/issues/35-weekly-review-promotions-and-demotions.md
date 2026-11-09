@@ -1,6 +1,6 @@
 # 35: Weekly review, promotions and demotions
 
-**Decision, 31 October 2026:** Saransh accepted Paper demotion to Retired. He requested an explanation of the upper 95th-percentile check; that check remains unchanged and unconfirmed. See [the follow-up](../review/decisions-follow-up-2026-10-31.md).
+**Decision, 31 October 2026:** Saransh accepted Paper demotion to Retired. On 4 November 2026 he accepted the recommendation on the upper 95th-percentile check: a record outside its tested range no longer holds a promotion back, and goes to him saying how it is outside. See [the follow-up](../review/decisions-follow-up-2026-10-31.md).
 
 **What to build:** Every Saturday the Stocks Brief carries the weekly review. Each Sleeve and Book is measured against its backtest's range and its benchmark. A strategy that breaks the demotion rule is demoted. The Portfolio Manager proposes promotions, which Saransh approves with an Answer. See the stocks Pipeline PRD's Review Step and "Reviews".
 
@@ -8,7 +8,7 @@
 
 **Blocked by:** 34: The Portfolio Manager, the Playbook and the final check
 
-**Status:** done, but for a review on real data: no strategy is in Paper yet (see "Not done")
+**Status:** done, but for its first Saturday's review, on 7 November 2026 (see "On real data")
 
 - [x] On Saturdays, a Review Step gets the weekly figures from `pd review`:
   - each Sleeve's and Book's live return and drawdown, against its backtest's range and its benchmark;
@@ -18,7 +18,7 @@
 - [x] The demotion rule is applied by itself, and the Brief reports each demotion. A strategy is demoted when:
   - its live drawdown passes 1.5 times its backtest's worst; or
   - after 12 months live, its rolling 12-month return falls below its backtest's 5th percentile.
-- [x] On Saturdays the Portfolio Manager gets the figures, writes the review's commentary, and proposes a promotion when a Stage's time is up (3 months of Paper, 6 of Real-small) and the strategy's record is inside its tested range.
+- [x] On Saturdays the Portfolio Manager gets the figures, writes the review's commentary, and proposes a promotion when a Stage's time is up (3 months of Paper, 6 of Real-small) and the strategy breaks no demotion rule. A record outside its tested range goes to Saransh with the proposal (changed on 4 November 2026).
 - [x] An approving Answer moves a promotion's Stage, and the next Rule plan uses it.
 - [x] Tests:
   - live within range and outside it;
@@ -42,13 +42,12 @@
 - **The Brief:** "Promotions waiting for your approval" comes after the Candidates, with Approve and Reject buttons (those the Stages Step read, and those Save state recorded in this Run). The "Weekly review" comes after "Sleeves and Stages": the Portfolio Manager's commentary, each demotion and why (or that none), each Book's paper Book and Sleeves with their live return, drawdown now and at worst, the benchmark's, the backtest's worst, the return against the range of the same windows and whether it is inside, Reconciliation's differences, and the promotions due. A Book with nothing to show is left out.
 - **Shared:** `runWeekday` moved from the MarketSmith Step to `src/schedule.ts`; ash_new's `book_backtest.quantiles`, `stages.service.tracked_at` and `today_in` are public now, for the review.
 - **On a copy of the real app database, 30 October 2026:** `pd review --dry-run` runs and prints its schema's shape: the Data gate fails (the Lake is 3 to 4 sessions behind), no Sleeve is in Paper and no paper Book has started, so there is nothing to measure, demote or promote.
+- **On real data, 4 November 2026:** `pd review --dry-run --month 2026-10` runs on the real Lake and app database, with the gate passing. Four Sleeves are measured against their backtests; the US's and Hong Kong's Super 30, in Paper from 3 and 4 November, have no two sessions yet. None is demoted and no promotion is due: the first falls due on 31 January 2027, 3 months from 31 October. Each paper Book says it has no two closes filled yet.
 - **Tests:**
   - **ash_new:** `tests/test_review_rules.py` (the pure rules on hand-made series: a record inside its range; a drawdown past the backtest's worst outside it but not demoted; a return under the 5th percentile outside it; each half of the demotion rule, the rolling one only after 12 months; a backtest too short for the window; when a Stage's time is up); `tests/test_review.py` (through `pd review` on the fixture Lake with a written live track: inside its range with its promotion due; a drawdown past the worst outside it and its promotion refused; past 1.5 times the worst demoted by itself, held in a dry run and while the Data gate fails, then not reviewed once Retired; judged again only after a demotion; a promotion proposed, refused twice, approved, and the next Rule plan holding it at Real-small; one before its time refused; a rejected one and a stale one; the paper Book measured against a Book backtest and its benchmark); `test_contract.py`'s list.
   - **agents:** `test/stocks-review.test.ts` (skips on a weekday; on a Saturday keeps `pd review`'s figures; a demotion in the log; a dry run; a failing `pd review`); `test/portfolio-manager.test.ts` (the review among its inputs, its commentary and promotions, Save state recording them; the review commented on when the Plan Step failed); `test/answers.test.ts` (promotion Answers through `pd stages promote` and `reject`); `test/stocks-brief.test.ts` (the weekly review, a demotion, a failed Review Step, promotions waiting); the Pipeline's tests.
 - **Code review** (Standards and Spec, done inline: the review sub-agents stopped on a usage limit). Fixed: the review's own copy of the Book engine's Stage mapping is gone (it uses `plan.engine_stage`); a missing type annotation in `promotions.py`; the Portfolio Manager's `plans` input now says it is null on a Saturday whose Plan Step failed. Left as judgement calls: `promotions.Decided` sharing its name with `judgement.service.Decided` (separate modules, the same role); a Sleeve demoted in a review still in that review's Book backtest of the paper Book.
 - **ash_new's full suite** passes but for `test_backtest_engine.py::test_what_happens_after_a_signal_day_never_changes_its_picks`, which fails the same way without this change (a Hypothesis case: a pandas dtype mismatch in `security_id`).
 - **Not done:**
-  - No strategy is in Paper on the real Lake yet (India Super 30 OK, tuned waits as a Candidate), so no review has measured a real record.
-  - The real Books aren't reviewed: they have no Order lists until issue 42, so their records are Legacy holdings, not the Sleeves'. A real Book's Sleeves are reviewed through the paper Book's (the same strategies' live tracks).
-  - The PRD's other weekly figures come with their issues: fill costs and the real-to-paper gap (44), Disaster stops not marked placed (42), the override scorecard (40), and each paper Book's gap to its rules-only paper Book (already in the Brief's paper Books section, issue 33).
-  - **For Saransh:** two choices made here. A Paper strategy demoted is Retired (the PRD says "demoted", not where to); and a record above the backtest's 95th percentile counts as outside its tested range, so it isn't promoted until it comes back inside. Say if either should change.
+  - **The first real review:** the Review Step has only run on fixtures. Its first real run is Saturday 7 November 2026.
+  - The real Books aren't reviewed: they have no Order lists until a strategy is Real-small or Real-full (issue 42), so their records are Legacy holdings, not the Sleeves'. A real Book's Sleeves are reviewed through the paper Book's (the same strategies' live tracks).

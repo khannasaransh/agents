@@ -136,6 +136,35 @@ test("after a Lake Step whose status couldn't be read, the Health Agent is told 
   assert.equal(promptInput(call.stdin, 'status'), null)
 })
 
+test("a healthy Lake still calls the Health Agent when this Run's MarketSmith fetch went wrong, giving it the fetch", async () => {
+  prepare({ status: 'status.clean.json' })
+  ws.writeRunFile(runId, 'marketsmith.json', example('marketsmith.latest.json'))
+  ws.setWorkerCli('codex', codexAnswering(answer))
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  const [call] = ws.workerCliCalls('codex')
+  assert.deepEqual(promptInput(call.stdin, 'why'), [
+    "MarketSmith's latest fetch of the US couldn't read its results calendar: NASDAQ's earnings calendar couldn't be read: 2026-10-27 (answered 403)",
+    "MarketSmith's last fetch of Hong Kong had 3 symbols whose files weren't whole.",
+    "MarketSmith's backup 2026-11-09T02-28-57Z of Hong Kong wasn't whole, so it was removed: not whole: 00700/summary.json is cut short",
+  ])
+  assert.deepEqual(promptInput(call.stdin, 'marketsmith'), example('marketsmith.latest.json'))
+  assert.equal(health().status, 'diagnosed')
+})
+
+test('a MarketSmith fetch that went well, or none, leaves a healthy Lake undiagnosed', async () => {
+  prepare({ status: 'status.clean.json' })
+  ws.writeRunFile(runId, 'marketsmith.json', example('marketsmith.fetched.json'))
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.workerCliCalls('codex'), [])
+  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /Skipped: The Lake is healthy: .*MarketSmith's fetch, if any, went well/)
+})
+
 test('after a refresh that worked, a Health report that flags something still calls the Health Agent', async () => {
   prepare({ status: 'status.healthy.json' })
   ws.setWorkerCli('codex', codexAnswering(answer))

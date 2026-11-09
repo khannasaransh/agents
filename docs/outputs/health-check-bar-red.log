@@ -1,0 +1,60 @@
+F
+================================== FAILURES ===================================
+____________ test_status_reads_an_existing_waiting_bar_correction _____________
+
+settings = Settings(config_dir=WindowsPath('D:/Saransh/backend/portfolio-dashboard/config'), ash_data_dir=WindowsPath('C:/Users/k...(enabled=False, times=['07:30', '19:00'], timezone='Asia/Kolkata'), action_expiry_days=3, api_port=8000, web_port=3000)
+
+    def test_status_reads_an_existing_waiting_bar_correction(settings):
+        engine = connect(settings)
+        migrate(engine)
+        with Session(engine) as session:
+            session.add(ProposedCorrection(
+                security_id="US:ONE", kind="bar", day=date(2025, 2, 10),
+                ratio=None, value=None, why="An isolated bad price",
+                proposed_by="the Health Agent", proposed_at=datetime(2025, 2, 28, tzinfo=UTC),
+                status=CorrectionStatus.WAITING,
+            ))
+            session.commit()
+        engine.dispose()
+    
+>       [correction] = status(settings)["corrections"]
+                       ^^^^^^^^^^^^^^^^
+
+tests\test_bar_corrections.py:37: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_status.py:41: in status
+    found = json.loads(json.dumps(lake_status(settings, now=NOW, task_registered=task_registered)))
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\pdash\status.py:57: in lake_status
+    **_corrections_and_quarantines(settings),
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+src\pdash\status.py:107: in _corrections_and_quarantines
+    **correction_json(c),
+      ^^^^^^^^^^^^^^^^^^
+src\pdash\corrections\store.py:64: in correction_json
+    "market": change_of(row).region,
+              ^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+row = <pdash.appdb.models.ProposedCorrection object at 0x000001A6C0533E30>
+
+    def change_of(row: ProposedCorrection) -> CorrectionChange:
+        """A proposal's change, as the Corrections file holds it."""
+>       return CorrectionChange(
+            security_id=row.security_id,
+            kind=row.kind,
+            date=row.day,
+            ratio=row.ratio,
+            value=row.value,
+            why=row.why,
+        )
+E       pydantic_core._pydantic_core.ValidationError: 1 validation error for CorrectionChange
+E       kind
+E         Input should be 'split', 'dividend' or 'demerger' [type=literal_error, input_value='bar', input_type=str]
+E           For further information visit https://errors.pydantic.dev/2.13/v/literal_error
+
+src\pdash\corrections\store.py:50: ValidationError
+=========================== short test summary info ===========================
+FAILED tests/test_bar_corrections.py::test_status_reads_an_existing_waiting_bar_correction
+!!!!!!!!!!!!!!!!!!!!!!!!!! stopping after 1 failures !!!!!!!!!!!!!!!!!!!!!!!!!!
+1 failed in 7.26s

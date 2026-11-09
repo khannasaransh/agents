@@ -1,0 +1,25 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+____ test_empty_holdings_keep_the_same_column_types_as_a_nonempty_backtest ____
+
+    def test_empty_holdings_keep_the_same_column_types_as_a_nonempty_backtest():
+        data = panels(random_walk(DAYS, ["IN:A"]))
+        options = {"selection": {"top_n": 1}, "signals": [momentum(5)]}
+        populated = backtest(spec(**options), data, start=date(2020, 2, 1)).holdings
+        empty = backtest(
+            spec(**options, universe={"filters": [{"field": "close", "op": ">", "value": 1e12}]}),
+            data, start=date(2020, 2, 1),
+        ).holdings
+        assert not populated.empty
+        assert empty.empty
+>       pd.testing.assert_frame_equal(empty, populated.iloc[:0].reset_index(drop=True))
+E       AssertionError: Attributes of DataFrame.iloc[:, 0] (column name="signal_date") are different
+E       
+E       Attribute "dtype" are different
+E       [left]:  object
+E       [right]: datetime64[us]
+
+tests\test_backtest_engine.py:779: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_backtest_engine.py::test_empty_holdings_keep_the_same_column_types_as_a_nonempty_backtest
+1 failed, 37 deselected in 2.80s

@@ -1,0 +1,20 @@
+✔ the Health Step skips itself when the Lake is healthy, calling no Agent and dropping a diagnosis an earlier run of it recorded (344.1426ms)
+✔ after a failed Lake Step, the Health Agent runs on Claude Code in ash_new's folder with the Lake Step's log, what it did and the Lake's status, and its diagnosis is recorded (537.5031ms)
+✔ after a Lake Step whose status couldn't be read, the Health Agent is told so (602.8239ms)
+✔ after a refresh that worked, a Health report that flags something still calls the Health Agent (565.7309ms)
+✔ a Health Agent that fails on Claude Code and then on Codex is recorded as failed, with both errors, and fails the Step (748.7713ms)
+✔ a Health Step that can't find ash_new is recorded as failed, saying where it looked (435.2192ms)
+✔ the Health Agent diagnoses once per Run unless forced, and again once the Lake Step has changed what it is given (2216.9911ms)
+✔ a dry run diagnoses on the fake Worker (391.7018ms)
+✔ the Corrections the Health Agent proposes are recorded in ash_new to wait for approval, and health.json says what became of them (873.9546ms)
+✔ a diagnosis with no Corrections records none in ash_new (508.1299ms)
+✔ Corrections that can't be recorded fail the Step, keeping the diagnosis, and a re-run records them without asking the Agent again (1137.1849ms)
+✔ a dry run records no Correction in ash_new (345.2703ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 8870.3922

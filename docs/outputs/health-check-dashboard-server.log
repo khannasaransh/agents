@@ -1,0 +1,66 @@
+[web] build is up to date
+Dashboard: http://localhost:3000   API: http://127.0.0.1:8000/docs   (Ctrl+C 
+stops both)
+[web] ? Next.js 16.3.8
+[web] - Local:         http://127.0.0.1:3000
+[web] - Network:       http://127.0.0.1:3000
+[web] ? Ready in 370ms
+[web] ? Running next.config.ts took 62ms
+[api] INFO:     Started server process [40616]
+[api] INFO:     Waiting for application startup.
+[api] INFO:     Application startup complete.
+[api] INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+[api] INFO:     127.0.0.1:53132 - "GET /api/v1/data/indices HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53130 - "GET /api/v1/data/health HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53128 - "GET /api/v1/actions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53129 - "GET /api/v1/jobs?limit=25&kind=refresh HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53131 - "GET /api/v1/data/schedule HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53127 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:0 - "GET /api/v1/jobs/474/events HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:0 - "GET /api/v1/jobs/474/log HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:49679 - "GET /api/v1/actions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:49672 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:49679 - "GET /api/v1/portfolios/net-worth?base_ccy=INR HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:49683 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:49682 - "GET /api/v1/portfolios?base_ccy=INR HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:62985 - "GET /api/v1/portfolios/1 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:62990 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:62989 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:62991 - "GET /api/v1/portfolios HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:65246 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:65247 - "GET /api/v1/data/health HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:65248 - "GET /api/v1/data/schedule HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:65249 - "GET /api/v1/portfolios HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:65252 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:64712 - "GET /api/v1/watchlist/strategy/in-momentum-30 HTTP/1.1" 404 Not Found
+[api] INFO:     127.0.0.1:64710 - "GET /api/v1/strategies/in-momentum-30 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:64711 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54402 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54400 - "GET /api/v1/portfolios/1 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54401 - "GET /api/v1/portfolios/1/performance HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56172 - "GET /api/v1/portfolios/1 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56173 - "GET /api/v1/portfolios/1/allocation?by=strategy HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56175 - "GET /api/v1/portfolios/1/allocation?by=currency HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56174 - "GET /api/v1/portfolios/1/allocation?by=region HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56172 - "GET /api/v1/portfolios/1 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56175 - "GET /api/v1/portfolios/1/allocation?by=currency HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56173 - "GET /api/v1/portfolios/1/allocation?by=strategy HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56174 - "GET /api/v1/portfolios/1/allocation?by=region HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:56172 - "GET /api/v1/portfolios/1 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:63201 - "GET /api/v1/settings HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:63202 - "PUT /api/v1/settings HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:63203 - "GET /api/v1/settings HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:64513 - "GET /api/v1/actions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:64512 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:64514 - "GET /api/v1/settings HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54798 - "GET /api/v1/actions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54797 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54799 - "GET /api/v1/portfolios/1 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54798 - "GET /api/v1/portfolios HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:54797 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53262 - "GET /api/v1/actions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53261 - "GET /api/v1/meta/regions HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53263 - "GET /api/v1/portfolios/1 HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53261 - "GET /api/v1/strategies HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:53262 - "GET /api/v1/portfolios HTTP/1.1" 200 OK
+[api] INFO:     127.0.0.1:0 - "GET /api/v1/actions?status=pending HTTP/1.1" 200 OK

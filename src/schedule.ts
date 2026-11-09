@@ -146,8 +146,12 @@ const taskDays: Record<Weekday, string> = { sunday: 'Sunday', monday: 'Monday', 
 
 /**
  * The Task Scheduler entry for a Schedule: its name, the task definition (Task Scheduler's XML),
- * and the arguments and PATH it runs with. Task Scheduler can't give a task environment variables,
- * so the entry hands them to the agents command, which sets them before the Run starts.
+ * and the arguments node runs with and PATH. Task Scheduler can't give a task environment variables,
+ * so the entry hands them to the agents command, which sets them before the Run starts. Node starts
+ * under a headless console host, since a logged-on task otherwise opens a console window, and
+ * closing it ends the Run partway through (STATUS_CONTROL_C_EXIT, as the Run of 7 Nov 2026 ended).
+ * conhost doesn't pass node's exit code on, so the task's last result is no Run's outcome: the
+ * scheduled-starts log and the Run record have that.
  */
 export function taskSchedulerEntry(schedule: NamedSchedule, install: TaskSchedulerInstall): { name: string; xml: string; args: string[]; path: string } {
   const name = `${taskFolder}${schedule.name}`
@@ -192,8 +196,8 @@ export function taskSchedulerEntry(schedule: NamedSchedule, install: TaskSchedul
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>${xml(install.node)}</Command>
-      <Arguments>${xml(args.map(windowsArg).join(' '))}</Arguments>
+      <Command>${xml(win32.join(system, 'conhost.exe'))}</Command>
+      <Arguments>${xml(['--headless', install.node, ...args].map(windowsArg).join(' '))}</Arguments>
       <WorkingDirectory>${xml(agentsRoot.replace(/[\\/]$/, ''))}</WorkingDirectory>
     </Exec>
   </Actions>

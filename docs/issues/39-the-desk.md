@@ -1,6 +1,6 @@
 # 39: The Desk
 
-**Decision, 31 October 2026:** Saransh accepted holding every reviewed buy when the Portfolio Manager fails, and using Claude Code first for Chart. Analyst input folders and web-search permissions remain proposals pending explanation; see [the follow-up](../review/decisions-follow-up-2026-10-31.md).
+**Decision, 31 October 2026:** Saransh accepted holding every reviewed buy when the Portfolio Manager fails, and using Claude Code first for Chart. On 4 November 2026 he accepted the recommendation on analyst folders, applied: each analyst runs in an empty folder of its own, denied the data folder. See [the follow-up](../review/decisions-follow-up-2026-10-31.md).
 
 **What to build:** Three analysts, Events, Chart and Risk, each write their own view of the names `pd plan` asks them to review. An analyst no name needs isn't called, so a quiet day costs few calls. The analysts can only subtract; their views are evidence in the Portfolio Manager's Decision records. An early exit the Desk proposes waits for Saransh's approval and then lands on the next Rule plan. See the stocks Pipeline PRD's Desk Step and "Agents".
 
@@ -8,7 +8,7 @@
 
 **Blocked by:** 34: The Portfolio Manager, the Playbook and the final check; 37: India Feeds and the dossiers
 
-**Status:** done, but for its first Run on real data: no strategy is in Paper yet, so no paper Book has a buy to review (see "Not done")
+**Status:** done, but for the Events analyst on real data (see "On real data")
 
 - [x] Each analyst is an Agent, read-only in the Run folder:
   - Events runs on Claude Code and reads results dates, guidance, pledges, promoter selling, governance and filings;
@@ -40,7 +40,7 @@
 - **The analysts** (`agents/events/`, `agents/chart/`, `agents/risk/`; the shared parts in `src/desk.ts`): each read-only in the Run folder, with a timeout and a turn limit, and an output schema: for each name a view (`none`, `veto`, `trim` with a `size` above 0 and under 1, or `exit`), its reasons and its evidence (`dossier`, `feed` or `web`, by what it cites), and the web searches it made with their sources. Their instructions say what each reads and may say, and state the Mandate.
   - **Workers:** Events and Risk on Claude Code, Codex as fallback. **Chart starts on Claude Code too**, not Codex as this issue has it: the PRD's "Unconfirmed" note puts it there, since on Windows Codex's unelevated sandbox can't enforce the deny-read rules on the Tools it doesn't declare, so Codex refuses to start (as for the Health Agent). Codex is its fallback; say if it should move once Codex's sandbox enforces them.
   - **Web search:** a new `webSearch` in an Agent's config, off by default. With it, Claude Code gets its WebSearch tool (never WebFetch) and Codex `web_search="live"`. Events and Risk have it; Chart doesn't.
-- **What an analyst reads** of each name: its part of the dossier, copied into its inputs. Events reads MarketSmith's snapshot, the fundamentals, the events and the orders; Chart the bars and the orders; Risk the last 63 bars, the snapshot, the events and the orders, plus each reviewed Book's holdings by name and sector with their results and board meetings to come. **No shares, prices, values, weights or cash** reach an analyst: an order is its side, strategy, reason, signal (without its weight) and the rules that cut it. So a search can't carry Saransh's holdings, sizes or amounts. As a check, each query an analyst reports is matched against every whole amount in the Run's plans and Book states (years aside), with a To-do for one that carries any. The instructions tell the analysts to read nothing in the Run folder but their inputs; nothing enforces it, as they run read-only there (see "Not done").
+- **What an analyst reads** of each name: its part of the dossier, copied into its inputs. Events reads MarketSmith's snapshot, the fundamentals, the events and the orders; Chart the bars and the orders; Risk the last 63 bars, the snapshot, the events and the orders, plus each reviewed Book's holdings by name and sector with their results and board meetings to come. **No shares, prices, values, weights or cash** reach an analyst: an order is its side, strategy, reason, signal (without its weight) and the rules that cut it. So a search can't carry Saransh's holdings, sizes or amounts. As a check, each query an analyst reports is matched against every whole amount in the Run's plans and Book states (years aside), with a To-do for one that carries any. Since 4 November 2026 the analysts' folders and a deny rule keep them out of the data folder (the follow-up's item 12); this issue's "read-only in the Run folder" is the earlier design.
 - **The Desk Step** (`steps/stocks/desk.ts`, between Feeds and the Portfolio Manager):
   - calls only the analysts the review list needs (`review.analysts`), all at once, and skips itself when it needs none;
   - checks each view against its name: a veto or trim is of a buy, an exit of a holding the paper Book holds, a trim has a size, a view against a name cites evidence, a web citation is a link, and Chart cites no web. A view it may not give is refused;
@@ -97,9 +97,7 @@
   - Book codes as string literals, as elsewhere;
   - the final check's `unweighed` flag;
   - the analysts' Run-folder access, and the unchecked views a Decision record names (above).
+- **On real data, 4 November 2026 (Run `2026-11-04-1930`):** Chart and Risk answered on Claude Code, with no adversary, on the US paper Book's 17 buys: 34 views, none missing or refused. 10 were against a buy: 7 Chart trims, 2 Risk trims and Risk's veto of Option Care, which it reports under a cash deal, from one of its 5 web searches. Events wasn't asked for any name (issue 37's notes), so it hasn't run on real data.
+- **Fixed after that Run:** two of Risk's searches raised false To-dos for carrying an amount: "8-K" matched the Hong Kong Book's 8 shares of gold. An SEC form's name no longer counts as an amount (`amountsIn`, `test/desk.test.ts`). Neither query carried a holding.
 - **Not done:**
-  - **On real data:** no Desk has reviewed a real plan. No strategy is in Paper, so no paper Book has a buy, and its holdings are empty.
-  - **Enforcing the analysts' reading:** they run read-only in the Run folder as the issue asks, where `plan.json`, `book-states.json` and the full dossiers hold shares and amounts. Only their inputs, their instructions and the query check keep amounts out of a search. Say if they should run in a folder holding only what they read.
-  - **For Saransh,** two readings to confirm:
-    - a failed Portfolio Manager holds back every reviewed buy, so the Rule plan's fallback sends only sales, stops and gold;
-    - Chart on Claude Code first until Codex's sandbox enforces deny rules on Windows.
+  - **The Events analyst on real data**, until a name asks for it.

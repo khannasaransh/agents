@@ -7,8 +7,9 @@ import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
 let ws: Workspace
 afterEach(() => ws.cleanup())
 
-// A Saturday's Run, and a Tuesday's.
+// A Saturday's Run, a Wednesday's and a Tuesday's.
 const saturday = '2026-10-31-0930'
+const wednesday = '2026-10-28-0930'
 const tuesday = '2026-10-27-0930'
 const stocksSteps = ['marketsmith', 'lake', 'brief'].map((name) => ({ name, status: 'pending' }))
 
@@ -22,7 +23,7 @@ const recorded = (runId: string) => JSON.parse(ws.readRunFile(runId, 'marketsmit
 const todos = (runId: string) => (ws.runFiles(runId, 'todos').includes('marketsmith.json') ? JSON.parse(ws.readRunFile(runId, 'todos', 'marketsmith.json')) : [])
 const log = (runId: string) => ws.readRunFile(runId, 'logs', 'marketsmith.log')
 
-test("on a weekday the MarketSmith Step skips itself, asking nothing of pd", async () => {
+test("on a day other than Wednesday or Saturday the MarketSmith Step skips itself, asking nothing of pd", async () => {
   prepare(tuesday)
   ws.setPd({})
 
@@ -32,10 +33,10 @@ test("on a weekday the MarketSmith Step skips itself, asking nothing of pd", asy
   assert.equal(JSON.parse(ws.readRunFile(tuesday, 'run.json')).steps[0].status, 'skipped')
   assert.deepEqual(ws.pdCalls(), [])
   assert.equal(ws.runFiles(tuesday, '').includes('marketsmith.json'), false)
-  assert.match(log(tuesday), /MarketSmith is fetched on Saturdays, and this Run started on a Tuesday/)
+  assert.match(log(tuesday), /MarketSmith is fetched on Wednesdays and Saturdays, and this Run started on a Tuesday/)
 })
 
-test("on a Saturday it fetches India, the US and Hong Kong with pd marketsmith and records the fetch", async () => {
+test("on a Saturday it fetches India, the US and Hong Kong with pd marketsmith in auto mode and records the fetch", async () => {
   prepare(saturday)
   ws.setPd({ marketsmith: { example: 'marketsmith.fetched.json', stderr: 'IN: fetching 2599 symbols from MarketSmith\n' } })
 
@@ -45,13 +46,29 @@ test("on a Saturday it fetches India, the US and Hong Kong with pd marketsmith a
   assert.equal(JSON.parse(ws.readRunFile(saturday, 'run.json')).steps[0].status, 'succeeded')
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['marketsmith', '--region', 'IN', '--region', 'US', '--region', 'HK']],
-    "each Book's market, Hong Kong's too",
+    [['marketsmith', '--mode', 'auto', '--full-on', '07-01', '--region', 'IN', '--region', 'US', '--region', 'HK']],
+    "each Book's market, Hong Kong's too, full once a year from 1 July and latest otherwise",
   )
   assert.deepEqual(recorded(saturday), example('marketsmith.fetched.json'))
   assert.deepEqual(todos(saturday), [])
   assert.match(log(saturday), /IN: fetching 2599 symbols from MarketSmith/, "pd marketsmith's log is in the Step's")
-  assert.match(log(saturday), /India: fetched 2571 of 2599, snapshot IN:2026-10-31/)
+  assert.match(log(saturday), /India: fetched 2571 of 2599 \(full\), snapshot IN:2026-10-31/)
+})
+
+test("on a Wednesday it fetches too, and a latest fetch's line says what it chose and what went wrong", async () => {
+  prepare(wednesday)
+  ws.setPd({ marketsmith: { example: 'marketsmith.latest.json' } })
+
+  const result = await ws.agents('step', 'marketsmith', '--run', wednesday)
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(ws.pdCalls().map((call) => call.args), [['marketsmith', '--mode', 'auto', '--full-on', '07-01', '--region', 'IN', '--region', 'US', '--region', 'HK']])
+  assert.match(log(wednesday), /India: fetched 712 of 2632 \(latest: 214 with results, 3 new, 500 stale\), snapshot IN:2026-11-11; 5 MarketSmith has nothing for/)
+  assert.match(log(wednesday), /The US: fetched 500 of 5971 \(latest: 0 with results, 0 new, 500 stale\), snapshot US:2026-11-11; its results calendar couldn't be read/)
+  assert.match(log(wednesday), /Hong Kong: .*; 3 not whole in the last fetch, fetched again, 1 backup not whole, removed/)
+  const raised = todos(wednesday)
+  assert.equal(raised.length, 1)
+  assert.match(raised[0], /^MarketSmith's latest fetch of the US couldn't read its results calendar \(NASDAQ's earnings calendar couldn't be read: 2026-10-27 \(answered 403\)\), so it fetched only its new and stale symbols/)
 })
 
 test('a rejected cookie skips the Step with a To-do naming the cookie, keeping what was fetched', async () => {
@@ -65,7 +82,7 @@ test('a rejected cookie skips the Step with a To-do naming the cookie, keeping w
   assert.deepEqual(recorded(saturday), example('marketsmith.rejected.json'))
   const raised = todos(saturday)
   assert.equal(raised.length, 1)
-  assert.match(raised[0], /^PDASH_MS_INDIA_AUTH didn't work, so India wasn't fetched this Saturday \(MarketSmith India answered 403/)
+  assert.match(raised[0], /^PDASH_MS_INDIA_AUTH didn't work, so India wasn't fetched in this Run \(MarketSmith India answered 403/)
   assert.match(raised[0], /ash_new's \.env as PDASH_MS_INDIA_AUTH, then run `uv run pd marketsmith --region IN` in ash_new/)
 })
 
@@ -113,7 +130,7 @@ test('run again, the Step fetches only the regions not yet fetched, and once all
   await ws.agents('step', 'marketsmith', '--run', saturday)
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['marketsmith', '--region', 'IN', '--region', 'US', '--region', 'HK'], ['marketsmith', '--region', 'IN']],
+    [['marketsmith', '--mode', 'auto', '--full-on', '07-01', '--region', 'IN', '--region', 'US', '--region', 'HK'], ['marketsmith', '--mode', 'auto', '--full-on', '07-01', '--region', 'IN']],
     'the second run asked again only for India, whose cookie was rejected, and the third for nothing',
   )
   const regions = recorded(saturday).regions
@@ -125,5 +142,5 @@ test('run again, the Step fetches only the regions not yet fetched, and once all
   assert.deepEqual(todos(saturday), [], "the fetch that worked dropped the cookie's To-do")
 
   await ws.agents('step', 'marketsmith', '--run', saturday, '--force')
-  assert.deepEqual(ws.pdCalls()[2].args, ['marketsmith', '--region', 'IN', '--region', 'US', '--region', 'HK'], 'forced, it fetches every region again')
+  assert.deepEqual(ws.pdCalls()[2].args, ['marketsmith', '--mode', 'auto', '--full-on', '07-01', '--region', 'IN', '--region', 'US', '--region', 'HK'], 'forced, it fetches every region again')
 })

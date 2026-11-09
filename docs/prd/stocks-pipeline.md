@@ -21,7 +21,7 @@ He wants the highest CAGR he can get, with 30% as the aim and as little drawdown
 A stocks Pipeline in the agents repo, run on the Windows machine that holds the Lake. It runs Tuesday to Saturday at 07:00 IST, so each Run has both markets' previous closes. Each Run:
 
 1. **Records what Saransh did:** his Answers from the last Stocks Brief, and the tradebooks and holdings exports he dropped in the Broker inbox.
-2. **Fetches MarketSmith's data** through ash_new, on Saturdays, keeping each fetch as a dated snapshot.
+2. **Fetches MarketSmith's data** through ash_new, on Wednesdays and Saturdays (only what changed, and every symbol once a year: issue 50), keeping each fetch as a dated snapshot.
 3. **Brings the Lake up to date** with ash_new's daily chain. It clears a stuck refresh and retries a failed one once. If something still breaks, the Health Agent works out why. The Data gate decides whether the Portfolio Manager may act at all (Hold mode otherwise), and a single flagged security goes into Quarantine.
 4. **Makes the Rule plan in code** for each Book: India, the US and Hong Kong, each real and paper. It starts from the Book's state: its reconciled holdings and cash, and what open orders reserve. It uses the same engine that backtests the Book, so live trades what was tested. It reads each market's Market condition, which sets how much of the Book may be in stocks.
 5. **Puts the plan to the Desk and the Portfolio Manager.** The Events, Chart and Risk analysts read the Feeds and the Lake for the Rule plan's names and argue over it. The Portfolio Manager decides what to change within the Book's Playbook, and writes a Decision record with the evidence for each change. A final check holds it to the Mandate, the Playbook and the Book's Judgement mode.
@@ -293,7 +293,7 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
 2. **Broker inbox** (command). It records each tradebook in its real Book and matches fills to orders. When a holdings export is present, it runs Reconciliation.
    - Processed files move out of the inbox. A file it can't read is set aside, with a To-do.
    - On a Book's first import, every holding no strategy bought becomes a Legacy holding, and the Brief asks whether to keep each one.
-3. **MarketSmith** (command, Saturdays only; it skips itself otherwise). It runs `pd marketsmith` for India, the US and Hong Kong, which writes the raw store and keeps the fetch as a dated snapshot. An expired cookie skips the Step, with a To-do naming the cookie.
+3. **MarketSmith** (command, Wednesdays and Saturdays; it skips itself otherwise). It runs `pd marketsmith --mode auto` for India, the US and Hong Kong. That is a latest fetch of the symbols with results lately, the new ones and the stalest, and a full one once a year from 1 July (issue 50). It starts from a copy of the raw store, keeps it only once it is whole, backs up what it replaced and keeps the store as a dated snapshot. An expired cookie skips the Step, with a To-do naming the cookie. A fetch or backup that went wrong calls the Health Agent.
 4. **Lake** (command):
    - It checks that ash_new's own schedule is off, and raises a To-do if it isn't.
    - It clears a refresh left running by a dead process.
@@ -544,7 +544,7 @@ There are two seams, and both are a command with files in and files out.
   - hands each file to the right import;
   - sets an unreadable file aside, with a To-do;
   - raises a To-do for placed orders that have no tradebook.
-- **MarketSmith:** skips itself on weekdays, and with a To-do on an expired cookie.
+- **MarketSmith:** skips itself on days other than Wednesday and Saturday, and with a To-do on an expired cookie or a results calendar it couldn't read.
 - **Lake:**
   - clears a stuck refresh;
   - retries once, and fails when the retry fails;
