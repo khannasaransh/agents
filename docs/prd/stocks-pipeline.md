@@ -18,7 +18,7 @@ He wants the highest CAGR he can get, with 30% as the aim and as little drawdown
 
 ## Solution
 
-A stocks Pipeline in the agents repo, run on the Windows machine that holds the Lake. It runs Tuesday to Saturday at 07:00 IST, so each Run has both markets' previous closes. Each Run:
+A stocks Pipeline in the agents repo, run on the Windows machine that holds the Lake. It runs Tuesday to Saturday at 06:00 IST, so each Run has both markets' previous closes. Each Run:
 
 1. **Records what Saransh did:** his Answers from the last Stocks Brief, and the tradebooks and holdings exports he dropped in the Broker inbox.
 2. **Fetches MarketSmith's data** through ash_new, on Wednesdays and Saturdays (only what changed, and every symbol once a year: issue 50), keeping each fetch as a dated snapshot.
@@ -34,7 +34,7 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 
 ### Running the stocks Pipeline
 
-1. As Saransh, I want the stocks Pipeline to run by itself Tuesday to Saturday at 07:00 IST, so that the Stocks Brief is ready with both markets' previous closes before India opens.
+1. As Saransh, I want the stocks Pipeline to run by itself Tuesday to Saturday at 06:00 IST, so that the Stocks Brief is ready with both markets' previous closes before India opens.
 2. As Saransh, I want the Windows machine woken from sleep for a Run, so that a sleeping PC doesn't cost me a trading day.
 3. As Saransh, I want a Run missed while the machine was off to start as soon as it is back, so that the worst case is a late Brief, not a missing one.
 4. As Saransh, I want `agents schedule install` to write the stocks Schedule into Windows Task Scheduler from its Schedule definition, so that the task is never hand-edited.
@@ -274,7 +274,7 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
 ### Schedule on Windows
 
 - A Schedule definition now names its machine, as well as its Pipeline, days and time. `agents schedule install` installs only the current machine's Schedules: launchd on the Mac, Task Scheduler on Windows.
-- The stocks Schedule runs Tuesday to Saturday at 09:30 on this machine's clock (Singapore time), which is 07:00 IST.
+- The stocks Schedule runs Tuesday to Saturday at 08:30 on this machine's clock (Singapore time), which is 06:00 IST.
 - The Task Scheduler entry is generated from the Schedule definition, and installing again replaces it rather than adding a second. The entry:
   - wakes the machine to run;
   - starts a missed time as soon as the machine is available;

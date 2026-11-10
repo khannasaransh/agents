@@ -25,7 +25,7 @@ Then open http://127.0.0.1:4312/portfolio.
 
 ## Connect the Windows portfolio runs
 
-The stocks schedule in this repository targets Windows, Tuesday through Saturday at 09:30 Singapore time. The schedule displayed by the dashboard is its repository definition; the dashboard does not verify its installation or start runs.
+The stocks schedule in this repository targets Windows, Tuesday through Saturday at 08:30 Singapore time. The schedule displayed by the dashboard is its repository definition; the dashboard does not verify its installation or start runs.
 
 This Mac's default data folder currently contains daily and weekly engineering runs. A portfolio page with no runs is expected until it can read stocks run snapshots.
 

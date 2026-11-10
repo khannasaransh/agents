@@ -41,8 +41,8 @@ test('the daily Schedule runs the daily Pipeline on the Mac, Tuesday to Saturday
   assert.deepEqual(await dailySchedule(), { name: 'daily', pipeline: 'daily', machine: 'mac', days: ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], time: '06:00' })
 })
 
-test('the stocks Schedule runs the stocks Pipeline on the Windows machine, Tuesday to Saturday at 09:30 Singapore time, 07:00 IST', async () => {
-  assert.deepEqual(await stocksSchedule(), { name: 'stocks', pipeline: 'stocks', machine: 'windows', days: ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], time: '09:30' })
+test('the stocks Schedule runs the stocks Pipeline on the Windows machine, Tuesday to Saturday at 08:30 Singapore time, 06:00 IST', async () => {
+  assert.deepEqual(await stocksSchedule(), { name: 'stocks', pipeline: 'stocks', machine: 'windows', days: ['tuesday', 'wednesday', 'thursday', 'friday', 'saturday'], time: '08:30' })
 })
 
 test('the weekly Schedule runs the weekly Pipeline on the Mac, on Sunday at 06:00', async () => {
@@ -212,13 +212,13 @@ function elements(xml: string, tag: string): string[] {
 
 const unescape = (text: string) => text.replaceAll('&quot;', '"').replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&')
 
-test("the stocks Schedule's Task Scheduler entry starts a scheduled Run of the stocks Pipeline Tuesday to Saturday at 09:30 on the machine's clock", async () => {
+test("the stocks Schedule's Task Scheduler entry starts a scheduled Run of the stocks Pipeline Tuesday to Saturday at 08:30 on the machine's clock", async () => {
   const entry = taskSchedulerEntry(await stocksSchedule(), windowsInstall)
 
   assert.equal(entry.name, '\\agents\\stocks')
   assert.deepEqual(elements(entry.xml, 'URI'), ['\\agents\\stocks'])
   // A time with no offset is the machine's own clock, whatever its time zone.
-  assert.deepEqual(elements(entry.xml, 'StartBoundary'), ['2026-10-25T09:30:00'])
+  assert.deepEqual(elements(entry.xml, 'StartBoundary'), ['2026-10-25T08:30:00'])
   assert.deepEqual(elements(entry.xml, 'DaysOfWeek'), ['<Tuesday /><Wednesday /><Thursday /><Friday /><Saturday />'])
   assert.deepEqual(elements(entry.xml, 'WeeksInterval'), ['1'])
   assert.deepEqual(elements(entry.xml, 'WorkingDirectory'), [agentsRoot.replace(/[\\/]$/, '')])
