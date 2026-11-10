@@ -15,7 +15,6 @@ const repos: Repo[] = [
   // flutter
   { name: 'app-qa-frontend', team: 'flutter', codebase: 'Shared', remote: 'https://github.com/NewsInShorts/app-qa-frontend.git', folder: '~/Saransh/github/flutter/app-qa-frontend', branch: 'main' },
   { name: 'core_dependencies_flutter', team: 'flutter', codebase: 'Shared', remote: 'https://github.com/NewsInShorts/core_dependencies_flutter.git', folder: '~/Saransh/github/flutter/core_dependencies_flutter', branch: 'development' },
-  { name: 'crux_flutter', team: 'flutter', codebase: 'Inshorts', remote: 'https://github.com/NewsInShorts/crux_flutter.git', folder: '~/Saransh/github/flutter/crux_flutter', branch: 'main' },
   { name: 'customcard_flutter', team: 'flutter', codebase: 'Shared', remote: 'https://github.com/NewsInShorts/customcard_flutter.git', folder: '~/Saransh/github/flutter/customcard_flutter', branch: 'development' },
   { name: 'flutter_payment', team: 'flutter', codebase: 'Shared', remote: 'https://github.com/NewsInShorts/flutter_payment.git', folder: '~/Saransh/github/flutter/flutter_payment', branch: 'main' },
   { name: 'inpix_flutter', team: 'flutter', codebase: 'InPix', remote: 'git@github.com:NewsInShorts/inpix_flutter.git', folder: '~/Saransh/github/flutter/inpix_flutter', branch: 'development' },
