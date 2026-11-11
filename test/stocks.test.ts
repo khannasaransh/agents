@@ -19,10 +19,14 @@ function workspace(): Workspace {
 }
 
 /** Whether the Run started on a Saturday, by its id: MarketSmith and the weekly review run only then. */
-function onSaturday(id: string): boolean {
+function weekday(id: string): number {
   const [year, month, day] = id.split('-').map(Number)
-  return new Date(year, month - 1, day).getDay() === 6
+  return new Date(year, month - 1, day).getDay()
 }
+
+const onSaturday = (id: string) => weekday(id) === 6
+/** MarketSmith is fetched on Wednesdays and Saturdays (9 November 2026). */
+const onFetchDay = (id: string) => [3, 6].includes(weekday(id))
 
 test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agent on a healthy Lake, judges on the fake Worker, then writes the Stocks Brief', async () => {
   ws = workspace()
@@ -32,6 +36,7 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
     review: { example: 'review.saturday.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
+    'cross-check': { example: 'cross-check.agreed.json' },
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
     feeds: { example: 'feeds.fetched.json' },
     check: { example: 'check.recorded.json' },
@@ -68,6 +73,8 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ['save-state', 'skipped'],
       ['sash', 'skipped'],
       ['brief', 'succeeded'],
+      // After the Brief; a dry run runs no backtest again.
+      ['backtests', 'skipped'],
     ],
   )
   assert.deepEqual(ws.workerCliCalls('claude'), [])
@@ -81,6 +88,8 @@ test('agents run stocks --dry-run reads the Lake as it is, skips the Health Agen
       ...(saturday ? [['review', '--dry-run']] : []),
       ['stages', 'check', '--dry-run'],
       ['plan', '--on', id.slice(0, 10), '--dossiers', 'dossiers'],
+      // The plans' closes are compared with a second source; a dry run quarantines nothing.
+      ['cross-check', '--plan', 'plan.json', '--dry-run'],
       ['book-state', 'IN'],
       ['book-state', 'US'],
       ['book-state', 'HK'],
@@ -110,6 +119,7 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
     review: { example: 'review.saturday.json' },
     stages: { example: 'stages-check.empty.json' },
     plan: { example: 'plan.normal.json' },
+    'cross-check': { example: 'cross-check.agreed.json' },
     'book-state': [{ example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.india.json' }, { example: 'book-state.paper.json' }, { example: 'book-state.rules-only.json' }],
     feeds: { example: 'feeds.fetched.json' },
     check: { example: 'check.recorded.json' },
@@ -124,14 +134,14 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   const [id] = ws.runIds()
   const run = ws.readRun(id)
   assert.equal(run.status, 'partial')
-  // MarketSmith is fetched, and the Books reviewed, only when the Run started on a Saturday.
+  // The Books are reviewed only when the Run started on a Saturday; MarketSmith is fetched on Wednesdays too.
   const saturday = onSaturday(id)
   assert.deepEqual(
     run.steps.map((s) => [s.name, s.status]),
     [
       ['answers', 'succeeded'],
       ['broker-inbox', 'succeeded'],
-      ['marketsmith', saturday ? 'succeeded' : 'skipped'],
+      ['marketsmith', onFetchDay(id) ? 'succeeded' : 'skipped'],
       ['lake', 'failed'],
       ['review', saturday ? 'succeeded' : 'skipped'],
       ['stages', 'succeeded'],
@@ -144,6 +154,8 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
       ['save-state', 'skipped'],
       ['sash', 'skipped'],
       ['brief', 'succeeded'],
+      // The Lake wasn't refreshed, so no backtest is stale because of this Run.
+      ['backtests', 'skipped'],
     ],
   )
   // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent, the Desk's three analysts and the Portfolio Manager fail on both.

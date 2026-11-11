@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Portfolio Pipeline Audit</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --ink: #1d1c1a; --quiet: #5f5c56; --border: #e3e0d8;
+    --edge: #b9b5ab; --accent: #2f6fd6; --accent-tint: rgba(47,111,214,.10); --tint: #f1efe9; --code: #f1efe9;
+    --good: #1f7a3d; --bad: #b3261e; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+      --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+      --good: #6cc48a; --bad: #f08a80; --warn: #e0b060;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+    --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+    --good: #6cc48a; --bad: #f08a80; --warn: #e0b060;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; line-height: 1.25; margin: 0 0 6px; }
+  .byline { color: var(--quiet); font-size: 14px; margin-bottom: 28px; }
+  h2 { font-size: 22px; margin: 44px 0 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+  h3 { font-size: 17px; margin: 26px 0 8px; }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  nav { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+  nav ol { margin: 0; columns: 2; }
+  @media (max-width: 600px) { nav ol { columns: 1; } }
+  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--tint); font-weight: 600; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr.now td { background: var(--accent-tint); }
+  .note { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; }
+  .note.warn { border-left-color: var(--warn); }
+  .note p:last-child { margin-bottom: 0; }
+  .good { color: var(--good); font-weight: 600; } .bad { color: var(--bad); font-weight: 600; } .open { color: var(--warn); font-weight: 600; }
+  .quiet { color: var(--quiet); font-size: 14px; }
+  .theme { position: fixed; top: 12px; right: 12px; font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="theme" type="button" id="theme" aria-label="Switch light or dark theme">Theme</button>
+<main>
+<h1>Portfolio pipeline audit</h1>
+<div class="byline">10–11 November 2026 · the stocks Pipeline (this repo) and ash_new (<code>backend/portfolio-dashboard</code>)</div>
+
+<div class="note">
+<p><strong>Verdict.</strong> The Pipeline is sound and ran end to end on 10 November. Its weakness was not in the plumbing: the Books as configured earned about half of what their strategies earn alone, and a few data checks had gaps. Five of the seven changes proposed are now in the working trees of both repos (nothing is committed). One was built, tested and taken out again because it tested worse. One, the US and Hong Kong Books, is a decision for you and is laid out in <a href="#us-hk">section 6</a>.</p>
+</div>
+
+<nav>
+<ol>
+  <li><a href="#measured">How it was measured</a></li>
+  <li><a href="#returns">Where the returns went</a></li>
+  <li><a href="#changed">What was changed, and what it did</a></li>
+  <li><a href="#breaker">The breaker: tried, not kept</a></li>
+  <li><a href="#data">Data safety</a></li>
+  <li><a href="#us-hk">The US and Hong Kong Books</a></li>
+  <li><a href="#operations">Operations</a></li>
+  <li><a href="#open">Still open</a></li>
+  <li><a href="#files">What changed in each repo</a></li>
+  <li><a href="#verified">What was verified</a></li>
+</ol>
+</nav>
+
+<h2 id="measured">1. How it was measured</h2>
+<p>Every figure below is from ash_new's own Book backtest (<code>pd book-backtest</code> and the same engine called from scripts), on the Lake as refreshed on 10 November 2026. Each is given as <strong>CAGR / max drawdown</strong> over two windows:</p>
+<ul>
+  <li><strong>the range:</strong> 9 November 2016 to 9 November 2026;</li>
+  <li><strong>the holdout:</strong> 1 January 2013 to 15 August 2016, the window ash_new's research held out.</li>
+</ul>
+<p>The Books are the three as they stand: India (Super 30 OK tuned and CW2 selected), the US (CW2 selected and Super 30 OK tuned) and Hong Kong (the same pair), each at Real-full, with 10% gold.</p>
+<div class="note warn">
+<p><strong>How far to trust the numbers.</strong> Each Book is one path through eight to twenty positions, so small changes move results by two or three points either way. The settings below were chosen after looking at both windows, so the holdout is no longer a clean test of them. Read the direction and the size of an effect, not its last digit. No backtest here includes capital gains tax or brokerage above ₹0 and $0 (<a href="#open">section 8</a>).</p>
+</div>
+
+<h2 id="returns">2. Where the returns went</h2>
+<p>The Books as they were configured on 10 November, against their benchmarks and against their own strategies run alone:</p>
+<div class="table-wrap"><table>
+<tr><th>Book</th><th class="n">Book, range</th><th class="n">Book, holdout</th><th class="n">Benchmark, range</th><th>Its strategies alone, range</th></tr>
+<tr><td>India</td><td class="n">16.0% / −11.1%</td><td class="n">18.0% / −7.2%</td><td class="n">13.7% / −38.1%</td><td>Super 30 23.7% / −34.7%; CW2 30.0% / −30.5%</td></tr>
+<tr><td>US</td><td class="n">10.8% / −11.7%</td><td class="n">4.6% / −5.3%</td><td class="n">15.2% / −33.8%</td><td>CW2 20.0% / −26.0%; Super 30 10.1% / −39.8%</td></tr>
+<tr><td>Hong Kong</td><td class="n">8.2% / −13.4%</td><td class="n">1.5% / −11.8%</td><td class="n">0.9% / −55.7%</td><td>CW2 10.8% / −34.8%; Super 30 12.2% / −53.0%</td></tr>
+</table></div>
+<p>The Mandate accepts a drawdown of 25%. The Books used less than half of that and sat 56% to 72% in the cash fund on average. Three defensive layers were stacked on strategies that already sell everything when their market's index falls under its 200-day average. Switching each rule off in turn (the <code>rules</code> block of <code>pd book-backtest</code>) showed what each cost over the range:</p>
+<div class="table-wrap"><table>
+<tr><th>Rule</th><th class="n">India: CAGR / drawdown effect</th><th class="n">US</th><th class="n">Hong Kong</th><th>What was happening</th></tr>
+<tr><td>Disaster stops</td><td class="n">−6.8 pts / +2.1 pts</td><td class="n">+4.0 / +4.3</td><td class="n">−1.7 / −0.6</td><td>India CW2's stop sat 20% under each week's close; the strategy's own trailing stop is 30% under its high. The Disaster stop sold first (42 of the Book's 54 stop sales) and the Sleeve did not buy back.</td></tr>
+<tr><td>Exposure level</td><td class="n">+0.2 / +1.7</td><td class="n">+0.7 / +3.3</td><td class="n">−6.7 / +1.0</td><td>Distribution days alone made a Correction of 29% of India's and the US's sessions. Hong Kong read Correction on 54% of sessions and Uptrend on 9%, because breadth was measured over every listing, penny stocks included.</td></tr>
+<tr><td>Breakers</td><td class="n">−0.7 / +2.2</td><td class="n">+1.1 / +8.4</td><td class="n">−3.0 / +7.7</td><td>The first breaker kept India from buying on 18% of days, the US on 23%, Hong Kong on 41%. See <a href="#breaker">section 4</a>.</td></tr>
+<tr><td>Order-size guard (1% of traded value)</td><td class="n">−2.7 / +0.5</td><td class="n">0 / 0</td><td class="n">0 / 0</td><td>Binds only in India, as the Book grows. Left as it is: <a href="#open">section 8</a>.</td></tr>
+<tr><td>Position cap, sector cap, limit price</td><td class="n">within ±0.4</td><td class="n">within ±0.8</td><td class="n">within ±0.7</td><td>Small either way.</td></tr>
+</table></div>
+<p class="quiet">Effect = the Book with the rule, less the same Book without it. A positive drawdown effect is a shallower drawdown. The sign of the stops' effect differs by Book: in the US they helped. That is the noise the warning above is about.</p>
+<p>India on 9 November 2026 showed the exposure rule's problem in one line: the Nifty 500 closed at 23,567, above its 50-day (22,486) and 200-day (22,759) averages, MarketSmith's outlook was Confirmed Uptrend, and the Book was capped at 40% in stocks on eight distribution days.</p>
+
+<h2 id="changed">3. What was changed, and what it did</h2>
+<h3>The Mandate, second version (<code>7d9f896c659f</code>)</h3>
+<ul>
+  <li><strong>A Disaster stop is never nearer than 10% past its strategy's own trailing stop</strong> (<code>disaster_stop_past_trail: 0.10</code>). India CW2's goes from 20% to 40% under its entry; Super 30's from 30% to 35%. Hong Kong CW2's stays at 50%, which was already past its trail.</li>
+  <li><strong>A Disaster stop stays where its entry set it</strong> (<code>raise_disaster_stops: false</code>). The Order list no longer asks you to raise stops on Saturdays.</li>
+</ul>
+<p>A Mandate with the first version's numbers still hashes to the first version (<code>f99c88f13b5b</code>): both settings default to the old behaviour, so a plan made before the change is not mistaken for one made after.</p>
+<h3>The Market condition</h3>
+<ul>
+  <li><strong>Distribution days make a Correction only while the index is under its 50-day average.</strong> Seven of them above it are Under pressure (80%), not a Correction (40%); five alone change nothing.</li>
+  <li><strong>Hong Kong's breadth and volume are measured over its liquid securities</strong>: those trading at least HK$20M a day on average over the 20 sessions before. India and the US keep their index members.</li>
+</ul>
+<h3>Before and after, on the code as it now stands</h3>
+<div class="table-wrap"><table>
+<tr><th>Book</th><th>Settings</th><th class="n">Range</th><th class="n">Sharpe</th><th class="n">Holdout</th><th class="n">Idle in cash</th><th class="n">Uptrend / pressure / Correction</th></tr>
+<tr><td rowspan="4">India</td><td>Before</td><td class="n">16.0% / −11.1%</td><td class="n">0.98</td><td class="n">18.0% / −7.2%</td><td class="n">66%</td><td class="n">36 / 34 / 29%</td></tr>
+<tr><td>The stops alone</td><td class="n">23.1% / −13.1%</td><td class="n">1.35</td><td class="n">15.2% / −9.3%</td><td class="n">61%</td><td class="n">36 / 34 / 29%</td></tr>
+<tr><td>The Market condition alone</td><td class="n">15.8% / −11.1%</td><td class="n">0.96</td><td class="n">24.9% / −7.4%</td><td class="n">66%</td><td class="n">47 / 27 / 26%</td></tr>
+<tr class="now"><td><strong>After (as set now)</strong></td><td class="n"><strong>22.4% / −13.1%</strong></td><td class="n">1.28</td><td class="n"><strong>25.3% / −7.3%</strong></td><td class="n">60%</td><td class="n">47 / 27 / 26%</td></tr>
+<tr><td rowspan="2">Hong Kong</td><td>Before</td><td class="n">8.2% / −13.4%</td><td class="n">0.65</td><td class="n">1.5% / −11.8%</td><td class="n">72%</td><td class="n">9 / 37 / 54%</td></tr>
+<tr class="now"><td><strong>After</strong></td><td class="n"><strong>12.2% / −12.9%</strong></td><td class="n">0.87</td><td class="n">1.2% / −12.8%</td><td class="n">69%</td><td class="n">34 / 23 / 43%</td></tr>
+<tr><td rowspan="2">US</td><td>Before</td><td class="n">10.8% / −11.7%</td><td class="n">0.74</td><td class="n">4.6% / −5.3%</td><td class="n">56%</td><td class="n">37 / 33 / 29%</td></tr>
+<tr class="now"><td><strong>After</strong></td><td class="n"><strong>8.6% / −13.2%</strong></td><td class="n">0.56</td><td class="n">4.8% / −3.3%</td><td class="n">60%</td><td class="n">57 / 23 / 20%</td></tr>
+</table></div>
+<ul>
+  <li><span class="good">India improves in both windows</span>: about six points of CAGR over the range and seven in the holdout, for two points more drawdown over the range. Each change carries one window: the stops the range, the Market condition the holdout. Together they hold up in both.</li>
+  <li><span class="open">Hong Kong improves over the range only.</span> In the holdout nothing beats the cash fund's 3%, before or after.</li>
+  <li><span class="bad">The US gets worse over the range</span> (each change alone helped a little, together they did not) and is flat in the holdout. No setting tried makes the US Book beat the S&amp;P 500, which is the subject of <a href="#us-hk">section 6</a>.</li>
+</ul>
+
+<h2 id="breaker">4. The breaker: tried, not kept</h2>
+<p>The first breaker stops a Book's buys at a 10% drawdown until it recovers above 5%. A Book whose stops have sold most of what it held recovers slowly, which is why it was locked out for a year or more at a time. The proposal was a second way out, when the market returns to an Uptrend. It was built into the engine and measured on top of the two changes above. It was then removed, because it tested worse:</p>
+<div class="table-wrap"><table>
+<tr><th>The first breaker</th><th class="n">India, range</th><th class="n">Hong Kong, range</th><th class="n">US, range</th></tr>
+<tr class="now"><td><strong>As it is: out only by recovering above −5%</strong></td><td class="n"><strong>22.4% / −13.1%</strong></td><td class="n"><strong>12.2% / −12.9%</strong></td><td class="n"><strong>8.6% / −13.2%</strong></td></tr>
+<tr><td>Never trips in an Uptrend (as first built)</td><td class="n">20.5% / −17.9%</td><td class="n">7.9% / −19.3%</td><td class="n">9.2% / −19.6%</td></tr>
+<tr><td>… without buying back on release</td><td class="n">21.8% / −13.1%</td><td class="n">11.8% / −12.9%</td><td class="n">8.0% / −18.1%</td></tr>
+<tr><td>… only after 20 sessions of Uptrend</td><td class="n">21.9% / −13.1%</td><td class="n">10.1% / −12.8%</td><td class="n">13.1% / −13.0%</td></tr>
+<tr><td>Released by an Uptrend, measured again from there</td><td class="n">21.7% / −13.1%</td><td class="n">8.8% / −18.9%</td><td class="n">9.1% / −18.4%</td></tr>
+<tr><td>Released after 60 sessions, measured again</td><td class="n">23.2% / −10.7%</td><td class="n">8.0% / −19.0%</td><td class="n">8.6% / −18.7%</td></tr>
+<tr><td>No breakers at all</td><td class="n">22.5% / −12.7%</td><td class="n">10.9% / −21.1%</td><td class="n">10.0% / −19.9%</td></tr>
+</table></div>
+<p>With the stops and the Market condition changed, the breaker is no longer what holds India back (with or without it: 22.4% against 22.5%), and it still protects Hong Kong and the US from drawdowns of 19% to 21%. No way out helped all three Books, and the holdout was the same under every one. The breakers are unchanged.</p>
+
+<h2 id="data">5. Data safety</h2>
+<div class="table-wrap"><table>
+<tr><th>Finding</th><th>What was done</th></tr>
+<tr><td><strong>The index was not gated.</strong> A missing index bar was carried forward by the panels and warned only after five sessions, yet the index sets the exposure level and the strategies' sell-everything exit.</td><td><span class="good">Fixed.</span> The Data gate fails when a market's index has no bar on the Lake's latest session.</td></tr>
+<tr><td><strong>US and Hong Kong prices had one source.</strong> The only check of a single bar was a move over 40%; India alone was compared with MarketSmith.</td><td><span class="good">Fixed.</span> After the plans are made, <code>pd cross-check</code> compares the closes they rest on with a second source: NSE's own bhavcopy and index file for India, Tencent's daily bars for the US, Hong Kong and their indices. A close over 1% away quarantines the security, or the index (which fails the gate), and the plans are made again. On 10 November's plan it compared 23 closes and all agreed, in 8 seconds.</td></tr>
+<tr><td><strong>The second source itself failed quietly once, in testing.</strong> Asked for a US name without its exchange, Tencent returns only the latest bar, so a check made while New York was trading found no bar of the last session and compared nothing.</td><td><span class="good">Fixed.</span> US names are asked for by their exchange, which returns several days (19 of 19 compared while New York was open). A source that answers but has none of a market's closes is now a To-do in the Brief.</td></tr>
+<tr><td><strong>Quarantines only piled up.</strong> 1,046 were open on 813 securities; about 21 were added a day and none lifted unless you answered.</td><td><span class="good">Fixed.</span> A Quarantine lifts once the Health report no longer raises its flag, unless a Correction for the security is waiting or its market could not be checked.</td></tr>
+<tr><td><strong>The Health Agent re-read every flag daily.</strong> 513 flags, none on a holding or Pool name, 9.5 million tokens and 8 minutes, with Codex out of quota.</td><td><span class="good">Fixed.</span> It is called for new flags, flags on a security the Books hold or may trade, and securities the Lake no longer prices that have not been looked up. It is given those, and told how many were left out.</td></tr>
+<tr><td><strong>The Agent could describe a bad bar but not propose its Correction</strong>: its output schema had no <code>bar</code> kind, as it said itself in the 10 November diagnosis.</td><td><span class="good">Fixed.</span> The schema now allows it.</td></tr>
+<tr><td><strong>A quarantined holding cannot be sold on a strategy exit</strong>, only by its Disaster stop.</td><td><span class="open">Open.</span> By design, but it bites exactly when a held name collapses. See <a href="#open">section 8</a>.</td></tr>
+</table></div>
+<p class="quiet">The second source is unofficial for the US and Hong Kong, as Yahoo is. A symbol or a day it does not have is listed, not flagged, and a source that cannot be reached is a To-do in the Brief and holds nothing up.</p>
+
+<h2 id="us-hk">6. The US and Hong Kong Books</h2>
+<p>This is the one change not implemented, because it is a choice of strategy, not a repair.</p>
+<h3>The evidence against the US stock Sleeves</h3>
+<div class="table-wrap"><table>
+<tr><th>US Book of</th><th class="n">Range, as set</th><th class="n">Range, best setting tried</th><th class="n">Holdout, best</th></tr>
+<tr><td>CW2 selected + Super 30 OK tuned (today's)</td><td class="n">10.8% / −11.7%</td><td class="n">15.0% / −22.7%</td><td class="n">5.4% / −3.5%</td></tr>
+<tr><td>CW2 selected alone</td><td class="n">6.5% / −12.8%</td><td class="n">10.9% / −12.4%</td><td class="n">8.7% / −7.6%</td></tr>
+<tr><td>CW2 selected + momentum tuned</td><td class="n">8.5% / −11.9%</td><td class="n">10.3% / −11.2%</td><td class="n">10.2% / −9.6%</td></tr>
+<tr><td>Investor v1 alone</td><td class="n">3.2% / −18.4%</td><td class="n">7.0% / −20.3%</td><td class="n">13.5% / −11.2%</td></tr>
+<tr><td>CW2 selected + Investor v1</td><td class="n">13.5% / −13.3%</td><td class="n">13.5% / −13.3%</td><td class="n">10.2% / −10.4%</td></tr>
+<tr><td><strong>S&amp;P 500, total return, held</strong></td><td class="n"><strong>15.2% / −33.8%</strong></td><td class="n"></td><td class="n"><strong>14.2% / −13.0%</strong></td></tr>
+</table></div>
+<p>Across five Sleeve sets and some forty settings, no US Book beat the index over the range. In the holdout only one came close (Investor v1 alone under one setting, 13.5% against 14.2%), and that same Book made 7% or less over the range. The Candidate test of 28 October said the same: it chose no US strategy. US Super 30 has no trades at all before 2016, so it has no holdout. The current US Book beats the S&amp;P 500 in 36% of rolling 12-month windows.</p>
+<h3>The alternative: the index under a trend rule</h3>
+<p>Hold an S&amp;P 500 ETF from the session after the index has closed above its 200-day average five sessions in a row; sell on the session after it closes 3% under that average; out of it, sit in the cash fund. Keep the Book's 10% in gold. This is the same market-trend rule the strategies already use, applied to the index itself.</p>
+<div class="table-wrap"><table>
+<tr><th>US Book as (with 10% gold)</th><th class="n">2016–2026</th><th class="n">Holdout</th><th class="n">2012–2026</th><th class="n">Trades, 14 yrs</th><th class="n">After rough tax, 2012–2026</th></tr>
+<tr><td>S&amp;P 500 held throughout</td><td class="n">15.1% / −30.7%</td><td class="n">12.2% / −11.3%</td><td class="n">14.0% / −30.7%</td><td class="n">1</td><td class="n">13.5%</td></tr>
+<tr class="now"><td><strong>S&amp;P 500, 200-day rule, out 3% under</strong></td><td class="n"><strong>12.5% / −16.4%</strong></td><td class="n"><strong>9.9% / −10.5%</strong></td><td class="n"><strong>11.6% / −16.4%</strong></td><td class="n">17</td><td class="n">9.8%</td></tr>
+<tr><td>S&amp;P 500, 200-day rule, no band</td><td class="n">11.6% / −14.5%</td><td class="n">7.7% / −10.5%</td><td class="n">10.2% / −14.5%</td><td class="n">43</td><td class="n">7.2%</td></tr>
+<tr><td>S&amp;P 500, 250-day rule, out 3% under</td><td class="n">11.9% / −17.7%</td><td class="n">10.1% / −10.5%</td><td class="n">11.0% / −17.7%</td><td class="n">17</td><td class="n">8.8%</td></tr>
+<tr><td>Nasdaq 100 held throughout (price only)</td><td class="n">18.7% / −33.5%</td><td class="n">14.7% / −14.4%</td><td class="n">16.8% / −33.5%</td><td class="n">1</td><td class="n">16.5%</td></tr>
+<tr><td>Nasdaq 100, 150-day rule, out 3% under</td><td class="n">17.2% / −18.7%</td><td class="n">9.5% / −17.6%</td><td class="n">14.1% / −18.7%</td><td class="n">22</td><td class="n">12.0%</td></tr>
+<tr><td>Today's US Book (before the changes)</td><td class="n">10.8% / −11.7%</td><td class="n">4.6% / −5.3%</td><td class="n"></td><td class="n">hundreds</td><td class="n">not measured</td></tr>
+</table></div>
+<p class="quiet">Rough tax: for an Indian resident, as <code>config/regions.yaml</code> assumes, a gain realised within 24 months at 30% and later at 12.5%; losses not set off; the holding at the end taxed as if sold. Cess and surcharge are left out. It is a guide to the ordering, not a tax computation.</p>
+<p>What the table says:</p>
+<ul>
+  <li><strong>The trend rule beats today's US Book in both windows</strong> (12.5% against 10.8%, 9.9% against 4.6%) with about one trade a year in one ETF, against hundreds of trades in single stocks.</li>
+  <li><strong>The trend rule does not beat simply holding the index.</strong> It gives up about 2.5 points of CAGR a year and roughly halves the drawdown (−16% against −31%). After tax the gap widens to almost four points, because every exit within 24 months is taxed at the slab rate.</li>
+  <li><strong>The 3% band is what makes the rule workable.</strong> Without it the rule trades 43 times instead of 17 and loses another 1.4 points. The 150-, 200- and 250-day versions land within about a point of each other, so the result does not hang on the exact average.</li>
+  <li><strong>By year,</strong> the rule matched the index in strong years (2013, 2017, 2021, 2024), lagged in whipsaw years (2019: +19% against +30%; 2023: +19% against +25%) and helped in 2018 (+1% against −4%) and 2022 (−13% against −17%).</li>
+</ul>
+<h3>The choice</h3>
+<div class="table-wrap"><table>
+<tr><th>Option</th><th>For</th><th>Against</th></tr>
+<tr><td><strong>A. Index under the trend rule</strong> (what I recommended)</td><td>Fits the 25% drawdown limit with room to spare. Better than today's Book in both windows. One order a year or so.</td><td>About 2.5 points a year under holding the index, more after tax.</td></tr>
+<tr><td><strong>B. Hold the index, no rule</strong></td><td>The highest CAGR tested for the US, before and after tax. Nothing to run.</td><td>A drawdown of about 31% over this period, and 50% or more in 2000–02 and 2008, which the Lake does not cover. Breaks the Mandate's 25% limit unless you set the US Book's own.</td></tr>
+<tr><td><strong>C. Keep the stock Sleeves on paper only</strong></td><td>Costs nothing, keeps the evidence coming. The Stages already hold real money back until August 2027.</td><td>The paper record so far (nine sessions) says nothing yet.</td></tr>
+</table></div>
+<p>A and C combine: put the US Book's real money in the index under the rule, and let CW2 and Super 30 keep running on paper until they earn a place by beating it. If "maximum CAGR" matters more to you than the 25% limit for this Book, B is the honest answer the data gives.</p>
+<h3>What building option A takes</h3>
+<ol>
+  <li><strong>An ETF as a Book instrument.</strong> <code>config/books.yaml</code> declares each Book's gold ETF and cash fund; an index ETF is a third of the same kind. The Lake fetches its prices with the rest.</li>
+  <li><strong>A Sleeve that holds it by rule.</strong> A strategy's track runs on its market's panels, which leave the Books' ETFs out. Either the index ETF joins the US panels as a security, or the engine gets an index Sleeve beside the gold Sleeve that is in or out by the rule. The second is smaller and keeps the rule in one place.</li>
+  <li><strong>The usual path to money:</strong> a version, the Candidate test against the Book without it, then Paper. The Rule plan, the final check and the Brief need no change.</li>
+</ol>
+<p>Things to settle first, which I could not check from here:</p>
+<ul>
+  <li><strong>Which ETF.</strong> A US-listed one (VOO, IVV, SPY) is the simplest at moomoo. US-listed funds and shares are US-situs assets: a non-resident's holdings above US$60,000 can fall under US estate tax, and India has no estate-tax treaty with the US. The US Book's US$105,000 in single stocks has the same exposure today. An Ireland-domiciled fund tracking the same index avoids it, but trades in London, which needs a broker that reaches it. Worth a question to a tax adviser before real money goes in.</li>
+  <li><strong>Dividends</strong> on a US-listed fund are withheld at source for a foreign holder; the backtest's total-return levels assume they are reinvested whole.</li>
+  <li><strong>Your tax residence.</strong> The config assumes an Indian resident's 24 months. If that is not right, the after-tax column changes and so may the ranking of A and B.</li>
+</ul>
+<h3>Hong Kong</h3>
+<p>The Hang Seng made 0.9% a year over the range and the trend rule on it made 1.1% to 2.3%, so an index Sleeve is no answer there. The stock Sleeves made 12.2% over the range after the changes and 1.2% in the holdout, under the cash fund's 3%. That is one good window out of two. The recommendation is to leave the Hong Kong Book in Paper and let the Stages decide: nothing needs changing for that, since no Sleeve of it is past Paper. If you want the money working meanwhile, the HK$247,000 could sit in the US Book's index Sleeve, which the Hong Kong Book's gold and cash fund already do in dollars.</p>
+
+<h2 id="operations">7. Operations</h2>
+<div class="table-wrap"><table>
+<tr><th>Finding</th><th>What was done</th></tr>
+<tr><td><strong>The Brief landed after Hong Kong opened.</strong> The 10 November Run ended at 09:38 on this machine's clock; Hong Kong opens at 09:30. Of the Lake Step's 53 minutes, 44 went on re-running every stale backtest, which no other Step reads.</td><td><span class="good">Fixed.</span> The Lake Step runs <code>pd daily --backtests-later</code>, and a new Backtests Step runs them after the Brief. On 10 November's timings the Brief would be ready around 08:55.</td></tr>
+<tr><td><strong>Two Runs died in the Lake Step</strong> (5 and 6 November) with nothing in the log, and nothing tells you when no Brief is written.</td><td><span class="open">Open.</span> The cause is not in the logs. A check at the start of each Run that the last one ended would at least say so in the next Brief.</td></tr>
+<tr><td><strong>India's holiday calendar ends on 31 December 2026.</strong></td><td><span class="open">Open.</span> Needs 2027's holidays in <code>config/calendar_overrides.csv</code> or a newer calendar library before January.</td></tr>
+<tr><td><strong>No real Book has started.</strong> Every Sleeve entered Paper on or after 31 October. Three months of Paper and six of Real-small put full-size real money in August 2027 at the earliest.</td><td>By design. Stated so the timeline is plain.</td></tr>
+</table></div>
+
+<h2 id="open">8. Still open</h2>
+<ul>
+  <li><strong>Taxes are in no backtest.</strong> India's short-term gains are taxed at 20%; CW2 with a 10% stop realises most of its gains short-term. A foreign share sold within 24 months is taxed at the slab rate. The after-tax order of the strategies may differ from the pre-tax one.</li>
+  <li><strong>Brokerage is assumed ₹0 at ICICI Direct.</strong> If your plan charges for delivery, a strategy turning its Book over several times a year pays it on every trade. Worth checking against a contract note.</li>
+  <li><strong>The order-size guard at 1% of traded value</strong> costs India 2.7 points over the range. It is a judgement about your own market impact at the pre-open auction, so it was left alone. Raising it to 3% recovered about half a point; removing it, all of it.</li>
+  <li><strong>A quarantined holding cannot be sold on a strategy's exit.</strong> A real 40% fall on a held name is flagged, quarantined, and then only its Disaster stop can sell it. Letting exits through for held names, or having the Health Agent's "real move" verdict lift the Quarantine, would close this.</li>
+  <li><strong>Two-thirds of the India Book is idle on average</strong> even after the changes (60%), because the strategies' empty slots and risk-off periods wait in the cash fund. A third Sleeve did not help (25.7% / −16.5% against 25.6% / −18.0% under the loosest settings). An index holding for idle money while the market is in an Uptrend is the obvious thing to test next.</li>
+  <li><strong>A jump flag ages out after 20 sessions.</strong> With Quarantines now lifting when their flag goes, a split Yahoo missed that nobody corrected would be released after about a month. A Correction waiting for the security holds the Quarantine, and India's MarketSmith check still catches it; for a liquid US or Hong Kong name the risk is small but real.</li>
+  <li><strong>Five tests fail in ash_new's suite, as they did before this work.</strong> Four read this machine's <code>settings.toml</code> and <code>.env</code> (risk-free rates of 6% and 3% where the tests expect 7% and 4%); <code>test_refresh_securities.py</code> expects a security Yahoo has nothing for not to be asked for again.</li>
+</ul>
+
+<h2 id="files">9. What changed in each repo</h2>
+<p>Nothing is committed in either repo. The scheduled Run uses the working trees as they are.</p>
+<h3>ash_new (<code>backend/portfolio-dashboard</code>)</h3>
+<div class="table-wrap"><table>
+<tr><th>Change</th><th>Where</th></tr>
+<tr><td>The Mandate's two new settings; the trailing stop's distance carried to plans and fills</td><td><code>core/books.py</code>, <code>portfolios/book_engine.py</code>, <code>portfolios/rule_plan.py</code>, <code>pipeline/plan.py</code>, <code>pipeline/book_backtest.py</code>, <code>pipeline/paper_books.py</code>, <code>pipeline/real_books.py</code>, <code>paper_books/store.py</code>, <code>config/books.yaml</code>, migration <code>0025</code></td></tr>
+<tr><td>The Market condition's two rules</td><td><code>engine/market_condition.py</code>, <code>config/market_condition.yaml</code></td></tr>
+<tr><td>The Data gate reads each market's index</td><td><code>status.py</code></td></tr>
+<tr><td>The second source and <code>pd cross-check</code></td><td><code>sources/second_source.py</code>, <code>pipeline/cross_check.py</code>, <code>cli.py</code>, <code>contract/cross-check.schema.json</code></td></tr>
+<tr><td>Quarantines lifted when their flag has gone; a second source's gaps</td><td><code>corrections/store.py</code>, <code>pipeline/quarantine.py</code>, <code>pipeline/refresh.py</code>, <code>appdb/models.py</code></td></tr>
+<tr><td><code>pd daily --backtests-later</code> and <code>pd backtests-update</code></td><td><code>pipeline/refresh.py</code>, <code>cli.py</code></td></tr>
+<tr><td>The evidence: scripts and their recorded output</td><td><code>docs/review/audit-20261110/</code></td></tr>
+</table></div>
+<p class="quiet">Migration 0025 adds one nullable column, <code>paper_books.trail_distances</code>. It was applied to the live <code>app.db</code> when the cross-check was dry-run against 10 November's plan.</p>
+<h3>This repo</h3>
+<div class="table-wrap"><table>
+<tr><th>Change</th><th>Where</th></tr>
+<tr><td>The Plan Step runs the cross-check, re-plans when it changed a Quarantine, raises its To-dos, and keeps the watched names</td><td><code>steps/stocks/plan.ts</code>, <code>src/watched.ts</code>, <code>src/pd.ts</code></td></tr>
+<tr><td>The Health Step calls its Agent only for flags that need attention, and gives it those; a bar Correction in its schema</td><td><code>steps/stocks/health.ts</code>, <code>agents/health/config.ts</code>, <code>agents/health/instructions.md</code></td></tr>
+<tr><td>The stale backtests after the Brief</td><td><code>steps/stocks/lake.ts</code>, <code>steps/stocks/backtests.ts</code>, <code>pipelines/stocks.ts</code>, <code>steps/stocks/brief.ts</code></td></tr>
+<tr><td>The PRD and the glossary kept true</td><td><code>docs/prd/stocks-pipeline.md</code>, <code>GLOSSARY.md</code></td></tr>
+<tr><td>Tests for each of the above, the stand-in <code>pd</code>'s examples for <code>pd cross-check</code>, and the Wednesday expectation</td><td><code>test/plan.test.ts</code>, <code>test/health.test.ts</code>, <code>test/backtests.test.ts</code>, <code>test/lake.test.ts</code>, <code>test/stocks.test.ts</code>, <code>test/pd/cross-check.*.json</code></td></tr>
+</table></div>
+<h3>To run the evidence again</h3>
+<p>From ash_new's folder:</p>
+<ul>
+  <li><code>.venv/Scripts/python.exe -B docs/review/audit-20261110/evaluate.py IN in-super30-ok-tuned in-cw2-selected</code>: section 3's table (also <code>US</code> and <code>HK</code>).</li>
+  <li><code>… breakers.py IN in-super30-ok-tuned in-cw2-selected</code>: section 4's.</li>
+  <li><code>… us_index.py</code>: section 6's.</li>
+</ul>
+<p class="quiet">The <code>fac-*.txt</code>, <code>sleeves-*.txt</code> and <code>var-IN.txt</code> files beside them are the first day's wider explorations, recorded against the code before the changes.</p>
+
+<h2 id="verified">10. What was verified</h2>
+<ul>
+  <li><strong>This repo:</strong> typecheck clean; 496 tests, all passing when the suite runs on its own. One timing-sensitive Lake test fails when another heavy job runs beside it, and passes alone. One whole-Pipeline test failed on Wednesdays only: it expected MarketSmith to be fetched on Saturdays alone, where the Step has fetched on Wednesdays too since 9 November. That expectation is fixed.</li>
+  <li><strong>ash_new:</strong> the full suite, run on its own, has the five failures listed in section 8 and no other; every test file changed or added passes. Lint is clean but for four long lines that were there before.</li>
+  <li><strong><code>pd plan</code> on the real Lake under the new settings:</strong> every Book plans under Mandate <code>7d9f896c659f</code>. India reads Under pressure (80%) on 9 November's close where it read Correction (40%) the day before on the same data; the US is unchanged; Hong Kong is still a Correction on a liquid-name breadth of 27%. Disaster stops: India CW2 40%, US CW2 30%, each Super 30 35%, Hong Kong CW2 50%.</li>
+  <li><strong><code>pd cross-check</code> on the real Lake:</strong> dry runs compared 23 closes on 10 November's plan and 20 on the 11th's; all agreed; nothing was recorded.</li>
+  <li><strong>A full dry run of the stocks Pipeline</strong> on the changed code (Run <code>2026-11-11-0151</code>) succeeded end to end: every Step in order, the cross-check inside the Plan Step, the Backtests Step last and skipped as a dry run should. <code>pd backtests-update</code> was then run once for real: nothing was stale, 5 seconds.</li>
+  <li><strong>Not yet seen:</strong> a scheduled Run on the changed code. The first one is the first to refresh with <code>--backtests-later</code>, lift Quarantines whose flags have gone, and run the Backtests Step for real; its Brief's Run health and To-dos are the place to look.</li>
+</ul>
+</main>
+<script>
+  (function () {
+    var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+    var root = document.documentElement;
+    var saved = store.get('portfolio-audit-theme');
+    if (saved) root.setAttribute('data-theme', saved);
+    document.getElementById('theme').addEventListener('click', function () {
+      var dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      var next = dark ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      store.set('portfolio-audit-theme', next);
+    });
+  })();
+</script>
+</body>
+</html>

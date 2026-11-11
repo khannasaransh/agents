@@ -9,10 +9,11 @@ const health: AgentConfig = {
   // To find out on exchanges' and the SEC's sites what became of a security the Lake no longer gets prices for.
   webSearch: true,
   inputs: {
-    why: 'Why you were called: the Lake Step failed, its status couldn\'t be read, the Data gate failed, the Health report flags something, or this Run\'s MarketSmith fetch went wrong (a region failed, a results calendar couldn\'t be read, or a fetch or a backup wasn\'t whole)',
+    why: 'Why you were called: the Lake Step failed, its status couldn\'t be read, the Data gate failed, the Health report fails or names a problem with a whole market\'s data, it has flags that need attention (new ones, ones on a security the Books hold or may trade, or securities the Lake no longer gets prices for that haven\'t been looked up), or this Run\'s MarketSmith fetch went wrong (a region failed, a results calendar couldn\'t be read, or a fetch or a backup wasn\'t whole)',
     lake: 'What the Lake Step did in this Run: the refreshes it cleared, each run of pd daily with its exit code, and whether one succeeded; null when it recorded nothing',
     lakeLog: "The end of the Lake Step's log in this Run, which holds pd daily's output",
-    status: "The Lake's status as `pd status` printed it after the refresh: each market's latest session, the last refresh job, the Health report's verdict and flags, the Data gate's verdict with its reasons, the open Quarantines and the Corrections waiting for approval; null when it couldn't be read",
+    status: "The Lake's status as `pd status` printed it after the refresh: each market's latest session, the last refresh job, the Health report's verdict and flags, the Data gate's verdict with its reasons, the open Quarantines and the Corrections waiting for approval; null when it couldn't be read. Its flags are those that need your attention (new in this Run's Health report, on a security the Books hold or may trade, or a security the Lake no longer gets prices for that hasn't been looked up), and its Quarantines those of the flagged securities and every second source's gap (check second_source)",
+    leftOut: "How many of the Health report's flags and of the open Quarantines were left out of `status`: earlier Runs diagnosed them, and no Book holds or may trade their securities; null when none was left out",
     delistings: "What earlier Runs found out about securities the Lake no longer gets prices for (the agents data area's state/delistings.json), by security: its status (delisted, renamed, trading or unknown), date, successor, why, source and the Run that found it. Empty until one is looked up",
     marketsmith: "What this Run's MarketSmith Step fetched (pd marketsmith's JSON): each region's mode (full or latest), the symbols a latest fetch chose and why, its results calendar, the symbols of the last fetch that weren't whole, and the backups kept and removed; null when MarketSmith wasn't fetched in this Run",
   },
@@ -50,10 +51,11 @@ const health: AgentConfig = {
           required: ['security_id', 'kind', 'date', 'ratio', 'value', 'why'],
           properties: {
             security_id: { type: 'string', description: 'As the flag names it: IN:BHAGYANGR' },
-            kind: { type: 'string', enum: ['split', 'dividend', 'demerger'] },
+            // A bar: Yahoo's bar on the date is wrong and is left out (the schema lacked it until the audit of 10 November 2026, so the Agent could only describe one).
+            kind: { type: 'string', enum: ['split', 'dividend', 'demerger', 'bar'] },
             date: { type: 'string', description: 'Its day, YYYY-MM-DD: the ex-date' },
-            ratio: { type: ['number', 'null'], description: "A split's shares after per share before (2 for a 2-for-1 split or a 1:1 bonus); a demerger's share of the value the company kept, above 0 and under 1; null for a dividend" },
-            value: { type: ['number', 'null'], description: "A dividend's cash per share, or null to drop it; null for a split or demerger" },
+            ratio: { type: ['number', 'null'], description: "A split's shares after per share before (2 for a 2-for-1 split or a 1:1 bonus); a demerger's share of the value the company kept, above 0 and under 1; null for a dividend or a bar" },
+            value: { type: ['number', 'null'], description: "A dividend's cash per share, or null to drop it; null for a split, a demerger or a bar" },
             why: { type: 'string', description: 'The evidence it rests on, in a sentence or two' },
           },
         },

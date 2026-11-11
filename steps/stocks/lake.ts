@@ -1,5 +1,6 @@
 // Lake: brings ash_new's Lake up to date and records how fresh and healthy it is. It clears a
-// refresh left running by a process that has gone, runs ash_new's daily chain (`pd daily`),
+// refresh left running by a process that has gone, runs ash_new's daily chain (`pd daily
+// --backtests-later`: its stale backtests are left for the Backtests Step, after the Brief),
 // retrying it once on failure, then records `pd status` as lake/status.json, the Data gate's
 // verdict among it, even when the refresh failed twice, which fails the Step. It raises a To-do when
 // ash_new's own schedule or Windows task is on, since only the stocks Pipeline should refresh the
@@ -39,7 +40,9 @@ async function refresh(runFolder: string): Promise<RefreshAttempt> {
   const startedAt = new Date().toISOString()
   // pd daily reports as it goes; its output goes to the Step's log as it comes, which the Health
   // Agent reads, so a refresh that never ends still leaves how far it got.
-  const { code, timedOut } = await runPd(['daily'], { cwd: runFolder, timeoutMs: refreshMs, echo: { stdout: true, stderr: true } })
+  // The stale backtests wait for the Backtests Step, after the Brief: nothing here reads them, and they
+  // took most of the refresh's time (the audit of 10 November 2026, docs/audit).
+  const { code, timedOut } = await runPd(['daily', '--backtests-later'], { cwd: runFolder, timeoutMs: refreshMs, echo: { stdout: true, stderr: true } })
   if (timedOut) console.error(`pd daily timed out after ${Math.round(refreshMs / 60_000)} minutes`)
   return { startedAt, endedAt: new Date().toISOString(), exitCode: code, timedOut }
 }

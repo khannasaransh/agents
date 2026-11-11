@@ -28,7 +28,8 @@ test('on a healthy Lake, the Lake Step clears nothing, refreshes once with pd da
   assert.equal(result.status, 0, result.stderr)
   assert.deepEqual(
     ws.pdCalls().map((call) => call.args),
-    [['clear-refresh'], ['daily'], ['status']],
+    // The stale backtests are left for the Backtests Step, after the Brief.
+    [['clear-refresh'], ['daily', '--backtests-later'], ['status']],
   )
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'lake', 'status.json')), example('status.healthy.json'))
   const recorded = lake()

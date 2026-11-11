@@ -1485,10 +1485,15 @@ function healthSection(status: PdStatus | null): string {
   ].join('\n')
 }
 
+/** The Steps the Brief can't report on: itself, and the Backtests Step, which runs after it (the audit of 10 November 2026). */
+const notReported = ['brief', 'backtests']
+
 function runHealthSection(run: RunRecord): string {
-  const notSucceeded = stepsNotSucceeded(run.steps).filter((s) => s.name !== 'brief')
+  const notSucceeded = stepsNotSucceeded(run.steps).filter((s) => !notReported.includes(s.name))
   const steps = notSucceeded.length ? list(notSucceeded.map((s) => `${esc(s.name)}: ${esc(s.status)}. Log: ${logLink(s.log)}`)) : '<p>No Step failed or was skipped.</p>'
-  return `<section><h2>Run health</h2><p>Run ${esc(run.id)} of the ${esc(run.pipeline)} Pipeline.</p>\n${steps}</section>`
+  const later = run.steps.find((s) => s.name === 'backtests')
+  const backtests = later ? `\n<p>The stale backtests are run again after this Brief, so it doesn't wait for them: how that went is in ${logLink(later.log)}.</p>` : ''
+  return `<section><h2>Run health</h2><p>Run ${esc(run.id)} of the ${esc(run.pipeline)} Pipeline.</p>\n${steps}${backtests}</section>`
 }
 
 const style = `

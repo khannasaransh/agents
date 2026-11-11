@@ -121,7 +121,7 @@ The Order list as code makes it from the Book state, before any Agent sees it: w
 _Avoid_: draft, signals, Strategy plan
 
 **Market condition**:
-A market's state as code reads it from the Lake each Run: Uptrend, Under pressure or Correction, from the index against its 50- and 200-day averages, breadth and distribution days, at thresholds Saransh sets. It sets each Book's **exposure level**, the most of the Book held in stocks, with the rest in the cash fund. MarketSmith's own outlook is shown beside it but decides nothing.
+A market's state as code reads it from the Lake each Run: Uptrend, Under pressure or Correction, from the index against its 50- and 200-day averages, breadth and distribution days, at thresholds Saransh sets. Distribution days make a Correction only while the index is under its 50-day average, and Hong Kong's breadth is of its liquid securities (the audit of 10 November 2026). It sets each Book's **exposure level**, the most of the Book held in stocks, with the rest in the cash fund. MarketSmith's own outlook is shown beside it but decides nothing.
 _Avoid_: regime, market direction (MarketSmith's), market-trend filter (a strategy's own, in ash_new)
 
 **Playbook**:
@@ -165,7 +165,7 @@ The Portfolio Manager's look back at the Books, in Saturday's Stocks Brief: the 
 _Avoid_: retro, report
 
 **Disaster stop**:
-The stop each holding keeps at the broker, wider than its strategy's own exit, for what happens between Runs. It is set at entry and raised only on Saturdays. A strategy's own exits are end-of-day and come through the Order list. A real Book's is proposed with its Order list until Saransh marks it placed, and every Saturday's Brief lists those not yet marked.
+The stop each holding keeps at the broker, wider than its strategy's own exit, for what happens between Runs: at twice its strategy's stop distance, and no nearer than 10% past its strategy's own trailing stop. It is set at entry and stays there: the Mandate no longer raises it on Saturdays (the audit of 10 November 2026: raised weekly, it sat inside the strategy's own trailing stop and sold what the strategy still held). A strategy's own exits are end-of-day and come through the Order list. A real Book's is proposed with its Order list until Saransh marks it placed, and every Saturday's Brief lists those not yet marked.
 _Avoid_: stop-loss (ash_new's Stop-loss is end-of-day), GTT (a broker's order type), trailing stop
 
 **Feed**:
@@ -193,7 +193,7 @@ Saturday's check of the real portfolios against the brokers' holdings exports. E
 _Avoid_: sync, audit
 
 **Data gate**:
-The check made before the Portfolio Manager decides anything: the Lake is as of each market's last finished session and its Health report has no failure. One security's flag doesn't fail it; that security goes into Quarantine.
+The check made before the Portfolio Manager decides anything: the Lake is as of each market's last finished session, its Health report has no failure, and each market's index has a bar on that session and isn't quarantined. One security's flag doesn't fail it; that security goes into Quarantine.
 _Avoid_: health check (that is the report the gate reads), sanity check
 
 **Hold mode**:
@@ -201,7 +201,7 @@ What the Portfolio Manager does on a day the Data gate fails: it opens nothing n
 _Avoid_: safe mode, pause
 
 **Quarantine**:
-What happens to one security whose data is flagged: the Portfolio Manager neither buys it nor sells it on a signal, and its Disaster stop stays. Saransh lifts it by approving its Correction or dismissing the flag.
+What happens to one security whose data is flagged, or whose close a second source gives otherwise (the Plan Step's cross-check): the Portfolio Manager neither buys it nor sells it on a signal, and its Disaster stop stays. Saransh lifts it by approving its Correction or dismissing the flag; it also lifts by itself once its flag has gone from the Health report, or a later cross-check agrees. An index can be quarantined too, which fails the Data gate.
 _Avoid_: untradeable (ash_new's Untradeable holding has had no price for over five sessions), frozen, blocked
 
 **Correction**:

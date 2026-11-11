@@ -1,0 +1,13 @@
+{
+  "on": "2026-10-27",
+  "dry_run": false,
+  "tolerance": 0.01,
+  "markets": [
+    { "market": "IN", "as_of": "2026-10-26", "source": "NSE's bhavcopy", "checked": 9, "agreed": 9, "unavailable": ["IN:BSEONLY"], "error": null },
+    { "market": "US", "as_of": "2026-10-26", "source": "Tencent's daily bars", "checked": 4, "agreed": 4, "unavailable": [], "error": null }
+  ],
+  "gaps": [],
+  "quarantined": [],
+  "lifted": [],
+  "changed": false
+}

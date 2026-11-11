@@ -1,0 +1,44 @@
+{
+  "on": "2026-10-27",
+  "dry_run": false,
+  "tolerance": 0.01,
+  "markets": [
+    { "market": "IN", "as_of": "2026-10-26", "source": "NSE's bhavcopy", "checked": 9, "agreed": 8, "unavailable": [], "error": null },
+    { "market": "US", "as_of": "2026-10-26", "source": "Tencent's daily bars", "checked": 4, "agreed": 3, "unavailable": [], "error": null },
+    { "market": "HK", "as_of": "2026-10-26", "source": "Tencent's daily bars", "checked": 0, "agreed": 0, "unavailable": [], "error": "Tencent's daily bars couldn't be fetched: timed out" }
+  ],
+  "gaps": [
+    {
+      "security_id": "IN:RATEGAIN",
+      "name": "Rategain Travel Technologies Ltd",
+      "market": "IN",
+      "index": false,
+      "date": "2026-10-26",
+      "lake": 578.2,
+      "second": 520.4,
+      "gap": -0.09996540989277066,
+      "source": "NSE's bhavcopy",
+      "detail": "The lake closed at 578.20 on 2026-10-26, NSE's bhavcopy at 520.40 (-10.0%)"
+    },
+    {
+      "security_id": "US:^GSPC",
+      "name": "S&P 500 (^GSPC)",
+      "market": "US",
+      "index": true,
+      "date": "2026-10-26",
+      "lake": 7000.0,
+      "second": 6510.0,
+      "gap": -0.07,
+      "source": "Tencent's daily bars",
+      "detail": "The lake closed at 7,000.00 on 2026-10-26, Tencent's daily bars at 6,510.00 (-7.0%)"
+    }
+  ],
+  "quarantined": [
+    { "id": 12, "market": "IN", "security_id": "IN:RATEGAIN", "name": "Rategain Travel Technologies Ltd", "check": "second_source", "date": "2026-10-26", "detail": "The lake closed at 578.20 on 2026-10-26, NSE's bhavcopy at 520.40 (-10.0%)", "since": "2026-10-27", "lifted_by": null, "lifted_at": null, "correction_id": null },
+    { "id": 13, "market": "US", "security_id": "US:^GSPC", "name": "S&P 500 (^GSPC)", "check": "second_source", "date": "2026-10-26", "detail": "The lake closed at 7,000.00 on 2026-10-26, Tencent's daily bars at 6,510.00 (-7.0%)", "since": "2026-10-27", "lifted_by": null, "lifted_at": null, "correction_id": null }
+  ],
+  "lifted": [
+    { "id": 9, "market": "US", "security_id": "US:AAPL", "name": "Apple", "check": "second_source", "date": "2026-10-23", "detail": "The lake closed at 340.00 on 2026-10-23, Tencent's daily bars at 300.00 (-11.8%)", "since": "2026-10-24", "lifted_by": "cleared", "lifted_at": "2026-10-27T01:52:10.441210+00:00", "correction_id": null }
+  ],
+  "changed": true
+}

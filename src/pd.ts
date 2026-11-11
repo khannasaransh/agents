@@ -55,7 +55,13 @@ export interface PdCorrection extends CorrectionChange {
   decided_at: string | null
 }
 
-/** A security a Health report flagged, held out of every Book until its Correction is approved or its flag dismissed. */
+/**
+ * A security a Health report flagged, or whose close a second source gave otherwise (its check
+ * second_source: `pd cross-check`), held out of every Book until its Correction is approved, its
+ * flag is dismissed, or it clears by itself: its flag gone from the Health report, or a later
+ * cross-check agreeing (the audit of 10 November 2026, docs/audit). An index is quarantined under
+ * its market's code and its benchmark's id (US:^GSPC), which fails the Data gate while it is open.
+ */
 export interface PdQuarantine {
   id: number
   market: string
@@ -66,9 +72,29 @@ export interface PdQuarantine {
   detail: string
   /** The Health report that flagged it first. */
   since: string
-  lifted_by: 'corrected' | 'dismissed' | null
+  lifted_by: 'corrected' | 'dismissed' | 'cleared' | null
   lifted_at: string | null
   correction_id: number | null
+}
+
+/**
+ * What `pd cross-check` prints (contract/cross-check.schema.json): the closes a Run's Rule plans
+ * rest on, on each market's last session, against a second source (NSE's own files for India,
+ * Tencent's daily bars for the US and Hong Kong). A close over the tolerance away is a gap, and its
+ * security is quarantined; a security quarantined so before whose closes agree now is released.
+ */
+export interface PdCrossCheck {
+  on: string
+  dry_run: boolean
+  tolerance: number
+  /** Each market with a plan made: what was compared, what the second source hadn't, and why it couldn't be read (which ends that market's check and holds nothing up). */
+  markets: { market: string; as_of: string; source: string; checked: number; agreed: number; unavailable: string[]; error: string | null }[]
+  /** Each close over the tolerance away; an index's (`index`) fails the Data gate while its Quarantine is open. */
+  gaps: { security_id: string; name: string | null; market: string; index: boolean; date: string; lake: number; second: number; gap: number; source: string; detail: string }[]
+  quarantined: PdQuarantine[]
+  lifted: PdQuarantine[]
+  /** Whether it made or lifted a Quarantine: the Rule plans are then made again. */
+  changed: boolean
 }
 
 /** What `pd corrections propose` prints (contract/corrections-propose.schema.json). */
@@ -919,7 +945,7 @@ export interface PdRulePlan {
   dropped?: { sleeve: string; security_id: string; name: string | null; side: 'BUY' | 'SELL'; wanted: number; rule: string }[]
   /** A paper Book's Sleeves it couldn't run, with why. */
   left_out?: { strategy_id: string; version: string; stage: PdStage; why: string }[]
-  /** The Disaster stops to place, for each new position, or raise (was: the stop it raises). */
+  /** The Disaster stops to place, for each new position, or raise (was: the stop it raises; none while the Mandate leaves the stops where they were set). */
   stops?: { sleeve: string; security_id: string; name: string | null; price: number; was: number | null }[]
   buys?: number
   sales?: number
@@ -962,7 +988,7 @@ export interface PdMarketCondition {
     long_average: number | null
     /** The share of the index's members (or the market's securities) above their own 200-day average. */
     breadth: number | null
-    /** The index whose members breadth was measured over (NIFTY500, SP500); null: the whole market's. */
+    /** The index whose members breadth was measured over (NIFTY500, SP500); null: the market's own securities (Hong Kong's liquid ones). */
     breadth_of: string | null
     distribution_days: number
   } | null

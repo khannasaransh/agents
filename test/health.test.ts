@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, test } from 'node:test'
 import { makeWorkspace, pdExamples, type Workspace } from './helpers.ts'
@@ -166,7 +166,7 @@ test('a MarketSmith fetch that went well, or none, leaves a healthy Lake undiagn
   assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /Skipped: The Lake is healthy: .*MarketSmith's fetch, if any, went well/)
 })
 
-test('after a refresh that worked, a Health report that flags something still calls the Health Agent', async () => {
+test('after a refresh that worked, a Health report with new flags, or a problem with a whole market, still calls the Health Agent', async () => {
   prepare({ status: 'status.healthy.json' })
   ws.setWorkerCli('codex', codexAnswering(answer))
 
@@ -174,8 +174,116 @@ test('after a refresh that worked, a Health report that flags something still ca
 
   assert.equal(result.status, 0, result.stderr)
   const [call] = ws.workerCliCalls('codex')
-  assert.deepEqual(promptInput(call.stdin, 'why'), ['The Health report of 2026-10-27 has 5 flags.'])
+  assert.deepEqual(promptInput(call.stdin, 'why'), [
+    "The Health report of 2026-10-27 names a problem with HK's data: The data is 1 session behind its last finished session, 2026-10-27",
+    'The Health report of 2026-10-27 has 5 new flags (5 in all).',
+  ])
+  // Every flag is new, so none is left out of what the Agent is given.
+  assert.deepEqual(promptInput(call.stdin, 'status'), example('status.healthy.json'))
+  assert.equal(promptInput(call.stdin, 'leftOut'), null)
   assert.equal(health().status, 'diagnosed')
+})
+
+/** The healthy Lake's status a week on: the same five flags, quarantined by an earlier Run's Health report, and no market with a problem. */
+function diagnosedBefore() {
+  const status = example('status.healthy.json')
+  status.health.markets = status.health.markets.map((m: { market: string }) => ({ ...m, status: 'ok', problems: [] }))
+  for (const quarantine of status.quarantines) quarantine.since = '2026-10-20'
+  return status
+}
+
+/** Keeps `names` as the last Run's watched names: what its plans held or might trade. */
+function watch(...names: string[]) {
+  mkdirSync(join(ws.dataDir, 'state'), { recursive: true })
+  writeFileSync(join(ws.dataDir, 'state', 'watched.json'), JSON.stringify({ run: '2026-10-24-0930', names }))
+}
+
+test('flags an earlier Run diagnosed, on securities no Book holds or may trade, leave the Health Agent uncalled', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', diagnosedBefore())
+  watch('IN:RELIANCE')
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.equal(ws.readRun(runId).steps.find((s) => s.name === 'health')!.status, 'skipped')
+  assert.deepEqual(ws.workerCliCalls('codex'), [])
+  assert.match(
+    ws.readRunFile(runId, 'logs', 'health.log'),
+    /Skipped: The Lake is healthy: the Lake Step succeeded, the Data gate passed, the Health report's 5 flags were diagnosed in earlier Runs and none is on a security the Books hold or may trade and MarketSmith's fetch, if any, went well/,
+  )
+})
+
+test('an old flag on a security the Books hold or may trade calls the Health Agent, which is given that flag and told how many were left out', async () => {
+  prepare()
+  ws.writeRunFile(runId, 'lake/status.json', diagnosedBefore())
+  // The last Run's plans might trade New Fortress Energy; the India Book holds Mcnally Bharat at ICICI Direct.
+  watch('US:NFE')
+  ws.writeRunFile(runId, 'broker-inbox.json', { dryRun: false, files: [], books: { books: [{ book: 'IN', holdings: [{ security_id: 'IN:MBECL' }] }] }, missingTradebooks: [] })
+  ws.setWorkerCli('codex', codexAnswering(answer))
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  const [call] = ws.workerCliCalls('codex')
+  assert.deepEqual(promptInput(call.stdin, 'why'), ['2 flags are on 2 securities the Books hold or may trade: IN:MBECL, US:NFE.'])
+  const given = promptInput(call.stdin, 'status') as { health: { flags: { security_id: string }[] }; quarantines: { security_id: string }[]; corrections: unknown[] }
+  assert.deepEqual(given.health.flags.map((f) => f.security_id), ['IN:MBECL', 'US:NFE'])
+  assert.deepEqual(given.quarantines.map((q) => q.security_id).sort(), ['IN:MBECL', 'US:NFE'])
+  assert.equal(given.corrections.length, 1, 'the Corrections waiting are all given')
+  assert.deepEqual(promptInput(call.stdin, 'leftOut'), { flags: 3, quarantines: 3 })
+})
+
+test("a security the Lake has had no price for in over 10 sessions calls the Health Agent until it has been looked up, and again a week after nothing was found", async () => {
+  const stale = (behind: string) => {
+    const status = diagnosedBefore()
+    status.health.flags.find((f: { check: string }) => f.check === 'stale').detail = behind
+    return status
+  }
+  prepare()
+  ws.setWorkerCli('codex', codexAnswering(answer))
+
+  // Six sessions behind isn't looked up yet.
+  ws.writeRunFile(runId, 'lake/status.json', stale('6 sessions behind'))
+  assert.equal((await step()).status, 0)
+  assert.deepEqual(ws.workerCliCalls('codex'), [])
+
+  ws.writeRunFile(runId, 'lake/status.json', stale('31 sessions behind'))
+  assert.equal((await step()).status, 0)
+  const [call] = ws.workerCliCalls('codex')
+  assert.deepEqual(promptInput(call.stdin, 'why'), ["1 security the Lake no longer gets prices for hasn't been looked up."])
+  assert.deepEqual((promptInput(call.stdin, 'status') as { health: { flags: { security_id: string }[] } }).health.flags.map((f) => f.security_id), ['HK:0083'])
+
+  // Looked up and found delisted: not again. Nothing found out a day ago: not yet; over a week ago: again.
+  const known = (status: string, run: string) =>
+    writeFileSync(join(ws.dataDir, 'state', 'delistings.json'), JSON.stringify({ 'HK:0083': { security_id: 'HK:0083', status, date: null, successor: null, why: '', source: '', run } }))
+  mkdirSync(join(ws.dataDir, 'state'), { recursive: true })
+  known('delisted', '2026-10-01-0930')
+  assert.equal((await step('--force')).status, 0)
+  known('unknown', '2026-10-26-0930')
+  assert.equal((await step('--force')).status, 0)
+  assert.equal(ws.workerCliCalls('codex').length, 1)
+  known('unknown', '2026-10-15-0930')
+  assert.equal((await step('--force')).status, 0)
+  assert.equal(ws.workerCliCalls('codex').length, 2)
+})
+
+test("a second source's gap is always among the Quarantines the Health Agent is given", async () => {
+  prepare()
+  const status = diagnosedBefore()
+  status.quarantines.push({ id: 9, market: 'US', security_id: 'US:^GSPC', name: 'S&P 500 (^GSPC)', check: 'second_source', date: '2026-10-26', detail: "The lake closed at 7,000.00 on 2026-10-26, Tencent's daily bars at 6,510.00 (-7.0%)", since: '2026-10-27', lifted_by: null, lifted_at: null, correction_id: null })
+  status.gate = { verdict: 'fail', reasons: ["United States: its index, the S&P 500 (^GSPC), is quarantined: The lake closed at 7,000.00 on 2026-10-26, Tencent's daily bars at 6,510.00 (-7.0%)"] }
+  ws.writeRunFile(runId, 'lake/status.json', status)
+  ws.setWorkerCli('codex', codexAnswering(answer))
+
+  assert.equal((await step()).status, 0)
+
+  const [call] = ws.workerCliCalls('codex')
+  assert.match((promptInput(call.stdin, 'why') as string[])[0], /^The Data gate failed: United States: its index, the S&P 500 \(\^GSPC\), is quarantined/)
+  const given = promptInput(call.stdin, 'status') as { health: { flags: unknown[] }; quarantines: { security_id: string }[] }
+  assert.deepEqual(given.health.flags, [])
+  assert.deepEqual(given.quarantines.map((q) => q.security_id), ['US:^GSPC'])
+  assert.deepEqual(promptInput(call.stdin, 'leftOut'), { flags: 5, quarantines: 5 })
 })
 
 test('a Health Agent that fails on Codex and then on Claude Code is recorded as failed, with both errors, and fails the Step', async () => {

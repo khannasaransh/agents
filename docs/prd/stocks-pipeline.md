@@ -122,8 +122,8 @@ The Portfolio Manager only advises; Saransh places every order. A strategy reach
 58. As Saransh, I want a second strategy's buy of a stock the Book already holds cut to fit under the caps, so that two strategies agreeing never breaks the 15% limit.
 59. As Saransh, I want no order bigger than 1% of the stock's 20-day average traded value, with any cut stated in the Brief, so that my own orders don't move the price.
 60. As Saransh, I want strategy exits to stay end-of-day and come through the Order list, so that I sell exactly when the backtests did.
-61. As Saransh, I want a Disaster stop proposed with every new position, at twice its strategy's stop distance or 15% below entry where the strategy has none, so that a collapse between Runs is limited.
-62. As Saransh, I want Disaster stops raised only on Saturdays, so that I have few stop changes to make.
+61. As Saransh, I want a Disaster stop proposed with every new position, at twice its strategy's stop distance or 15% below entry where the strategy has none, and never nearer than 10% past its strategy's own trailing stop, so that a collapse between Runs is limited and the stop never sells what the strategy still holds. (Changed on 10 November 2026, the audit.)
+62. As Saransh, I want a Disaster stop left where it was set, so that I have no stop changes to make and a winner isn't sold inside its strategy's own trailing stop. (Changed on 10 November 2026, the audit: they were raised on Saturdays.)
 63. As Saransh, I want the Rule plan to apply the Data gate, Quarantines, the breakers, the exposure level, the Stages and my approved early exits, so that everything decided before the Desk sits in one place.
 
 ### The Desk
@@ -297,14 +297,14 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
 4. **Lake** (command):
    - It checks that ash_new's own schedule is off, and raises a To-do if it isn't.
    - It clears a refresh left running by a dead process.
-   - It runs `pd daily`, retrying once on failure, and fails if the retry fails too.
+   - It runs `pd daily --backtests-later`, retrying once on failure, and fails if the retry fails too. The stale backtests are left for the Backtests Step (15).
    - It records each market's latest session and the Health report.
 5. **Stages** (command, through `pd`). It runs `pd stages check`, which records as a Candidate each new version of a strategy with a Sleeve, the old version keeping its Stage, and prints each Book's Sleeves and their Stages for the Brief (issue 31).
-6. **Health** (Agent: the Health Agent). It skips itself when the Lake Step succeeded and the Health report flags nothing. It reads, read-only, the Lake Step's log, the Health report, ash_new's code and its job records. Its output:
+6. **Health** (Agent: the Health Agent). It skips itself when the Lake Step succeeded and the Health report has no flag that needs attention: a new one, one on a security the Books hold or may trade, or a security the Lake no longer gets prices for that hasn't been looked up (the audit of 10 November 2026: before, every flag called it every day). It is given those flags, and told how many were left out. It reads, read-only, the Lake Step's log, the Health report, ash_new's code and its job records. Its output:
    - a diagnosis;
    - a proposed fix, as text, never applied;
    - proposed Corrections in the Corrections file's format, recorded in ash_new to wait for approval.
-7. **Plan** (command, through `pd`). It applies the Data gate and reads each market's Market condition, then makes the Rule plan for each Book, real and paper, from the Book's state (see The Book engine and The Book state). It writes the Rule plans, each Book's exposure level and Pool, and the names the Desk must review with the analysts each needs, with a dossier for each name. Issue 47 built it first for the India Book in shadow: `pd plan`, then `pd book-state` for each Book with a plan, kept as `plan.json` and `book-states.json`.
+7. **Plan** (command, through `pd`). It applies the Data gate and reads each market's Market condition, then makes the Rule plan for each Book, real and paper, from the Book's state (see The Book engine and The Book state). It writes the Rule plans, each Book's exposure level and Pool, and the names the Desk must review with the analysts each needs, with a dossier for each name. Then it checks the closes the plans rest on against a second source (`pd cross-check`: NSE's own files for India, Tencent's daily bars for the US and Hong Kong; the audit of 10 November 2026). A close over 1% away quarantines its security, or its market's index, which fails the Data gate; the plans are then made again, and each gap is a To-do. A second source that can't be reached is a To-do and holds nothing up. Issue 47 built it first for the India Book in shadow: `pd plan`, then `pd book-state` for each Book with a plan, kept as `plan.json` and `book-states.json`.
 8. **Feeds** (command, through `pd`). It fetches the Feeds for the Rule plan's names and the holdings, reusing what it has cached.
 9. **Review** (command, through `pd`, Saturdays only). It computes the weekly figures, adds the monthly ones on the first Saturday of a month, and the yearly ones at the yearly review.
 10. **Desk** (Agents: one call per analyst needed, all at once; it skips itself when none is). Each analyst gets the names `pd plan` asks it to review, with their dossiers and Feeds, and writes a view of each. A view is reused, with its date, while nothing that analyst reads for the name has changed.
@@ -330,6 +330,7 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
     - It records each accepted change as an Override, with the Rule plan's order and the Decision record beside it.
 13. **Save state** (command). It applies the Journal's entries and queues each proposed Lesson for Saransh's Answer, as the daily Pipeline's Save state does for Memory.
 14. **Brief** (command). It writes the Stocks Brief as a single self-contained HTML file in the Run folder.
+15. **Backtests** (command, through `pd`; after the Brief). It runs `pd backtests-update`: each strategy whose newest run the refresh made stale is backtested again (story 17). It was part of `pd daily` until the audit of 10 November 2026: it took 44 of the Lake Step's 53 minutes that day, so the Brief was written after Hong Kong had opened, and no other Step reads what it stores. It skips itself in a dry run, and when this Run's Lake Step didn't refresh the Lake.
 
 A dry run changes nothing in ash_new:
 - the fake Worker stands in for every Agent;
@@ -355,7 +356,7 @@ A dry run changes nothing in ash_new:
 - **Strategy versions:** every strategy has a version, made of its rules, its parameters and its code hash. A change to any of them is a new strategy. The approved versions are in ash_new's config, and the Candidate test considers only those. The ash ports already exist; their audit reports how each version differs from ash's own (fill timing, regime index, costs, missing inputs), and each gets a version that fills at the next open.
 - **The engine builds on ash_new's portfolio code** that exists today (sizing, costs, drift and order proposals, paper follow), not a second copy.
 - **Sleeve weights:** each strategy's weight is proportional to the inverse of its volatility over the past year, then scaled by its Stage. Gold is fixed at 10%. Whatever no Sleeve uses waits in the cash fund. Weights are set at each yearly review and drift in between.
-- **Disaster stops** are set at entry, at twice the strategy's stop distance, or 15% below the entry for a strategy without a stop. They are raised only on Saturdays. On daily bars, a low under the stop fills at the stop, or at the open when the price opens below it.
+- **Disaster stops** are set at entry, at twice the strategy's stop distance, or 15% below the entry for a strategy without a stop, and no nearer than 10% past the strategy's own trailing stop. They stay where they were set. Both are the Mandate's second version (the audit of 10 November 2026): raised each Saturday at twice the stop distance, India CW2's sat 20% under each week's close, inside its strategy's own 30% trailing stop, and took 42 of the Book's 54 stop sales of 2016 to 2026, for 6.7 points of CAGR a year. On daily bars, a low under the stop fills at the stop, or at the open when the price opens below it.
 - **Strategy exits** stay end-of-day, as each strategy's spec says.
 - **Legacy holdings** are sold to pay for the Sleeves' buys: losses first, then gains. A winner within two months of turning long-term (12 months in India, 24 in the US) is held until it has. Kept holdings are never sold.
 - **Costs** come from the cost presets, with brokerage at ₹0 for ICICI Direct and $0 for moomoo for now. In the backtest, the cash fund earns its own region's risk-free rate (the US's for the Hong Kong Book's, which is the US Book's).
@@ -370,7 +371,7 @@ A dry run changes nothing in ash_new:
 
 ADR 0003 records why the Portfolio Manager judges within a Playbook rather than only subtracting.
 
-- **The Market condition** is read by `pd plan` for each market from the Lake: the index against its 50- and 200-day averages, breadth (the share of the index's members above their 200-day average) and distribution days. Its thresholds are in ash_new's config. MarketSmith's own outlook, from the latest snapshot, is recorded beside it and decides nothing.
+- **The Market condition** is read by `pd plan` for each market from the Lake: the index against its 50- and 200-day averages, breadth (the share of the index's members above their 200-day average; of Hong Kong's liquid securities, as the Lake keeps no membership of the Hang Seng) and distribution days, which make a Correction only while the index is under its 50-day average (both since the audit of 10 November 2026). Its thresholds are in ash_new's config. MarketSmith's own outlook, from the latest snapshot, is recorded beside it and decides nothing.
 - **The exposure level** for each Market condition is set in each Book's config, and the Book engine applies it (rule 4 above), so the Book backtest includes it.
 - **The Playbook** is in each Book's config beside its Mandate, under a version as the Mandate's is. It gives each Lever its range:
   - **exposure:** the floor the Portfolio Manager may cut to below the exposure level, never above it. A cut works as the exposure level does: no new buys, then the weakest trimmed first;
@@ -402,8 +403,8 @@ ADR 0003 records why the Portfolio Manager judges within a Playbook rather than 
 
   These answers are recorded in ash_new's decisions file, and its tickets carry them.
 - **Corrections:** a proposed Correction waits in the app database until Saransh approves it. Approving it adds it to the Corrections file, and the next refresh applies it.
-- **Quarantine:** a security flagged by the Health report is quarantined in every Book until its Correction is approved or its flag dismissed.
-- **The Data gate fails** on a problem across the whole Lake: no refresh, a failed Health report, or a market not at its last finished session.
+- **Quarantine:** a security flagged by the Health report is quarantined in every Book until its Correction is approved or its flag dismissed. Since the audit of 10 November 2026 it is also lifted once the Health report no longer raises its flag (unless a Correction for it is waiting), and a security whose close a second source gives otherwise (`pd cross-check`) is quarantined until a later cross-check agrees.
+- **The Data gate fails** on a problem across the whole Lake: no refresh, a failed Health report, a market not at its last finished session, or a market's index without a bar on that session or quarantined by the cross-check.
 - **Stuck refreshes:** a `pd` command clears a refresh job marked running whose process no longer exists. It marks the job failed and frees the refresh lock. The `BrokenProcessPool` failure is diagnosed and fixed before the stocks Pipeline relies on the Lake.
 - **New securities:** the gold ETFs and cash funds are added to the Lake, with their prices.
 
