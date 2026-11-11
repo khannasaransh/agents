@@ -609,7 +609,7 @@
           "drawdown": -0.0114,
           "max_drawdown": -0.0352,
           "limits": {
-            "no_new_buys_at": -0.1,
+            "no_new_buys_at": null,
             "halve_exposure_at": -0.18,
             "drawdown_limit": -0.25
           },
@@ -674,13 +674,11 @@
           "drawdown": -0.0087,
           "max_drawdown": -0.1123,
           "limits": {
-            "no_new_buys_at": -0.1,
+            "no_new_buys_at": null,
             "halve_exposure_at": -0.18,
             "drawdown_limit": -0.25
           },
-          "reached": [
-            "no_new_buys_at"
-          ]
+          "reached": []
         }
       },
       {
@@ -717,7 +715,7 @@
           "drawdown": null,
           "max_drawdown": null,
           "limits": {
-            "no_new_buys_at": -0.1,
+            "no_new_buys_at": null,
             "halve_exposure_at": -0.18,
             "drawdown_limit": -0.25
           },

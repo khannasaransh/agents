@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAGR at a Sharpe Floor</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --ink: #1d1c1a; --quiet: #5f5c56; --border: #e3e0d8;
+    --edge: #b9b5ab; --accent: #2f6fd6; --accent-tint: rgba(47,111,214,.10); --tint: #f1efe9; --code: #f1efe9;
+    --good: #1f7a3d; --bad: #b3261e; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+      --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+      --good: #6cc48a; --bad: #f08a80; --warn: #e0b060;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+    --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+    --good: #6cc48a; --bad: #f08a80; --warn: #e0b060;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; line-height: 1.25; margin: 0 0 6px; }
+  .byline { color: var(--quiet); font-size: 14px; margin-bottom: 28px; }
+  h2 { font-size: 22px; margin: 44px 0 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  nav { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+  nav ol { margin: 0; columns: 2; }
+  @media (max-width: 600px) { nav ol { columns: 1; } }
+  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--tint); font-weight: 600; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr.now td { background: var(--tint); }
+  tr.pick td { background: var(--accent-tint); }
+  .note { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; }
+  .note.warn { border-left-color: var(--warn); }
+  .note p:last-child { margin-bottom: 0; }
+  .quiet { color: var(--quiet); font-size: 14px; }
+  .theme { position: fixed; top: 12px; right: 12px; font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="theme" type="button" id="theme" aria-label="Switch light or dark theme">Theme</button>
+<main>
+<h1>The most CAGR with a Sharpe ratio of 0.8 or more</h1>
+<div class="byline">11 November 2026 · a study on ash_new (<code>backend/portfolio-dashboard</code>) · follows <a href="2026-11-11-sharpe-across-markets.html">raising the Sharpe ratio across markets</a> and the <a href="../2026-11-10-portfolio-pipeline-audit.html">Pipeline audit</a></div>
+
+<div class="note">
+<p><strong>Finding.</strong> A Book loses its CAGR in its own rules, not in its strategies, and one rule is the trap: the first breaker, which stops all buying from a 10% drawdown. Without it and without the exposure level, the US Book goes from 8.7% to 15.3% a year with a Sharpe of 1.00, and the gain holds in three windows, 2008 among them. India gains less and less surely (22.4% to 25.0%). Hong Kong gains nothing. The three Books together go from 15.4% to 19.5% a year at a weekly Sharpe of 1.47. Nothing is changed: the exposure levels and the Mandate are yours to set.</p>
+</div>
+
+<nav>
+<ol>
+  <li><a href="#measured">How it was measured</a></li>
+  <li><a href="#rules">Where a Book's CAGR goes</a></li>
+  <li><a href="#grid">Every setting, on average</a></li>
+  <li><a href="#breaker">The first breaker</a></li>
+  <li><a href="#books">The Books</a></li>
+  <li><a href="#together">The three Books together</a></li>
+  <li><a href="#more">More CAGR for more risk</a></li>
+  <li><a href="#proposed">What is proposed</a></li>
+  <li><a href="#limits">Limits</a></li>
+  <li><a href="#files">Where the work is</a></li>
+</ol>
+</nav>
+
+<h2 id="measured">1. How it was measured</h2>
+<p>Cells are <strong>CAGR / Sharpe / max drawdown</strong>, in local currency, after costs, on ash_new's Book engine. Each setting was laid over the Book in memory: no config file was written. Three windows:</p>
+<ul>
+  <li><strong>the ten years</strong> to 9 or 10 November 2026;</li>
+  <li><strong>the holdout</strong>, 1 January 2013 to 15 August 2016;</li>
+  <li><strong>the frozen panels</strong>, to 15 August 2016: the US Book from 1 June 2007, through 2008, and India's from 2 February 2009. These are the first days each Book's gold ETF and cash fund have prices.</li>
+</ul>
+<div class="table-wrap">
+<table>
+<tr><th>Benchmark</th><th class="n">Ten years</th><th class="n">Holdout</th><th class="n">Frozen panels</th></tr>
+<tr><td>Nifty 500 (total return)</td><td class="n">13.7% / 0.53 / −38.1%</td><td class="n">13.9% / 0.56 / −20.1%</td><td class="n">17.8% / 0.68 / −31.8%</td></tr>
+<tr><td>S&amp;P 500 (total return)</td><td class="n">15.1% / 0.71 / −33.8%</td><td class="n">14.2% / 0.85 / −13.0%</td><td class="n">3.9% / 0.15 / −56.8%</td></tr>
+</table>
+</div>
+
+<h2 id="rules">2. Where a Book's CAGR goes</h2>
+<p>The US Book over the ten years, each rule switched off alone and then together. CW2 selected makes about 20% a year on its own; in a Book as it is, 11%.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Rules</th><th class="n">The US Book now (CW2 + Super 30 OK)</th><th class="n">CW2 selected alone</th></tr>
+<tr class="now"><td>As it is</td><td class="n">8.7% / 0.57 / −16.4%</td><td class="n">11.0% / 0.80 / −11.1%</td></tr>
+<tr><td>No breakers</td><td class="n">10.0% / 0.61 / −19.9%</td><td class="n">10.9% / 0.70 / −13.2%</td></tr>
+<tr><td>No exposure level</td><td class="n">7.0% / 0.39 / −15.2%</td><td class="n">11.0% / 0.76 / −12.4%</td></tr>
+<tr><td>No limit price</td><td class="n">7.2% / 0.48 / −12.2%</td><td class="n">7.9% / 0.53 / −12.9%</td></tr>
+<tr><td>No Disaster stops</td><td class="n">9.0% / 0.60 / −18.1%</td><td class="n">11.2% / 0.80 / −11.5%</td></tr>
+<tr><td>No sector cap</td><td class="n">8.6% / 0.54 / −17.4%</td><td class="n">12.0% / 0.78 / −12.5%</td></tr>
+<tr class="pick"><td>No exposure level and no breakers</td><td class="n">15.0% / 0.79 / −23.0%</td><td class="n">16.2% / 0.89 / −19.3%</td></tr>
+<tr><td>No rule at all</td><td class="n">16.6% / 0.76 / −25.9%</td><td class="n">20.2% / 0.93 / −21.4%</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>No rule alone matters; two together double the CAGR.</strong> A buy a rule cuts is never tried again. The money waits in the cash fund until the strategy next trades that stock, which for CW2 is its sale months later. So taking one rule away leaves the next to cut the same buy.</li>
+  <li><strong>The first breaker feeds on itself.</strong> It trips at a 10% drawdown and lets go above 5%. In between the Book buys nothing, so what its strategies sell is not replaced, it drifts to cash at 3% and has less to climb back with. It kept the US Book from buying on 30% of days.</li>
+  <li><strong>The exposure level hides it.</strong> A Book held to 80% or 40% in stocks falls less, so it reaches −10% less often. With the level off and the breakers on, the US Books make less than as they are (9.1% against 12.7%).</li>
+  <li><strong>The strategies have their own market gates.</strong> CW2 sells everything when its index closes 3% to 5% under its 200-day average. The Book's level and breakers stand on top of that.</li>
+</ul>
+
+<h2 id="grid">3. Every setting, on average</h2>
+<p>Four exposure levels with three breakers, with a catch-up of cut buys and without, over seven or eight sets of Sleeves a Book: 1,056 Book backtests. An average over sets says more than one Book's best row. Cells are <strong>CAGR / Sharpe</strong>, the ten years | the holdout.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Setting</th><th class="n">US, 8 sets</th><th class="n">India, 7 sets</th><th class="n">Hong Kong, 7 sets</th></tr>
+<tr class="now"><td>Level as set (100/80/40)</td><td class="n">12.1% / 0.77 | 6.7% / 0.50</td><td class="n">22.2% / 1.26 | 24.9% / 1.54</td><td class="n">10.3% / 0.69 | 3.1% / 0.04</td></tr>
+<tr><td>Level 100/90/60</td><td class="n">12.8% / 0.77 | 8.2% / 0.61</td><td class="n">23.2% / 1.25 | 27.1% / 1.58</td><td class="n">11.1% / 0.72 | 3.1% / 0.05</td></tr>
+<tr><td>Level 100/100/70</td><td class="n">12.6% / 0.76 | 8.7% / 0.63</td><td class="n">23.7% / 1.27 | 27.6% / 1.58</td><td class="n">11.2% / 0.72 | 2.5% / −0.01</td></tr>
+<tr><td>No exposure level</td><td class="n">12.9% / 0.77 | 9.6% / 0.67</td><td class="n">23.2% / 1.23 | 26.4% / 1.47</td><td class="n">11.3% / 0.72 | 2.2% / −0.05</td></tr>
+<tr class="now"><td>Breakers as set (−10%, −18%)</td><td class="n">9.7% / 0.65 | 8.0% / 0.58</td><td class="n">21.6% / 1.23 | 25.6% / 1.50</td><td class="n">11.3% / 0.77 | 1.9% / −0.11</td></tr>
+<tr><td>Breakers at −15% and −25%</td><td class="n">13.3% / 0.80 | 8.4% / 0.61</td><td class="n">23.6% / 1.27 | 27.0% / 1.56</td><td class="n">10.3% / 0.67 | 2.9% / 0.05</td></tr>
+<tr><td>No breakers</td><td class="n">14.9% / 0.85 | 8.4% / 0.61</td><td class="n">24.0% / 1.25 | 27.0% / 1.56</td><td class="n">11.3% / 0.70 | 3.3% / 0.09</td></tr>
+<tr class="now"><td>A cut buy not retried (as now)</td><td class="n">12.1% / 0.76 | 8.3% / 0.63</td><td class="n">23.1% / 1.30 | 26.1% / 1.56</td><td class="n">10.9% / 0.74 | 3.1% / 0.05</td></tr>
+<tr><td>Catch-up of cut buys</td><td class="n">13.1% / 0.77 | 8.3% / 0.58</td><td class="n">23.1% / 1.21 | 26.9% / 1.53</td><td class="n">11.1% / 0.69 | 2.3% / −0.04</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>The US:</strong> the breakers are worth 5 points over the ten years and the level 3 in the holdout. Sharpe rises with CAGR.</li>
+  <li><strong>India:</strong> 1.4 to 2.7 points from each, in both windows, for 2 to 3 points of drawdown.</li>
+  <li><strong>Hong Kong:</strong> nothing, in either window.</li>
+  <li><strong>The catch-up</strong> adds a point in the US's ten years and about nothing elsewhere, for deeper drawdowns. It would be a change to the Book engine and is not proposed.</li>
+</ul>
+
+<h2 id="breaker">4. The first breaker dropped, the second kept</h2>
+<p>The second breaker (half the Book in stocks from −18% until above −9%) can stay. "Second only" has the first breaker's level where it never trips.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Book</th><th>Level</th><th>Breakers</th><th class="n">Ten years</th><th class="n">Holdout</th></tr>
+<tr><td>US C</td><td>off</td><td>as set</td><td class="n">9.1% / 0.75 / −12.2%</td><td class="n">10.1% / 0.74 / −8.7%</td></tr>
+<tr class="pick"><td>US C</td><td>off</td><td>second only</td><td class="n">15.3% / 1.00 / −13.2%</td><td class="n">10.1% / 0.74 / −8.7%</td></tr>
+<tr><td>US CW2 + Momentum</td><td>off</td><td>as set</td><td class="n">9.0% / 0.57 / −15.2%</td><td class="n">10.2% / 0.70 / −9.6%</td></tr>
+<tr><td>US CW2 + Momentum</td><td>off</td><td>first at −15%, second at −25%</td><td class="n">8.7% / 0.53 / −17.0%</td><td class="n">10.2% / 0.70 / −9.6%</td></tr>
+<tr><td>US CW2 + Momentum</td><td>off</td><td>second only</td><td class="n">14.4% / 0.82 / −16.7%</td><td class="n">10.2% / 0.70 / −9.6%</td></tr>
+<tr><td>India now</td><td>100/100/70</td><td>as set</td><td class="n">22.8% / 1.23 / −16.0%</td><td class="n">27.0% / 1.56 / −10.1%</td></tr>
+<tr class="pick"><td>India now</td><td>100/100/70</td><td>second only</td><td class="n">25.0% / 1.24 / −14.5%</td><td class="n">29.3% / 1.67 / −10.1%</td></tr>
+<tr><td>India now</td><td>off</td><td>second only</td><td class="n">24.7% / 1.24 / −19.3%</td><td class="n">28.2% / 1.54 / −11.6%</td></tr>
+<tr><td>India now</td><td>off</td><td>none</td><td class="n">25.9% / 1.22 / −24.0%</td><td class="n">28.2% / 1.54 / −11.6%</td></tr>
+<tr><td>Hong Kong now</td><td>as set</td><td>second only</td><td class="n">7.6% / 0.51 / −19.1%</td><td class="n">1.9% / −0.11 / −12.8%</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>Moving the first breaker further out does not mend it.</strong> At −15% it trips later and shuts the Book as long. It is the rule, not its level.</li>
+  <li><strong>The second breaker costs nothing where it never trips</strong>, and takes 3 to 5 points off India's deepest falls without a level.</li>
+</ul>
+
+<h2 id="books">5. The Books</h2>
+<p>Shaded rows are the Books as they are; highlighted rows are the proposals. US C is the Sharpe study's set: CW2 selected, Low Volatility 30 and Momentum tuned.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Book</th><th>Settings</th><th class="n">Ten years</th><th class="n">Idle</th><th class="n">Holdout</th><th class="n">Frozen panels</th></tr>
+<tr class="now"><td>US, now</td><td>as set</td><td class="n">8.7% / 0.57 / −16.4%</td><td class="n">62%</td><td class="n">4.8% / 0.37 / −3.3%</td><td class="n">can't run</td></tr>
+<tr><td>US C</td><td>as set</td><td class="n">12.7% / 0.98 / −11.1%</td><td class="n">36%</td><td class="n">6.1% / 0.53 / −4.3%</td><td class="n">5.8% / 0.46 / −10.8%</td></tr>
+<tr class="pick"><td>US C</td><td>no level, second breaker only</td><td class="n">15.3% / 1.00 / −13.2%</td><td class="n">13%</td><td class="n">10.1% / 0.74 / −8.7%</td><td class="n">9.9% / 0.72 / −12.2%</td></tr>
+<tr><td>US CW2 + Momentum</td><td>no level, second breaker only</td><td class="n">14.4% / 0.82 / −16.7%</td><td class="n">28%</td><td class="n">10.2% / 0.70 / −9.6%</td><td class="n">11.3% / 0.79 / −9.2%</td></tr>
+<tr><td>US now (same Sleeves)</td><td>no level, second breaker only</td><td class="n">13.8% / 0.76 / −19.9%</td><td class="n">37%</td><td class="n">5.4% / 0.46 / −3.5%</td><td class="n">can't run</td></tr>
+<tr class="now"><td>India, now</td><td>as set</td><td class="n">22.4% / 1.28 / −13.1%</td><td class="n">60%</td><td class="n">25.3% / 1.68 / −7.3%</td><td class="n">19.4% / 1.14 / −10.9%</td></tr>
+<tr class="pick"><td>India now (same Sleeves)</td><td>level 100/100/70, second breaker only</td><td class="n">25.0% / 1.24 / −14.5%</td><td class="n">40%</td><td class="n">29.3% / 1.67 / −10.1%</td><td class="n">20.9% / 1.14 / −19.2%</td></tr>
+<tr><td>India now (same Sleeves)</td><td>no level, second breaker only</td><td class="n">24.7% / 1.24 / −19.3%</td><td class="n">42%</td><td class="n">28.2% / 1.54 / −11.6%</td><td class="n">21.1% / 1.11 / −22.3%</td></tr>
+<tr><td>India A (CW2, Steady Leaders)</td><td>as set</td><td class="n">21.6% / 1.35 / −9.0%</td><td class="n">47%</td><td class="n">24.2% / 1.67 / −7.3%</td><td class="n">20.5% / 1.34 / −11.4%</td></tr>
+<tr><td>India A</td><td>level 100/100/70, second breaker only</td><td class="n">23.7% / 1.38 / −14.9%</td><td class="n">39%</td><td class="n">26.7% / 1.67 / −8.2%</td><td class="n">20.0% / 1.23 / −18.3%</td></tr>
+<tr><td>India M (CW2, Momentum tuned)</td><td>level 100/100/70, second breaker only</td><td class="n">26.0% / 1.32 / −20.5%</td><td class="n">46%</td><td class="n">28.4% / 1.48 / −10.2%</td><td class="n">19.6% / 1.14 / −20.8%</td></tr>
+<tr class="now"><td>Hong Kong, now</td><td>as set</td><td class="n">12.2% / 0.88 / −13.0%</td><td class="n">69%</td><td class="n">1.2% / −0.20 / −12.8%</td><td class="n">can't run</td></tr>
+<tr><td>Hong Kong now (same Sleeves)</td><td>level 100/100/70, second breaker only</td><td class="n">10.5% / 0.69 / −19.6%</td><td class="n">58%</td><td class="n">1.6% / −0.12 / −16.8%</td><td class="n">can't run</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>The US.</strong> The change holds in all three windows for every set of Sleeves run (C: +2.6, +4.0 and +4.1 points; CW2 + Momentum: +2.4, +3.1 and +2.7). Over the ten years C matches the S&amp;P 500's 15.1% with two-fifths of its drawdown. In the holdout it trails the index (10.1% against 14.2%); from 2007 it leads it (9.9% against 3.9%).</li>
+  <li><strong>India.</strong> The gain is 2.6 points over the ten years and 4.0 in the holdout, with drawdowns a tenth to two-fifths deeper. Over 2009–2016 it is 1.5 points for a drawdown nearly twice as deep, and sets A and M lose 0.5 and 1.0 there. India's Book is close to what its strategies allow: a third to two-fifths of it sits idle by their own gates, with the Book's rules or without.</li>
+  <li><strong>Hong Kong.</strong> No setting helps in both windows. Dropping the first breaker alone takes it from 12.2% to 7.6%, so it keeps the Mandate as it is.</li>
+</ul>
+
+<h2 id="together">6. The three Books together</h2>
+<p>The capital as set (43% / 43% / 13%), each Book in its own currency. Cells are <strong>CAGR / weekly Sharpe over cash / max drawdown</strong>.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Books</th><th class="n">Ten years</th><th class="n">Holdout</th></tr>
+<tr class="now"><td>As they are</td><td class="n">15.4% / 1.32 / −8.7%</td><td class="n">12.9% / 1.30 / −3.9%</td></tr>
+<tr><td>The Sharpe study's Sleeves, settings as set</td><td class="n">16.6% / 1.60 / −6.7%</td><td class="n">13.4% / 1.37 / −4.5%</td></tr>
+<tr><td>The US Book alone changed (C, no level, second breaker only)</td><td class="n">18.4% / 1.52 / −8.1%</td><td class="n">15.4% / 1.39 / −5.6%</td></tr>
+<tr class="pick"><td>The proposal: that, and India at 100/100/70 with the second breaker only</td><td class="n">19.5% / 1.47 / −9.3%</td><td class="n">17.1% / 1.46 / −6.9%</td></tr>
+<tr><td>The furthest tested: India M, US CW2 + Momentum with a 50% sector cap</td><td class="n">21.3% / 1.47 / −11.5%</td><td class="n">16.9% / 1.33 / −7.4%</td></tr>
+</table>
+</div>
+<p>Three-quarters of the gain is the US Book's. The whole keeps a Sharpe well over the floor because the three markets move little together.</p>
+
+<h2 id="more">7. More CAGR for more risk: tested, not proposed</h2>
+<div class="table-wrap">
+<table>
+<tr><th>Change</th><th>What it did</th><th>Why not</th></tr>
+<tr><td>Sector cap 50% (30% now), US</td><td>CW2 + Momentum 14.4% → 17.7%, drawdown −16.7% → −22.0%; C 15.3% → 16.0%; nothing in the holdout</td><td>The ten years were technology's decade: the cap bound then and not before. It is a concentration limit.</td></tr>
+<tr><td>The idle money in the index, not the cash fund (an estimate, not an engine run)</td><td>US C 15.3% → 17.3%, drawdown −13.2% → −28.9%; India 25.0% → 29.8%, drawdown −14.5% → −26.6%</td><td>The strategies go to cash in a downtrend, and this puts that cash back in the market. The engine has no index Sleeve.</td></tr>
+<tr><td>CW2 with six slots (eight now), India</td><td>The strategy alone 30.4% → 37.2%; in the Book, lower in the holdout in five of six Books (−8.0 to +0.3)</td><td>Does not hold in the Book. Four slots falls to 22.0% with a −53% drawdown.</td></tr>
+<tr><td>Gold 0% (10% now)</td><td>India +1.0 to +1.5 over the ten years, −0.2 to +2.7 in the holdout; the US lower over the ten years, higher in the holdout</td><td>In India it is about a point for giving up the Book's one holding that is not stocks. A Mandate number, and your call.</td></tr>
+<tr><td>Order-size guard 5% (1% now), India</td><td>+0.7 over the ten years, +0.9 in the holdout</td><td>Small, and the guard is there for the stocks a ₹1 crore Book moves.</td></tr>
+<tr><td>No limit price, a 25% position cap, no Disaster stops</td><td>Within a point and a half either way, with no pattern</td><td>Nothing to gain.</td></tr>
+</table>
+</div>
+
+<h2 id="proposed">8. What is proposed</h2>
+<div class="table-wrap">
+<table>
+<tr><th>Book</th><th>Sleeves</th><th>Exposure level (Uptrend / Under pressure / Correction)</th><th>Breakers</th></tr>
+<tr><td>US</td><td>CW2 selected, Low Volatility 30, Momentum tuned</td><td>100% / 100% / 100%</td><td>the second only</td></tr>
+<tr><td>India</td><td>as now</td><td>100% / 100% / 70%</td><td>the second only</td></tr>
+<tr><td>Hong Kong</td><td>as now, on paper</td><td>as set</td><td>as set</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>The exposure levels</strong> are <code>exposure</code> in <code>config/books.yaml</code>, marked there as placeholders until you set them. The three Books share one block; each would need its own.</li>
+  <li><strong>The first breaker</strong> is the Mandate's <code>no_new_buys_at</code> and <code>resume_buys_at</code>. The Mandate has no way to switch it off: in these runs it sits at −99%, where it never trips. A clean change makes it optional in the Mandate, which is a new Mandate version. Hong Kong keeps the present one.</li>
+  <li><strong>The US Sleeves</strong> need <code>us-low-volatility-30</code> (<code>446fa769f5d3</code>) approved, as the Sharpe study said.</li>
+  <li><strong>On paper first.</strong> The US paper Book under these settings, beside the real one, is the test nobody has looked at.</li>
+</ul>
+<p><strong>Applied the same day, at Saransh's word:</strong> the first breaker is dropped from all three Books, Hong Kong's included, and the exposure levels are set as above (Mandate <code>44a0f8162062</code>). The Sleeves are unchanged. What is in force now, and what each Book measured after the change, is in <a href="../../rules/README.md">docs/rules</a>.</p>
+
+<h2 id="limits">9. Limits</h2>
+<div class="note warn">
+<p><strong>The floor is met over the ten years, not everywhere.</strong> Every proposed Book is over 0.8 on the ten years. The US Book is at 0.74 in the holdout and 0.72 from 2007 to 2016, where the S&amp;P 500 made 0.85 and 0.15.</p>
+</div>
+<ol>
+  <li><strong>The settings were chosen with every window in view.</strong> The US result is the same sign and size in three windows and for five sets of Sleeves, which is the case for it. India's is not.</li>
+  <li><strong>The Mandate's drawdown limit is −25%.</strong> The proposed Books' deepest falls are −13.2% (US), −14.5% (India; −19.2% over 2009–2016) and −9.3% together. India without a level and without breakers reached −24.0% to −25.7%.</li>
+  <li><strong>No Book was run through 2008 in India or Hong Kong.</strong> Their gold ETF and cash fund have no prices then. The US's 2008 is one crash.</li>
+  <li><strong>Low Volatility 30 has no gate of its own.</strong> With no exposure level over it, a third of the US Book is always in stocks. Through 2008 the Book's deepest fall was −12.2%.</li>
+  <li><strong>The first months.</strong> A Book backtest starts from cash, so the short windows understate every Book and flatter whatever fills it faster.</li>
+  <li><strong>One path each.</strong> A Book is a few dozen positions at a time; two or three points either way is noise. The averages over sets are the firmer evidence.</li>
+  <li><strong>Survivorship, local currency, no taxes or brokerage</strong>, as in every backtest here.</li>
+</ol>
+
+<h2 id="files">10. Where the work is</h2>
+<p>All of it is in <code>backend/portfolio-dashboard</code>, uncommitted. Nothing is written but the strategies' runs a Book backtest stores in the Lake and <code>data/debug/cagr-20261111/</code>.</p>
+<ul>
+  <li><strong>The full write-up:</strong> <code>docs/review/2026-11-11-cagr-at-sharpe-floor.md</code>, with the commands to reproduce each table.</li>
+  <li><strong>Scripts and recorded outputs:</strong> <code>docs/review/cagr-20261111/</code>. <code>grid.py</code> runs a Book over sets of Sleeves and settings; <code>pick.py</code> averages them; <code>fill.py</code> is the index estimate; <code>together.py</code> the three Books. <code>grid-*.txt</code>, <code>pick-*.txt</code>, <code>rules-US.txt</code>, <code>breakers-*.txt</code>, <code>extras-*.txt</code>, <code>frozen-*.txt</code>, <code>slots*.txt</code>, <code>fill.txt</code> and <code>together.txt</code> are the outputs.</li>
+</ul>
+</main>
+<script>
+  (function () {
+    var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+    var root = document.documentElement;
+    var saved = store.get('portfolio-audit-theme');
+    if (saved) root.setAttribute('data-theme', saved);
+    document.getElementById('theme').addEventListener('click', function () {
+      var dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      var next = dark ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      store.set('portfolio-audit-theme', next);
+    });
+  })();
+</script>
+</body>
+</html>

@@ -119,7 +119,7 @@ On a month's first Saturday `review.monthly` holds the monthly figures for the m
 
   `sleeves` splits the first two by Sleeve. A `no_record` attribution says why there is none.
 - `correlation`: each pair of Sleeves' correlation of daily returns (each strategy's own backtest's, and gold's) over the year to the month's end.
-- `drawdown`: the paper Book's drawdown at the month's end and its deepest in the month, against the Mandate's `limits`: the breakers (no new buys, half the exposure) and the drawdown limit. `reached` names each the deepest reached.
+- `drawdown`: the paper Book's drawdown at the month's end and its deepest in the month, against the Mandate's `limits`: the breakers (no new buys, which is null where the Mandate has no first breaker, and half the exposure) and the drawdown limit. `reached` names each the deepest reached.
 
 Write the monthly review's commentary in `monthly`: where each Book's return came from and what that says, what the correlations and drawdowns say about its risk, and the promotions due (`review.promotions_due`). Say plainly what your Overrides added or cost. Plain sentences, a few short paragraphs, the figures as the file gives them. When `review.monthly` is null, `monthly` is null.
 

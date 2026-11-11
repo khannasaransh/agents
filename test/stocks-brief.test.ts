@@ -712,7 +712,8 @@ test('each paper Book is shown against its rules-only paper Book, with its drawd
   const page = text(await brief())
 
   assert.match(page, /Paper Books Book Paper Book Rules-only paper Book Gap Drawdown/)
-  assert.match(page, /India Book ₹10,03,413 on 2026-10-27 ₹10,01,980 on 2026-10-27 ₹1,433 0\.1% -0\.3% breakers at -10% and -18%/)
+  // The Mandate has no first breaker (11 November 2026): only the one that halves the exposure.
+  assert.match(page, /India Book ₹10,03,413 on 2026-10-27 ₹10,01,980 on 2026-10-27 ₹1,433 0\.1% -0\.3% breaker at -18%/)
   assert.match(page, /US Book \$100,000 not started: all cash \$100,000 not started: all cash \$0 0% 0%/)
   assert.match(page, /The paper Books together: ₹2,11,73,413, at USD at ₹88\.20 and HKD at ₹11\.35\./)
   assert.match(page, /India Book's paper Book Its Sleeves: in-super30-ok-tuned in Paper since 2026-10-26: ₹1,82,322; gold: ₹1,00,000\./)
@@ -831,14 +832,33 @@ test("on a month's first Saturday the monthly review attributes each Book's retu
   )
   assert.match(page, /Over the month its benchmark made 1\.18% and its rules-only paper Book 2\.00%\./)
   assert.match(page, /India Super 30 OK, tuned and Gold 0\.08/)
-  assert.match(page, /Its drawdown: -1\.1% at the month's end, -3\.5% at its deepest; its limits -10% for no new buys, -18% for half the exposure level, -25% for the drawdown limit\. It reached none of them\./)
+  // The Mandate has no first breaker, so no limit for new buys.
+  assert.match(page, /Its drawdown: -1\.1% at the month's end, -3\.5% at its deepest; its limits -18% for half the exposure level, -25% for the drawdown limit\. It reached none of them\./)
   // The US Book, in dollars, is reviewed in rupees: the dollar's move against the rupee is a part of its return.
   assert.match(page, /The dollar against the rupee 0\.80% 87\.92 to 88\.62 rupees Its return 2\.31% In rupees, 22 sessions/)
   assert.match(page, /Over the month its benchmark made 1\.41% and its rules-only paper Book 1\.47% in USD\./)
-  assert.match(page, /Its deepest reached no new buys\./)
+  assert.match(page, /Its drawdown: -0\.9% at the month's end, -11\.2% at its deepest; its limits -18% for half the exposure level, -25% for the drawdown limit\. It reached none of them\./)
+  assert.doesNotMatch(page, /no new buys/)
   assert.doesNotMatch(page, /Hong Kong Book Source/, 'a Book with nothing to attribute is left out')
   assert.match(page, /Monthly review: October 2026 .* Promotions due India Super 30 OK, tuned in the India Book: from Paper to Real-small/)
   assert.ok(page.indexOf('Weekly review') < page.indexOf('Monthly review'), 'the monthly review comes after the weekly')
+})
+
+test('a Mandate with a first breaker shows it among the breakers and the limits', async () => {
+  prepare()
+  const standing = JSON.parse(example('paper-books.json'))
+  for (const book of standing.books) book.breakers.no_new_buys_at = -0.1
+  ws.writeRunFile(runId, 'paper-books.json', standing)
+  const review = JSON.parse(example('review.monthly.json'))
+  for (const book of review.monthly.books) book.drawdown.limits.no_new_buys_at = -0.1
+  review.monthly.books[1].drawdown.reached = ['no_new_buys_at']
+  ws.writeRunFile(runId, 'review.json', review)
+
+  const page = text(await brief())
+
+  assert.match(page, /India Book ₹10,03,413 on 2026-10-27 ₹10,01,980 on 2026-10-27 ₹1,433 0\.1% -0\.3% breakers at -10% and -18%/)
+  assert.match(page, /its limits -10% for no new buys, -18% for half the exposure level, -25% for the drawdown limit\. It reached none of them\./)
+  assert.match(page, /Its deepest reached no new buys\./)
 })
 
 test('on other Saturdays there is no monthly review', async () => {

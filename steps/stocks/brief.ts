@@ -733,7 +733,10 @@ function monthlyBookPart(book: MonthlyBook, names: Map<string, string>): string 
       table(['Sleeves', 'Correlation'], c.pairs.map((pair) => [esc(`${name(pair.a)} and ${name(pair.b)}`), pair.correlation === null ? '—' : esc(pair.correlation.toFixed(2))])),
     )
   if (d.status === 'measured' && d.drawdown !== null && d.max_drawdown !== null) {
-    const limits = (Object.keys(limitName) as (keyof typeof limitName)[]).map((key) => `${percent(d.limits[key])} for ${limitName[key]}`).join(', ')
+    // A limit the Mandate hasn't (null: no first breaker) is left out.
+    const limits = (Object.keys(limitName) as (keyof typeof limitName)[])
+      .flatMap((key) => { const limit = d.limits[key]; return limit === null ? [] : [`${percent(limit)} for ${limitName[key]}`] })
+      .join(', ')
     const reached = d.reached.length ? ` Its deepest reached ${d.reached.map((key) => limitName[key]).join(' and ')}.` : ' It reached none of them.'
     out.push(`<p>${esc(`Its drawdown: ${percent(d.drawdown)} at the month's end, ${percent(d.max_drawdown)} at its deepest; its limits ${limits}.${reached}`)}</p>`)
   }
@@ -1389,7 +1392,9 @@ function standingCell(book: PdPaperBook, kind: 'paper' | 'rules_only'): string {
 function drawdownCell(book: PdPaperBook): string {
   const { drawdown, buying, halved } = book.paper
   const tripped = [!buying ? 'no new buys' : '', halved ? 'half exposure' : ''].filter(Boolean)
-  const breakers = `breakers at ${percent(book.breakers.no_new_buys_at)} and ${percent(book.breakers.halve_exposure_at)}`
+  // A Mandate without the first breaker (null) has only the one that halves the exposure.
+  const { no_new_buys_at: first, halve_exposure_at: second } = book.breakers
+  const breakers = first === null ? `breaker at ${percent(second)}` : `breakers at ${percent(first)} and ${percent(second)}`
   return `${percent(drawdown)}<br><span class="muted">${tripped.length ? `tripped: ${tripped.join(', ')}` : breakers}</span>`
 }
 

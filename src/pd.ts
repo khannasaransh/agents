@@ -760,7 +760,8 @@ export interface PdMonthlyReview {
       /** At the month's last close filled, and the deepest in the month. */
       drawdown: number | null
       max_drawdown: number | null
-      limits: { no_new_buys_at: number; halve_exposure_at: number; drawdown_limit: number }
+      /** no_new_buys_at is null where the Mandate has no first breaker. */
+      limits: { no_new_buys_at: number | null; halve_exposure_at: number; drawdown_limit: number }
       /** Each limit the month's deepest reached. */
       reached: ('no_new_buys_at' | 'halve_exposure_at' | 'drawdown_limit')[]
     }
@@ -1349,7 +1350,7 @@ export interface PdPaperStanding {
   peak: number
   /** Its value per unit against its highest close: 0 or less. */
   drawdown: number
-  /** False while the first breaker stops new buys. */
+  /** False while the first breaker stops new buys (always true under a Mandate without one). */
   buying: boolean
   /** True while the second breaker halves its exposure. */
   halved: boolean
@@ -1367,7 +1368,8 @@ export interface PdPaperBook {
   rules_only: PdPaperStanding
   /** The paper Book's value less its rules-only paper Book's: what judgement added (ADR 0004). */
   gap: { value: number; share: number } | null
-  breakers: { no_new_buys_at: number; halve_exposure_at: number }
+  /** The Mandate's breakers, as drawdowns: no_new_buys_at is null where it has no first breaker. */
+  breakers: { no_new_buys_at: number | null; halve_exposure_at: number }
   sleeves: { strategy_id: string; version: string; stage: PdStage; stage_name: string; since: string; value: number | null }[]
   gold: number | null
   risk_per_trade: number

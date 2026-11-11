@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sharpe Across Markets</title>
+<style>
+  :root {
+    --bg: #fbfaf7; --surface: #ffffff; --ink: #1d1c1a; --quiet: #5f5c56; --border: #e3e0d8;
+    --edge: #b9b5ab; --accent: #2f6fd6; --accent-tint: rgba(47,111,214,.10); --tint: #f1efe9; --code: #f1efe9;
+    --good: #1f7a3d; --bad: #b3261e; --warn: #8a5a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+      --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+      --good: #6cc48a; --bad: #f08a80; --warn: #e0b060;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1b1a18; --surface: #232220; --ink: #ecebe7; --quiet: #a8a49c; --border: #3a3834;
+    --edge: #6e6a62; --accent: #6ea0f0; --accent-tint: rgba(110,160,240,.14); --tint: #2a2926; --code: #2d2c29;
+    --good: #6cc48a; --bad: #f08a80; --warn: #e0b060;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 40px 16px 80px; }
+  h1 { font-size: 30px; line-height: 1.25; margin: 0 0 6px; }
+  .byline { color: var(--quiet); font-size: 14px; margin-bottom: 28px; }
+  h2 { font-size: 22px; margin: 44px 0 10px; padding-top: 8px; border-top: 1px solid var(--border); }
+  p { margin: 0 0 14px; }
+  ul, ol { margin: 0 0 14px; padding-left: 24px; }
+  li { margin-bottom: 6px; }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 1px 5px; border-radius: 4px; font-size: .9em; }
+  nav { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 12px 16px; font-size: 14px; }
+  nav ol { margin: 0; columns: 2; }
+  @media (max-width: 600px) { nav ol { columns: 1; } }
+  .table-wrap { overflow-x: auto; margin: 0 0 16px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { background: var(--tint); font-weight: 600; }
+  td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr:last-child td { border-bottom: none; }
+  tr.now td { background: var(--tint); }
+  tr.pick td { background: var(--accent-tint); }
+  .note { background: var(--surface); border: 1px solid var(--border); border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 16px; margin: 0 0 16px; }
+  .note.warn { border-left-color: var(--warn); }
+  .note p:last-child { margin-bottom: 0; }
+  .quiet { color: var(--quiet); font-size: 14px; }
+  .theme { position: fixed; top: 12px; right: 12px; font: inherit; font-size: 13px; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+</style>
+</head>
+<body>
+<button class="theme" type="button" id="theme" aria-label="Switch light or dark theme">Theme</button>
+<main>
+<h1>Raising the Sharpe ratio across India, the US and Hong Kong</h1>
+<div class="byline">11 November 2026 · a study on ash_new (<code>backend/portfolio-dashboard</code>) · follows the <a href="../2026-11-10-portfolio-pipeline-audit.html">Pipeline audit</a> · next: <a href="2026-11-11-cagr-at-sharpe-floor.html">the most CAGR at a Sharpe floor</a></div>
+
+<div class="note">
+<p><strong>Finding.</strong> Tuning the strategies further does not raise Sharpe. What a Book holds together does. Changing the Sleeves takes the three Books together from a Sharpe of about 1.35 to about 1.6 over the ten years, and from 1.33 to 1.40 in the 2013–2016 holdout, almost all of it from the US Book. Nothing is approved, launched or changed in any Book: the Sleeve changes are proposals.</p>
+</div>
+
+<nav>
+<ol>
+  <li><a href="#measured">How it was measured</a></li>
+  <li><a href="#rejected">What was tested and rejected</a></li>
+  <li><a href="#strategies">The strategies, and what moves with what</a></li>
+  <li><a href="#books">The Books</a></li>
+  <li><a href="#together">The three Books together</a></li>
+  <li><a href="#proposed">What is proposed</a></li>
+  <li><a href="#limits">Limits</a></li>
+  <li><a href="#files">Where the work is</a></li>
+</ol>
+</nav>
+
+<h2 id="measured">1. How it was measured</h2>
+<p>Cells are <strong>Sharpe / CAGR / max drawdown</strong>, in local currency, after costs.</p>
+<ul>
+  <li><strong>A strategy's figures</strong> are from ash_new's backtest engine, with its idle cash at the market's risk-free rate (India 6%, the US and Hong Kong 3%), as a Book's cash fund pays it. Windows: 16 August 2016 to 14 August 2026, and the holdout, 1 January 2013 to 15 August 2016.</li>
+  <li><strong>A Book's figures</strong> are from the Book engine, under the Mandate <code>7d9f896c659f</code> and the Market condition as set. Windows: the ten years to 9 or 10 November 2026, and the same holdout.</li>
+  <li><strong>The frozen window</strong> is 2006 to 2016 on the frozen panels, which includes 2008.</li>
+</ul>
+
+<h2 id="rejected">2. What was tested and rejected</h2>
+<p>Four general changes were tested on every market and both windows. None raises Sharpe across them.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Change</th><th>Where</th><th>What it did to Sharpe</th></tr>
+<tr><td>Volatility target (15% or 20%, over 20 or 60 sessions, no leverage)</td><td>44 strategy versions</td><td>Lower in India in both windows (−0.07 to −0.21 over 2016–2026, for every strategy); mixed in the US; higher only in Hong Kong's holdout</td></tr>
+<tr><td>Half the strategy while its own NAV is under its 100- or 200-session average</td><td>The same 44</td><td>Lower in all six market-windows</td></tr>
+<tr><td>Risk-sized buys in CW2: a slot scaled down for a stock moving more than the median one</td><td>CW2 selected, on the engine</td><td>India 2016–2026 +0.13; the other five cells −0.00 to −0.05</td></tr>
+<tr><td>Buying each Sleeve back to its strategy's weights when the exposure level rises</td><td>The Book engine, five Books</td><td>India 1.28 → 1.31 with a deeper drawdown, holdout 1.68 → 1.54; the US and Hong Kong lower</td></tr>
+</table>
+</div>
+<p>The first two are worked out on stored NAVs, so they are estimates. The last two ran on the engines. With the earlier studies' 100-odd CW2 variants a market, the strategies look to be at their ceiling: about 1.1 in India, 0.9 in the US, 0.6 in Hong Kong.</p>
+<p>The fourth is worth knowing whatever its result: the Book engine trims a Book when its Market condition worsens and never buys it back when the condition improves. A holding it trimmed returns only when its strategy next trades it.</p>
+
+<h2 id="strategies">3. The strategies, and what moves with what</h2>
+<p>All 83 strategies a Book could trade were run on the engine over both windows. Every momentum and breakout strategy in a market moves with the others (correlations of 0.6 to 0.9), so two of them diversify little. The Low Volatility 30 template moves least with the Books' Sleeves.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Strategy</th><th class="n">2016–2026</th><th class="n">2013–2016</th><th class="n">2006–2016 (frozen)</th><th class="n">Correlation with the Book's Sleeves</th></tr>
+<tr><td><code>in-steady-leaders</code></td><td class="n">1.34 / 24.7% / −18.4%</td><td class="n">1.23 / 21.2% / −10.4%</td><td class="n">0.86 / 19.9% / −30.1%</td><td class="n">0.73</td></tr>
+<tr class="now"><td><code>in-cw2-selected</code> (a Sleeve)</td><td class="n">1.17 / 32.4% / −26.2%</td><td class="n">1.59 / 41.4% / −21.5%</td><td class="n">0.52 / 15.3% / −35.8%</td><td class="n">0.92</td></tr>
+<tr class="now"><td><code>in-super30-ok-tuned</code> (a Sleeve)</td><td class="n">0.89 / 23.3% / −41.7%</td><td class="n">0.87 / 19.1% / −17.9%</td><td class="n">0.67 / 20.7% / −36.8%</td><td class="n">0.92</td></tr>
+<tr><td><code>in-low-volatility-30</code></td><td class="n">0.82 / 15.6% / −24.4%</td><td class="n">1.65 / 25.7% / −10.7%</td><td class="n">0.75 / 19.4% / −47.6%</td><td class="n">0.46</td></tr>
+<tr class="now"><td><code>us-cw2-selected</code> (a Sleeve)</td><td class="n">0.95 / 22.6% / −24.1%</td><td class="n">0.76 / 13.9% / −14.2%</td><td class="n">0.57 / 10.6% / −12.6%</td><td class="n">0.89</td></tr>
+<tr><td><code>us-momentum-tuned</code></td><td class="n">0.77 / 19.1% / −30.1%</td><td class="n">0.77 / 12.5% / −11.5%</td><td class="n">0.52 / 10.2% / −16.8%</td><td class="n">0.78</td></tr>
+<tr><td><code>us-low-volatility-30</code></td><td class="n">0.56 / 10.2% / −35.5%</td><td class="n">0.95 / 13.3% / −11.6%</td><td class="n">0.39 / 8.8% / −37.8%</td><td class="n">0.18</td></tr>
+<tr class="now"><td><code>us-super30-ok-tuned</code> (a Sleeve)</td><td class="n">0.47 / 12.1% / −38.3%</td><td class="n">held nothing</td><td class="n">not run</td><td class="n">0.91</td></tr>
+<tr class="now"><td><code>hk-cw2-selected</code> (a Sleeve)</td><td class="n">0.60 / 12.0% / −30.2%</td><td class="n">−0.21 / −0.9% / −22.4%</td><td class="n">0.34 / 7.4% / −28.1%</td><td class="n">0.93</td></tr>
+<tr class="now"><td><code>hk-super30-ok-tuned</code> (a Sleeve)</td><td class="n">0.63 / 14.9% / −49.6%</td><td class="n">0.18 / 4.5% / −29.1%</td><td class="n">not run</td><td class="n">0.93</td></tr>
+<tr><td><code>hk-low-volatility-30</code></td><td class="n">0.40 / 7.3% / −34.7%</td><td class="n">0.24 / 5.1% / −25.1%</td><td class="n">0.42 / 8.9% / −53.4%</td><td class="n">0.44</td></tr>
+<tr><td><code>hk-canslim-leaders</code></td><td class="n">0.49 / 11.3% / −38.3%</td><td class="n">0.77 / 15.3% / −19.1%</td><td class="n">0.37 / 8.0% / −42.2%</td><td class="n">0.65</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>Low Volatility 30</strong> is the same template in each market: the 30 calmest of the 300 largest, at inverse volatility weights, rebalanced quarterly. It is always fully invested and has no stop or market gate. Alone it lost 38% to 53% through 2008.</li>
+  <li><strong><code>us-super30-ok-tuned</code> held nothing in the holdout.</strong> The US fundamentals it screens on do not reach back that far, so half the US Book sat in the cash fund from 2013 to 2016.</li>
+</ul>
+
+<h2 id="books">4. The Books</h2>
+<p>On the Book engine, every Sleeve at its full share. Shaded rows are the Books as they are; highlighted rows are the proposals. Idle is the share of the Book in the cash fund over the ten years.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Book</th><th>Sleeves</th><th class="n">Ten years</th><th class="n">Idle</th><th class="n">Holdout</th></tr>
+<tr class="now"><td>India, now</td><td>Super 30 OK tuned, CW2 selected</td><td class="n">1.28 / 22.4% / −13.1%</td><td class="n">60%</td><td class="n">1.68 / 25.3% / −7.3%</td></tr>
+<tr class="pick"><td>India A</td><td>CW2 selected, Steady Leaders</td><td class="n">1.35 / 21.6% / −9.0%</td><td class="n">47%</td><td class="n">1.67 / 24.2% / −7.3%</td></tr>
+<tr><td>India B</td><td>A + Low Volatility 30</td><td class="n">1.36 / 18.5% / −9.7%</td><td class="n">41%</td><td class="n">1.73 / 21.7% / −6.9%</td></tr>
+<tr><td>India C</td><td>now + Low Volatility 30</td><td class="n">1.25 / 18.2% / −10.7%</td><td class="n">45%</td><td class="n">1.74 / 22.5% / −6.2%</td></tr>
+<tr><td>India D</td><td>now + Steady Leaders</td><td class="n">1.27 / 20.8% / −10.7%</td><td class="n">48%</td><td class="n">1.62 / 22.5% / −7.6%</td></tr>
+<tr><td>India E</td><td>now + Steady Leaders + Low Volatility 30</td><td class="n">1.29 / 18.4% / −9.7%</td><td class="n">42%</td><td class="n">1.68 / 21.0% / −7.2%</td></tr>
+<tr><td>India F</td><td>CW2 selected, Momentum tuned, Steady Leaders, Low Volatility 30</td><td class="n">1.46 / 20.4% / −10.3%</td><td class="n">43%</td><td class="n">1.58 / 20.8% / −8.1%</td></tr>
+<tr class="now"><td>US, now</td><td>CW2 selected, Super 30 OK tuned</td><td class="n">0.57 / 8.7% / −16.4%</td><td class="n">62%</td><td class="n">0.37 / 4.8% / −3.3%</td></tr>
+<tr><td>US A</td><td>CW2 selected, Low Volatility 30</td><td class="n">1.11 / 13.3% / −10.7%</td><td class="n">33%</td><td class="n">0.42 / 5.4% / −5.3%</td></tr>
+<tr><td>US B</td><td>A + Investor v1</td><td class="n">1.00 / 13.9% / −13.1%</td><td class="n">37%</td><td class="n">0.61 / 7.3% / −5.6%</td></tr>
+<tr class="pick"><td>US C</td><td>A + Momentum tuned</td><td class="n">0.98 / 12.7% / −11.1%</td><td class="n">36%</td><td class="n">0.53 / 6.1% / −4.3%</td></tr>
+<tr><td>US D</td><td>now + Low Volatility 30</td><td class="n">0.76 / 10.1% / −12.0%</td><td class="n">44%</td><td class="n">0.59 / 5.9% / −4.0%</td></tr>
+<tr><td>US E</td><td>A + HAMA tuned</td><td class="n">0.92 / 10.9% / −11.5%</td><td class="n">38%</td><td class="n">0.41 / 5.3% / −4.6%</td></tr>
+<tr><td>US F</td><td>CW2 selected, Momentum tuned</td><td class="n">0.92 / 12.0% / −11.3%</td><td class="n">53%</td><td class="n">0.63 / 7.1% / −5.7%</td></tr>
+<tr class="now"><td>Hong Kong, now</td><td>CW2 selected, Super 30 OK tuned</td><td class="n">0.88 / 12.2% / −13.0%</td><td class="n">69%</td><td class="n">−0.20 / 1.2% / −12.8%</td></tr>
+<tr><td>Hong Kong A</td><td>CW2 selected, CAN SLIM-like Leaders</td><td class="n">0.81 / 12.2% / −14.3%</td><td class="n">63%</td><td class="n">0.01 / 2.7% / −11.1%</td></tr>
+<tr class="pick"><td>Hong Kong B</td><td>now + Low Volatility 30</td><td class="n">0.90 / 10.8% / −11.2%</td><td class="n">49%</td><td class="n">0.07 / 3.2% / −8.0%</td></tr>
+<tr><td>Hong Kong C</td><td>CAN SLIM-like Leaders, Swing tuned, Low Volatility 30</td><td class="n">0.37 / 6.2% / −15.0%</td><td class="n">49%</td><td class="n">0.57 / 7.2% / −10.3%</td></tr>
+<tr><td>Hong Kong D</td><td>now + CAN SLIM-like Leaders</td><td class="n">0.54 / 7.7% / −13.7%</td><td class="n">68%</td><td class="n">0.09 / 3.3% / −12.3%</td></tr>
+<tr><td>Hong Kong E</td><td>CW2 selected, CAN SLIM-like Leaders, Low Volatility 30</td><td class="n">0.66 / 8.9% / −9.8%</td><td class="n">46%</td><td class="n">0.51 / 6.6% / −9.4%</td></tr>
+</table>
+</div>
+<ul>
+  <li><strong>India is near its ceiling.</strong> The sets are within 0.1 of each other in each window, which is noise. A is proposed because it keeps the CAGR and cuts the drawdown from −13.1% to −9.0%.</li>
+  <li><strong>The US Book is where the gain is.</strong> All six alternatives beat today's Book on Sharpe and CAGR in both windows, so the finding is "replace Super 30 OK", whichever replaces it. C is proposed over A for resting on three strategies rather than two.</li>
+  <li><strong>The US Book still trails the S&amp;P 500</strong> (15.2% a year over the ten years, 14.2% in the holdout). The change raises its Sharpe, not its case against holding the index.</li>
+  <li><strong>Hong Kong stays weak.</strong> B is today's Book with one Sleeve added: better in both windows and still about nothing in the holdout.</li>
+</ul>
+
+<h2 id="together">5. The three Books together</h2>
+<p>Each Book over its own risk-free rate, in its own currency, the split held constant. Cells are <strong>weekly Sharpe / return over cash / max drawdown</strong>; weekly because the markets trade at different hours.</p>
+<div class="table-wrap">
+<table>
+<tr><th>Books</th><th>Split (India / US / Hong Kong)</th><th class="n">Ten years</th><th class="n">Holdout</th></tr>
+<tr class="now"><td>As they are</td><td>capital as set (43% / 43% / 13%)</td><td class="n">1.35 / 10.7% / −11.5%</td><td class="n">1.33 / 8.3% / −4.7%</td></tr>
+<tr><td>The US changed to C</td><td>capital as set</td><td class="n">1.59 / 12.4% / −11.3%</td><td class="n">1.39 / 9.0% / −4.2%</td></tr>
+<tr class="pick"><td>India A, US C, Hong Kong B</td><td>capital as set</td><td class="n">1.63 / 11.8% / −9.3%</td><td class="n">1.40 / 8.8% / −4.9%</td></tr>
+<tr><td>India A, US C, Hong Kong B</td><td>the best split over the ten years (45% / 30% / 25%)</td><td class="n">1.66 / 11.7% / −9.3%</td><td class="n">1.36 / 8.7% / −5.0%</td></tr>
+<tr><td>India A and US C alone</td><td>half each</td><td class="n">1.57 / 12.4% / −9.7%</td><td class="n">1.45 / 10.1% / −5.3%</td></tr>
+</table>
+</div>
+<p>The Books' weekly returns correlate 0.1 to 0.3 with each other, against 0.6 to 0.9 for two strategies in one market. That is why the whole is at 1.35 already with a US Book at 0.57, and why mending the US Book moves the whole more than anything done inside India. The best split found on the ten years is no better in the holdout, so the capital is left as set.</p>
+
+<h2 id="proposed">6. What is proposed</h2>
+<div class="table-wrap">
+<table>
+<tr><th>Book</th><th>Proposed Sleeves</th><th>Needs</th></tr>
+<tr><td>India</td><td><code>in-cw2-selected</code>, and <code>in-steady-leaders</code> (<code>2740347b82d5</code>) in place of <code>in-super30-ok-tuned</code></td><td>Steady Leaders approved and through the Candidate test; on paper first</td></tr>
+<tr><td>US</td><td><code>us-cw2-selected</code>, and <code>us-low-volatility-30</code> (<code>446fa769f5d3</code>) and <code>us-momentum-tuned</code> in place of <code>us-super30-ok-tuned</code></td><td>Low Volatility 30 approved; on paper first</td></tr>
+<tr><td>Hong Kong</td><td><code>hk-low-volatility-30</code> (<code>8e787915dc49</code>) added</td><td>Approved; the Book stays on paper</td></tr>
+</table>
+</div>
+<p>Approving the versions in <code>config/approved_versions.yaml</code> and setting each Sleeve's Stage are yours to do. Neither is changed here. The US change is the one worth doing whatever is decided on the other two.</p>
+
+<h2 id="limits">7. Limits</h2>
+<div class="note warn">
+<p><strong>The Sleeve sets were chosen with both windows in view</strong>, from 17 sets run on the Book engine and 83 strategies screened. The holdout shows consistency here; it is not a test nobody looked at. The honest test is the paper Book.</p>
+</div>
+<ol>
+  <li><strong>Steady Leaders was designed on all three windows</strong>, and its family has 196 trials. India's case for it rests on a smaller drawdown, not a higher Sharpe.</li>
+  <li><strong>The templates were not audited</strong> as the ash ports were. Low Volatility 30's market caps are approximate, and its sectors are today's.</li>
+  <li><strong>Survivorship:</strong> the Lake has what was delisted since it began, not before. Every figure is overstated.</li>
+  <li><strong>No Book was run through 2008.</strong> The frozen panels have each strategy's run, not a Book's. Low Volatility 30 alone fell 38% to 53% then; a Book's exposure level would have cut it to 40% in stocks, which is untested.</li>
+  <li><strong>A quarterly Sleeve under the exposure level:</strong> what the level trims of it stays in the cash fund until the next quarter.</li>
+  <li><strong>Local currency.</strong> A rupee investor also carries the dollar's and the Hong Kong dollar's moves.</li>
+  <li><strong>Taxes and brokerage are not in any figure</strong>, as in every backtest here.</li>
+</ol>
+
+<h2 id="files">8. Where the work is</h2>
+<p>All of it is in <code>backend/portfolio-dashboard</code>, read-only on the Lake but for the strategies' runs a Book backtest stores.</p>
+<ul>
+  <li><strong>The full write-up:</strong> <code>docs/review/2026-11-11-sharpe-across-markets.md</code>, with the commands to reproduce each table.</li>
+  <li><strong>Scripts and recorded outputs:</strong> <code>docs/review/sharpe-20261111/</code>. <code>analyse.txt</code> has each of the 83 strategies in both windows; <code>books-*.txt</code> the Sleeve sets; <code>together.txt</code> the splits; <code>overlays.txt</code>, <code>risk-sized.txt</code> and <code>restore-*.txt</code> the rejected changes.</li>
+</ul>
+</main>
+<script>
+  (function () {
+    var store = { get: function (k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: function (k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+    var root = document.documentElement;
+    var saved = store.get('portfolio-audit-theme');
+    if (saved) root.setAttribute('data-theme', saved);
+    document.getElementById('theme').addEventListener('click', function () {
+      var dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
+      var next = dark ? 'light' : 'dark';
+      root.setAttribute('data-theme', next);
+      store.set('portfolio-audit-theme', next);
+    });
+  })();
+</script>
+</body>
+</html>
