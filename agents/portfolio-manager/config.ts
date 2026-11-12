@@ -99,10 +99,11 @@ const book: JsonSchema = {
 
 const portfolioManager: AgentConfig = {
   // Claude Code first: on Windows, Codex's unelevated sandbox can't enforce a deny-read rule, so Codex
-  // refuses to start there (see the Health Agent).
+  // refuses to start as the main Worker (see the Health Agent). Cursor with Grok 4.7 at extra-high
+  // effort is the fallback. Codex is the adversary.
   worker: { name: 'claude-code', model: 'opus', effort: 'high' },
-  fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
-  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  adversaryWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   permissions: 'read-only',
   // Save state applies the Journal; each Lesson waits for Saransh's Answer.
   memoryChanges: { [journalMemory]: 'apply', lessons: 'review' },

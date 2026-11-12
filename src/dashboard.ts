@@ -5,11 +5,13 @@ import { agentsRoot, dataDir, runsDir } from './paths.ts'
 import { loadSchedules } from './schedule.ts'
 import { readTokenUsage, summarizeTokenUsage } from './token-usage.ts'
 import type { RunRecord } from './run.ts'
-import type { PdStatus, PdMarketSmith } from './pd.ts'
+import type { PdBookState, PdJudgedBook, PdMarketSmith, PdPaperBooks, PdPaperStanding, PdPlan, PdPlanKind, PdPlanOrder, PdRulePlan, PdStatus } from './pd.ts'
 import type { BrokerInboxResult } from '../steps/stocks/broker-inbox.ts'
+import type { CheckResult } from '../steps/stocks/check.ts'
 import type { HealthResult } from '../steps/stocks/health.ts'
 import type { LakeResult } from '../steps/stocks/lake.ts'
 import type { AnswersResult } from '../steps/stocks/answers.ts'
+import type { PortfolioManagerResult } from '../steps/stocks/portfolio-manager.ts'
 
 export type DashboardView = 'engineering' | 'portfolio'
 const pipelines = { engineering: new Set(['daily', 'weekly']), portfolio: new Set(['stocks']) }
@@ -89,6 +91,105 @@ function runRecord(id: string): RunRecord | null {
       && (step.startedAt === undefined || timestamp(step.startedAt)) && (step.endedAt === undefined || timestamp(step.endedAt))) ? run : null
 }
 
+/** A holding of a Book's on its last close, as the portfolio page lists it. */
+export interface DashboardHolding {
+  security_id: string
+  name: string | null
+  qty: number
+  avg_cost: number | null
+  /** The last close the plan knew; null when no plan of the Book priced it. */
+  close: number | null
+  value: number | null
+  /** The Sleeves holding it, each with its Disaster stop (null: none). */
+  sleeves: { sleeve: string; stop: number | null }[]
+}
+
+/** The part of the Book engine's state the page reads: each Sleeve's holdings and Disaster stops. */
+interface EngineSleeves {
+  sleeves?: Record<string, { holdings?: Record<string, unknown> }>
+  stops?: Record<string, Record<string, number>>
+}
+
+/** One Book of one kind (real, paper or rules-only) in a Run: its plan, holdings, orders and what became of them. */
+export interface DashboardBook {
+  book: string
+  kind: PdPlanKind
+  name: string
+  currency: string | null
+  as_of: string | null
+  value: number | null
+  cash: number | null
+  plan: { status: PdRulePlan['status']; why: string | null; mode: PdRulePlan['mode']; for_placing: boolean; session: string | null; exposure: PdRulePlan['exposure'] | null } | null
+  holdings: DashboardHolding[]
+  orders: PdPlanOrder[]
+  stops: NonNullable<PdRulePlan['stops']>
+  /** What the Check Step made of its Order list; null when it didn't run. */
+  list: { status: string; why: string | null; orders: number; superseded: number } | null
+  /** The Portfolio Manager's judgement of its plan; null for a rules-only Book's, or when it didn't answer. */
+  judgement: PdJudgedBook | null
+  /** A paper Book's standing from pd paper-books, with its gap to the rules-only one on the paper Book's. */
+  standing: PdPaperStanding | null
+  gap: { value: number; share: number } | null
+}
+
+const list = <T>(value: T[] | null | undefined): T[] => Array.isArray(value) ? value.filter(item => item !== null && item !== undefined) : []
+
+/**
+ * Each Book of each kind in the Run, from its plan, Book state, Order list, the Portfolio Manager's
+ * judgement and the paper Books' standing. plan.json is trimmed here: its names not traded (every
+ * Quarantine) would make each 15-second refresh a quarter of a megabyte.
+ */
+export function dashboardBooks(plan: PdPlan | null, states: { states?: PdBookState[] } | null, check: CheckResult | null, manager: PortfolioManagerResult | null, paper: PdPaperBooks | null): DashboardBook[] {
+  const plans = list(plan?.plans)
+  const judged = manager?.status === 'answered' ? list(manager.answer?.books) : []
+  const kindOf = (state: PdBookState): PdPlanKind => !state.paper ? 'real' : state.rules_only ? 'rules_only' : 'paper'
+  const keys = new Map<string, { book: string; kind: PdPlanKind }>()
+  for (const p of plans) keys.set(`${p.book}/${p.kind}`, { book: p.book, kind: p.kind })
+  for (const s of list(states?.states)) keys.set(`${s.book}/${kindOf(s)}`, { book: s.book, kind: kindOf(s) })
+  const order = { IN: 0, US: 1, HK: 2 } as Record<string, number>, kinds = { real: 0, paper: 1, rules_only: 2 }
+  return [...keys.values()].sort((a, b) => (order[a.book] ?? 9) - (order[b.book] ?? 9) || kinds[a.kind] - kinds[b.kind]).map(({ book, kind }) => {
+    const p = plans.find(item => item.book === book && item.kind === kind) ?? null
+    const state = list(states?.states).find(item => item.book === book && kindOf(item) === kind) ?? null
+    // A rules-only plan lists no holdings: its closes are the other plans' of the same Book.
+    const closes = new Map<string, number>()
+    for (const other of plans.filter(item => item.book === book)) {
+      for (const h of list(other.holdings)) closes.set(h.security_id, h.close)
+      for (const o of list(other.orders)) if (!closes.has(o.security_id)) closes.set(o.security_id, o.price)
+    }
+    // Each holding's Sleeves and stops: the engine's state has them for every paper Book; a real Book's plan lists them.
+    const engine = (state?.engine ?? null) as EngineSleeves | null
+    const sleevesOf = (security: string) => {
+      const fromEngine = Object.entries(engine?.sleeves ?? {}).filter(([, sleeve]) => sleeve?.holdings && security in sleeve.holdings)
+        .map(([sleeve]) => ({ sleeve, stop: engine?.stops?.[sleeve]?.[security] ?? null }))
+      return fromEngine.length ? fromEngine : list(p?.holdings).filter(item => item.security_id === security).map(item => ({ sleeve: item.sleeve, stop: item.stop }))
+    }
+    const holdings = list(state?.holdings).map((h): DashboardHolding => {
+      const close = closes.get(h.security_id) ?? null
+      return { security_id: h.security_id, name: h.name, qty: h.qty, avg_cost: h.avg_cost, close, value: close === null ? null : close * h.qty, sleeves: sleevesOf(h.security_id) }
+    })
+    const listed = list(check?.check?.lists).find(item => item.book === book && item.kind === kind)
+    const standing = list(paper?.books).find(item => item.book === book)
+    return {
+      book, kind, name: p?.name ?? state?.name ?? book, currency: p?.currency ?? state?.currency ?? null,
+      as_of: p?.as_of ?? state?.as_of ?? null, value: p?.value ?? null, cash: p?.cash ?? state?.cash ?? null,
+      plan: p && { status: p.status, why: p.why, mode: p.mode, for_placing: p.for_placing, session: p.session ?? null, exposure: p.exposure ?? null },
+      holdings, orders: list(p?.orders), stops: list(p?.stops),
+      list: listed ? { status: listed.status, why: listed.why, orders: listed.orders, superseded: listed.superseded } : null,
+      judgement: kind === 'rules_only' || !p ? null : judged.find(item => item.plan_id === p.id) ?? null,
+      standing: kind === 'paper' ? standing?.paper ?? null : kind === 'rules_only' ? standing?.rules_only ?? null : null,
+      gap: kind === 'paper' ? standing?.gap ?? null : null,
+    }
+  })
+}
+
+/** What the page shows of the Portfolio Manager's answer: all but the Books (each in its DashboardBook) and the Journal it read. */
+function managerOf(manager: PortfolioManagerResult | null) {
+  if (!manager) return null
+  if (manager.status !== 'answered') return { status: manager.status, error: manager.error ?? null }
+  const { books, ...rest } = manager.answer
+  return { status: manager.status, error: null, books: list(books).length, ...rest }
+}
+
 export function dashboardRun(id: string, view: DashboardView = 'engineering') {
   const run = runRecord(id)
   if (!run || !pipelines[view].has(run.pipeline)) return null
@@ -107,7 +208,14 @@ export function dashboardRun(id: string, view: DashboardView = 'engineering') {
     truncated: steps.some(step => step.logTruncated),
     agents: [...new Set(attempts.map(attempt => attempt.agent))].map(agent => ({ agent, ...summarizeTokenUsage(attempts.filter(attempt => attempt.agent === agent)) })),
   }
+  const plan = view === 'portfolio' ? json<PdPlan>(folder, 'plan.json') : null
+  const manager = view === 'portfolio' ? json<PortfolioManagerResult>(folder, 'portfolio-manager.json') : null
+  const paperBooks = view === 'portfolio' ? json<PdPaperBooks>(folder, 'paper-books.json') : null
   const portfolio = view === 'portfolio' ? {
+    books: dashboardBooks(plan, json(folder, 'book-states.json'), json<CheckResult>(folder, 'check.json'), manager, paperBooks),
+    market: plan && { on: plan.on, gate: plan.gate, mode: plan.mode, markets: list(plan.markets) },
+    paperCombined: paperBooks?.combined ?? null,
+    portfolioManager: managerOf(manager),
     lake: json<LakeResult>(folder, 'lake.json'),
     status: json<PdStatus>(folder, 'lake/status.json'),
     healthStatus: json<PdStatus>(folder, 'health/status.json'),

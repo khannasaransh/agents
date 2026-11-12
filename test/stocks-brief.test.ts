@@ -190,6 +190,28 @@ test("what became of the Corrections the Health Agent proposed is said under its
   assert.match(text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html'))), /It proposed 1 Correction, but they couldn't be recorded in ash_new: pd corrections propose exited with 1: no database/)
 })
 
+test('the Corrections the Health Agent approved by itself are said under its diagnosis, with how to undo one, and those it left for you', async () => {
+  prepare({ health: 'succeeded' })
+  ws.writeRunFile(runId, 'lake.json', lakeResult(true, [0]))
+  ws.writeRunFile(runId, 'lake/status.json', example('status.healthy.json'))
+  const proposed = JSON.parse(example('corrections-propose.recorded.json'))
+  const split = { id: 7, security_id: 'IN:BHAGYANGR', kind: 'split', date: '2026-10-08', ratio: 11.655, value: null }
+  const dividend = { id: 3, security_id: 'US:NFE', kind: 'dividend', date: '2023-01-03', ratio: null, value: null, why: 'a Book holds or may trade its security, so it is yours to approve' }
+  const approvals = { approved: [split], left: [dividend], applied: 'applied', standing: [] }
+  ws.writeRunFile(runId, 'health.json', { ...diagnosis, corrections: [{ ...split, why: 'The filing', confident: true }], proposals: { status: 'recorded', printed: proposed, approvals } })
+
+  const page = text(await brief())
+
+  assert.match(page, /It proposed 1 Correction: 1 recorded, 0 of them waiting for your approval, 1 proposed before/)
+  assert.match(page, /It was confident of 1 Correction and approved it by itself: 7, IN:BHAGYANGR, Split of 11\.655 for 1 on 2026-10-08\. They are applied: their securities' prices were built again in this Run, before the Rule plans\. To undo one, remove its entry \(it says approved_by ?\) from ash_new's config\/corrections\.yaml ?: the next refresh builds the prices again without it/)
+  assert.match(page, /It was confident of 1 Correction that waits for you all the same: 3, US:NFE, No dividend on 2023-01-03 \(a Book holds or may trade its security, so it is yours to approve\)\./)
+
+  const failed = { ...approvals, left: [], applied: 'failed', error: 'pd corrections apply exited with 1' }
+  ws.writeRunFile(runId, 'health.json', { ...diagnosis, corrections: [], proposals: { status: 'recorded', printed: proposed, approvals: failed } })
+  const again = text(await ws.agents('step', 'brief', '--run', runId, '--force').then(() => ws.readRunFile(runId, 'brief.html')))
+  assert.match(again, /They couldn't be applied in this Run \(pd corrections apply exited with 1\), so no Rule plan trades their securities until the next refresh applies them\./)
+})
+
 test('a Health Agent that failed is shown under the Data gate, with why and its log', async () => {
   prepare({ lake: 'failed', health: 'failed' })
   ws.writeRunFile(runId, 'lake/status.json', example('status.hold.json'))

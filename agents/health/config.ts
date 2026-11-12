@@ -2,9 +2,10 @@ import type { AgentConfig } from '../../src/agent.ts'
 
 const health: AgentConfig = {
   // Codex CLI first, using the provisioned Windows sandbox with deny-read support.
+  // Cursor with Grok 4.7 at extra-high effort is the fallback. Claude Code is the adversary.
   worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
-  fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
-  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  adversaryWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
   permissions: 'read-only',
   // To find out on exchanges' and the SEC's sites what became of a security the Lake no longer gets prices for.
   webSearch: true,
@@ -21,7 +22,7 @@ const health: AgentConfig = {
     diagnosis: 'What went wrong and why, in plain words',
     fix: 'The fix you propose, as text: what Saransh should do or change. It is never applied',
     evidence: 'Each thing you read that the diagnosis rests on: where you read it and what it shows',
-    corrections: "The Corrections you propose for corporate actions Yahoo got wrong, in the Corrections file's format; none when no flag is one. They wait for Saransh's approval",
+    corrections: "The Corrections you propose for corporate actions Yahoo got wrong, in the Corrections file's format, each with whether you are confident of it; none when no flag is one. One you are confident of is approved and applied in this Run without Saransh; the others wait for his approval",
     delistings: 'What you found out in this Run about securities the Lake no longer gets prices for, one per security you looked up; none when you looked up none. They are kept for later Runs',
   },
   outputSchema: {
@@ -48,7 +49,7 @@ const health: AgentConfig = {
         items: {
           type: 'object',
           additionalProperties: false,
-          required: ['security_id', 'kind', 'date', 'ratio', 'value', 'why'],
+          required: ['security_id', 'kind', 'date', 'ratio', 'value', 'why', 'confident'],
           properties: {
             security_id: { type: 'string', description: 'As the flag names it: IN:BHAGYANGR' },
             // A bar: Yahoo's bar on the date is wrong and is left out (the schema lacked it until the audit of 10 November 2026, so the Agent could only describe one).
@@ -56,7 +57,12 @@ const health: AgentConfig = {
             date: { type: 'string', description: 'Its day, YYYY-MM-DD: the ex-date' },
             ratio: { type: ['number', 'null'], description: "A split's shares after per share before (2 for a 2-for-1 split or a 1:1 bonus); a demerger's share of the value the company kept, above 0 and under 1; null for a dividend or a bar" },
             value: { type: ['number', 'null'], description: "A dividend's cash per share, or null to drop it; null for a split, a demerger or a bar" },
-            why: { type: 'string', description: 'The evidence it rests on, in a sentence or two' },
+            why: { type: 'string', description: 'The evidence it rests on, in a sentence or two, with the URL of the filing or exchange notice when you are confident' },
+            // The Health Step approves a confident one in the Agent's name and applies it in the same Run (11 November 2026); the rest wait for Saransh.
+            confident: {
+              type: 'boolean',
+              description: "true only when every test in your instructions' \"When you are confident\" holds: the Pipeline then approves it without Saransh and applies it in this Run. false when any fails: it waits for him",
+            },
           },
         },
       },

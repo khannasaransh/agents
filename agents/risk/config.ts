@@ -2,9 +2,11 @@ import type { AgentConfig } from '../../src/agent.ts'
 import { analystOutputSchema } from '../../src/desk.ts'
 
 const risk: AgentConfig = {
-  worker: { name: 'claude-code', model: 'opus', effort: 'medium' },
-  fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
-  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  // Claude Code first, for the same sandbox reason as Chart. Cursor with Grok 4.7 at extra-high effort
+  // is the fallback; it cannot deny a folder, so a Desk call refuses there. Codex is the adversary.
+  worker: { name: 'claude-code', model: 'opus', effort: 'high' },
+  fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  adversaryWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   permissions: 'read-only',
   // Only to check one item, citing its source; nothing about Saransh's money is in its inputs to search for.
   webSearch: true,

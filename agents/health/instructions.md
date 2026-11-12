@@ -56,14 +56,14 @@ A security Yahoo no longer prices stays in the Lake, stale and flagged every day
    - **renamed**, with `successor` and the day it changed, when it trades under another ticker, or its shares became another listed company's (say the terms in `why`: 2.793 VMRK shares for each AVB share);
    - **trading** when it is still listed under the same ticker, so the gap is Yahoo's: then say in `fix` what to check at the source;
    - **unknown** when you couldn't find out.
-5. In `fix`, group the findings: those to mark inactive in ash_new, those to follow to their successor, and those trading still. Don't propose a Correction for any of them: a Correction fixes a corporate action in the prices, not a listing.
+5. In `fix`, group the findings: those to mark inactive in ash_new, those to follow to their successor, and those trading still. A security is marked inactive by a row in ash_new's `config/inactive_securities.csv` (its id, the day it stopped trading, why, and the source's URL), which Saransh adds: MarketSmith's manifest still lists it, so without the row every refresh makes it active again. Give the row for each, ready to paste. One the file names already is inactive: it isn't flagged, and needs nothing. Don't propose a Correction for any of them: a Correction fixes a corporate action in the prices, not a listing.
 
 ## What to answer
 
 - **diagnosis:** what went wrong and why, in plain words, in a few sentences. Say how sure you are when the evidence leaves room for doubt.
-- **fix:** what you propose Saransh does or changes, step by step: a command to run again, a setting, a change to ash_new's code (name the file and the function). Nothing you propose is applied for him. When nothing needs fixing, say so.
+- **fix:** what you propose Saransh does or changes, step by step: a command to run again, a setting, a change to ash_new's code (name the file and the function). Nothing you propose here is applied for him; only a Correction you are confident of is. When nothing needs fixing, say so.
 - **evidence:** one entry for each thing you read that the diagnosis rests on, most telling first. Give its path from ash_new's folder, or the input's name, and in one line what it shows.
-- **corrections:** the Corrections you propose, in the Corrections file's format. The Pipeline records them in ash_new, where they wait for Saransh: nothing is applied until he approves one. Leave the list empty when no flag is a corporate action gone wrong.
+- **corrections:** the Corrections you propose, in the Corrections file's format, each with whether you are `confident` of it ("When you are confident", below). The Pipeline records them in ash_new. It approves a confident one in your name and applies it in this Run; the others wait for Saransh, and nothing of theirs is applied until he approves one. Leave the list empty when no flag is a corporate action gone wrong.
 - **delistings:** what you found out about each security you looked up because the Lake no longer gets prices for it. The Pipeline keeps them, so later Runs don't look them up again. Leave the list empty when you looked up none.
 
 ## Corrections
@@ -75,4 +75,20 @@ A Correction fixes one corporate action, or one bad bar. It is one of:
 - **demerger:** on `date` the company kept `ratio` of its value (above 0, under 1), the rest going to the demerged company. Yahoo doesn't adjust demergers.
 - **bar:** Yahoo's bar on `date` is wrong, and is left out: a close many times the closes around it (or a fraction of them), back to them the next session, with no news to explain it. It has neither a ratio nor a value.
 
-Give `ratio` for a split or demerger and `value` null; give `value` (or null) for a dividend and `ratio` null; give neither for a bar. Say in `why` what the evidence is and how sure you are. Don't propose a Correction that is waiting already (`status.corrections`) or that `config/corrections.yaml` holds. Propose none for a real move, a stale price or a gap between MarketSmith and Yahoo: those are for Saransh to dismiss or fix at the source.
+Give `ratio` for a split or demerger and `value` null; give `value` (or null) for a dividend and `ratio` null; give neither for a bar. Say in `why` what the evidence is and how sure you are. Don't propose a Correction that `config/corrections.yaml` holds. Propose none for a real move, a stale price or a gap between MarketSmith and Yahoo: those are for Saransh to dismiss or fix at the source.
+
+## When you are confident
+
+Each Correction says whether you are `confident` of it. The Pipeline approves a confident one in your name, without Saransh, and builds the security's prices again in this Run; no one checks it first. One that isn't confident waits for him, its security in Quarantine, and the Run carries on without it. A wrong Correction that is applied is worse than a right one that waits a day, so when in doubt answer `false`.
+
+Answer `confident: true` only when all of these hold:
+
+1. **A primary source states it.** You read the company's filing, or the exchange's notice or circular, that states the action, its terms and its day, and `why` gives its URL. A news story, a data site or a press summary isn't enough. For a `bar`, the primary source is the exchange's own close for that day.
+2. **The Lake's prices agree with it.** A split's ratio is the announced terms, and the prices show that basis change on that day and no other: the close before divided by the ratio is within 25% of that day's open (a small company's first open after a reverse split often gaps 5–15%, which is a real move, not doubt about the ratio), and nothing in Yahoo's series shows it adjusted already. A dividend's value matches the fall in the close; a dropped dividend is one no filing shows; a bad bar is back among its neighbours the next session.
+3. **The day isn't in doubt.** You know which bar the change falls on in Yahoo's series, not only the announced day.
+4. **Nothing else explains it as well.** If `why` would offer an alternative ("or rescale it instead", "if Yahoo records it on the 23rd, drop that one"), you aren't confident.
+5. **It is whole.** It doesn't depend on another Correction you aren't confident of, and it isn't one of many flags that share a cause you haven't pinned down: a market-wide change in Yahoo's data isn't fixed one security at a time.
+
+A Correction that is waiting already (`status.corrections`) isn't proposed again, except to make it confident. Judge each waiting one against the tests above every Run, whoever proposed it and whatever was answered then: when it meets every one now (whether from new evidence, such as a later session's bar or a filing, or because it was judged too strictly before), propose it again exactly as it stands there (the same security, kind, date, ratio and value) with `confident: true`, and the Pipeline approves it. The figures in its `why` and `status` count as the Lake's prices: you needn't read the parquet files yourself.
+
+The Pipeline keeps its own limits whatever you answer: it leaves a Correction on a security a Book holds or may trade for Saransh, and approves none when a Run has more than ten confident ones.

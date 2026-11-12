@@ -250,7 +250,7 @@ These stories were added on 25 Oct 2026, from the consolidation research (ADR 00
 
 ### Agents and Workers
 
-119. As Saransh, I want the Portfolio Manager on Claude Code with Codex as fallback, and the Health Agent on Codex with Claude Code as fallback, so that one subscription's outage doesn't cost a Run.
+119. As Saransh, I want the Portfolio Manager on Claude Code and the Health Agent on Codex, each with Cursor Grok 4.7 at extra-high effort as fallback and the previous fallback as the adversary, so that one subscription's outage doesn't cost a Run.
 120. As Saransh, I want every stocks Agent to run read-only, with a schema-checked output, a timeout and a turn limit, so that no Agent can change my data or hold up a Run.
 
 ### Secrets and data
@@ -480,14 +480,14 @@ Code computes the review figures, and the Portfolio Manager writes what they mea
 
 ### Agents
 
-- **Portfolio Manager:** Claude Code, with Codex as fallback, read-only in the Run folder. Its Memory has two parts:
+- **Portfolio Manager:** Claude Code, with Cursor Grok 4.7 at extra-high effort as fallback and Codex as the adversary, read-only in the Run folder. Its Memory has two parts:
   - the Journal, which Save state applies;
   - Lessons, which wait for Saransh's Answer. That Answer can now come from the Brief as well as from `agents memory`.
 
   So an Agent's Memory changes can now be set per Memory file rather than per Agent.
-- **Health Agent:** Codex, with Claude Code as fallback. It reads ash_new's repo, its logs and the Lake's Health reports, read-only.
+- **Health Agent:** Codex, with Cursor Grok 4.7 at extra-high effort as fallback and Claude Code as the adversary. It reads ash_new's repo, its logs and the Lake's Health reports, read-only.
 - **The Desk:**
-  - **Workers:** Events runs on Codex. Chart and Risk run on Claude Code. Each falls back to the other Worker.
+  - **Workers:** Events runs on Codex. Chart and Risk run on Claude Code. Each falls back to Cursor with Grok 4.7 at extra-high effort, and the previous fallback is the adversary. Cursor cannot deny the data folder, so that fallback refuses a Desk call.
   - **Access:** all three are read-only in the Run folder. Events and Risk may use their Worker's web search, only to check one item and citing its source. Chart has no web access.
   - **Output**, checked against a schema, for each name: no view, a veto, a trim to a given size, or a proposed exit, with reasons and the evidence cited.
 - **Instructions** tell each Agent what it may and may not do, and state the Mandate and the Playbook. What enforces them is the final check, not the instructions.

@@ -98,9 +98,10 @@ test("each analyst the review list needs is called at once, read-only in an empt
   const [events] = callsFor('codex', '# Events analyst')
   const [risk] = callsFor('claude', '# Risk analyst')
   const [chart] = callsFor('claude', '# Chart analyst')
-  assert.equal(ws.workerCliCalls('codex').length, 1)
-  assert.equal(ws.workerCliCalls('claude').length, 2)
-  // Cursor can't keep an analyst from the data folder, so its independent assessment isn't run.
+  // Events stays on Codex. Chart and Risk stay on Claude Code. Their adversaries are the other CLI, so each
+  // independent assessment and its comparison add two calls. Cursor is the fallback and is not reached.
+  assert.equal(ws.workerCliCalls('codex').length, 5)
+  assert.equal(ws.workerCliCalls('claude').length, 4)
   assert.equal(ws.workerCliCalls('agent').length, 0)
   // Each folder is removed once its analyst has answered.
   for (const call of [events, risk, chart]) assert.ok(!resolve(call.cwd).startsWith(resolve(ws.dataDir)) && !existsSync(call.cwd), call.cwd)
@@ -160,8 +161,8 @@ test("an analyst no name needs isn't called, and the Desk skips itself when no a
 
   assert.equal((await step('desk')).status, 0)
 
-  assert.deepEqual(ws.workerCliCalls('codex'), [])
-  assert.equal(ws.workerCliCalls('agent').length, 0, "Cursor can't keep Chart from the data folder")
+  assert.equal(ws.workerCliCalls('codex').length, 2, 'Codex is Chart\'s adversary')
+  assert.equal(ws.workerCliCalls('agent').length, 0)
   assert.deepEqual(ws.workerCliCalls('claude').map((c) => c.stdin.split(/\r?\n/)[0]), ['# Chart analyst'])
   assert.deepEqual(desk().analysts.map((a: any) => a.analyst), ['chart'])
   ws.cleanup()
@@ -185,9 +186,9 @@ test("a view is reused, keeping its date, while nothing its analyst reads for th
   prepare({ run: later })
   assert.equal((await step('desk', later)).status, 0)
 
-  // Nothing changed, so no analyst is called, and every view keeps the date it was made.
-  assert.equal(ws.workerCliCalls('claude').length + ws.workerCliCalls('codex').length, 3)
-  assert.equal(ws.workerCliCalls('agent').length, 0, 'no assessment on Cursor, which cannot deny the data folder')
+  // Nothing changed, so no analyst is called again. The first run's three answers and six adversary calls remain.
+  assert.equal(ws.workerCliCalls('claude').length + ws.workerCliCalls('codex').length, 9)
+  assert.equal(ws.workerCliCalls('agent').length, 0, 'Cursor, the fallback, is not reached while the primaries answer')
   assert.deepEqual(desk(later).analysts.map((a: any) => [a.analyst, a.status]), [['chart', 'reused'], ['events', 'reused'], ['risk', 'reused']])
   assert.deepEqual(desk(later).views.map((v: any) => [v.analyst, v.security_id, v.viewed_at, v.reused]), first.map((v: any) => [v.analyst, v.security_id, v.viewed_at, true]))
 
@@ -211,42 +212,24 @@ test("a view is reused, keeping its date, while nothing its analyst reads for th
   assert.match(events.viewed_at, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d$/, 'in UTC without an offset')
 })
 
-test('each analyst falls back to the other Worker', async () => {
+test('each analyst falls back to Cursor, which refuses because it cannot deny the data folder', async () => {
   ws = makeWorkspace()
   prepare()
-  // Events starts on Codex; Chart and Risk start on Claude Code. Each primary fails, and the other answers.
-  ws.setWorkerCli('codex', {
-    ...failing,
-    byPrompt: {
-      '# Events analyst': failing,
-      '# Chart analyst': codexAnswering(answers['# Chart analyst']),
-      '# Risk analyst': codexAnswering(answers['# Risk analyst']),
-    },
-  })
-  ws.setWorkerCli('claude', {
-    ...failing,
-    byPrompt: {
-      '# Events analyst': claudeCodeAnswering(answers['# Events analyst']),
-      '# Chart analyst': failing,
-      '# Risk analyst': failing,
-    },
-  })
-  assert.equal((await step('desk')).status, 0)
-  assert.equal(callsFor('claude', '# Events analyst').length, 1)
-  assert.equal(callsFor('codex', '# Chart analyst').length, 1)
-  assert.equal(callsFor('codex', '# Risk analyst').length, 1)
-  assert.deepEqual(desk().analysts.map((a: any) => a.status), ['answered', 'answered', 'answered'])
-  assert.match(log(), /events failed on codex[\s\S]*retrying once on claude-code[\s\S]*events answered on claude-code/)
-  for (const analyst of ['chart', 'risk']) assert.match(log(), new RegExp(`${analyst} failed on claude-code[\\s\\S]*retrying once on codex[\\s\\S]*${analyst} answered on codex`))
+  ws.setWorkerCli('codex', failing)
+  ws.setWorkerCli('claude', failing)
+  assert.equal((await step('desk')).status, 1)
+  assert.equal(ws.workerCliCalls('agent').length, 0, 'Cursor refuses before its CLI runs')
+  assert.match(log(), /events failed on codex[\s\S]*retrying once on cursor[\s\S]*can't keep the events Agent from reading/)
+  for (const analyst of ['chart', 'risk']) assert.match(log(), new RegExp(`${analyst} failed on claude-code[\\s\\S]*retrying once on cursor[\\s\\S]*can't keep the ${analyst} Agent from reading`))
 })
 
 test("an analyst that fails on both Workers fails the Step, and the buys it had to review are missing their review; a view it may not give is refused", async () => {
   ws = makeWorkspace()
   prepare()
-  // Chart fails on both Workers; Events vetoes Rategain but cites the web without a link.
+  // Chart fails on Claude Code, then Cursor refuses the fallback. Events vetoes Rategain but cites the web without a link.
   const unsourced = { views: [view('IN:RATEGAIN', 'veto', { evidence: [{ source: 'web', cite: 'Moneycontrol', says: 'Results moved.' }] })], searches: [] }
-  ws.setWorkerCli('codex', failing)
-  ws.setWorkerCli('claude', { ...failing, byPrompt: { '# Events analyst': claudeCodeAnswering(unsourced), '# Risk analyst': claudeCodeAnswering(answers['# Risk analyst']) } })
+  ws.setWorkerCli('codex', { ...failing, byPrompt: { '# Events analyst': codexAnswering(unsourced) } })
+  ws.setWorkerCli('claude', { ...failing, byPrompt: { '# Risk analyst': claudeCodeAnswering(answers['# Risk analyst']) } })
 
   const ran = await step('desk')
 
@@ -255,7 +238,7 @@ test("an analyst that fails on both Workers fails the Step, and the buys it had 
   const kept = desk()
   assert.equal(kept.analysts.find((a: any) => a.analyst === 'chart').status, 'failed')
   assert.deepEqual(kept.missing.map((m: any) => [m.security_id, m.analyst]), [['IN:RATEGAIN', 'chart'], ['IN:STOVEKRAFT', 'chart'], ['IN:RATEGAIN', 'events']])
-  assert.match(kept.missing[0].why, /^The Chart analyst failed: claude-code failed: down; then codex failed/)
+  assert.match(kept.missing[0].why, /^The Chart analyst failed: claude-code failed: down; then cursor failed/)
   assert.deepEqual(kept.refused.map((r: any) => [r.analyst, r.security_id, r.why]), [['events', 'IN:RATEGAIN', 'It cites the web without the link of its source']])
   assert.deepEqual(kept.views.map((v: any) => v.analyst), ['risk', 'risk'])
   assert.match(log(), /The Chart analyst failed, so the buys it had to review wait a session/)
@@ -361,19 +344,17 @@ test('a dry run calls the analysts on the fake Worker, and keeps no view and pro
   assert.ok(desk('2026-10-28-0930').views.every((v: any) => !v.reused))
 })
 
-test("the Desk honors --worker for Chart, and Cursor, its adversary, refuses it as it can't deny the data folder", async () => {
+test("the Desk honors --worker cursor for Chart, refuses that call because it cannot deny the data folder, and answers on Claude Code", async () => {
   ws = makeWorkspace()
   const plan = example('plan.normal.json')
   plan.review = { ...plan.review, names: plan.review.names.map((n: any) => ({ ...n, analysts: n.analysts.filter((a: any) => a.analyst === 'chart') })), risk: [], analysts: ['chart'] }
   prepare({ plan })
-  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'codex' })
+  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'cursor' })
   workersAnswer()
   assert.equal((await step('desk')).status, 0)
-  assert.deepEqual(ws.workerCliCalls('claude'), [])
-  assert.equal(ws.workerCliCalls('codex').length, 1)
   assert.equal(ws.workerCliCalls('agent').length, 0)
-  assert.equal(desk().adversaries[0].mainWorker.name, 'codex')
-  assert.equal(desk().adversaries[0].worker.name, 'cursor')
-  assert.equal(desk().adversaries[0].status, 'failed')
-  assert.match(desk().adversaries[0].error, /The Cursor CLI can't keep the chart-adversary Agent from reading/)
+  assert.equal(callsFor('claude', '# Chart analyst').length, 1)
+  assert.equal(desk().adversaries[0].mainWorker.name, 'claude-code')
+  assert.equal(desk().adversaries[0].worker.name, 'codex')
+  assert.match(log(), /chart failed on cursor .*can't keep the chart Agent from reading[\s\S]*chart answered on claude-code/)
 })

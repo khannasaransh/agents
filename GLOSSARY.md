@@ -15,7 +15,7 @@ The coding-agent CLI that runs an Agent: Claude Code, Codex, Antigravity or the 
 _Avoid_: engine, provider, harness, model (a Worker runs a model; it is not one)
 
 **Adversary Worker**:
-The Worker configured as `adversaryWorker`. It independently answers the same task before seeing the main answer, then compares the two and records substantive disagreements and missed items with evidence. It runs read-only and does not apply its proposed actions or Memory. It must use a different CLI from both main and fallback Workers, including when `--worker` swaps their order. Bundled Agents use Cursor with Grok 4.7 at extra-high effort. `ADVERSARY=false` in the env file turns it off for every Agent without removing that config.
+The Worker configured as `adversaryWorker`. It independently answers the same task before seeing the main answer, then compares the two and records substantive disagreements and missed items with evidence. It runs read-only and does not apply its proposed actions or Memory. It must use a different CLI from both main and fallback Workers, including when `--worker` swaps their order. The daily Pipeline's Agents use Cursor with Grok 4.7 at extra-high effort. The stocks Pipeline's Agents use that same Cursor model as their fallback, and their previous fallback as the adversary. `ADVERSARY=false` in the env file turns it off for every Agent without removing that config.
 
 **Contested**:
 The Brief section preserving the main and adversarial positions, the evidence for their disagreement, and the check needed to resolve it. It also lists items one answer raised and the other left out, and reports an assessment that failed or found neither. A disagreement or a missed item does not replace the main answer.
@@ -205,11 +205,11 @@ What happens to one security whose data is flagged, or whose close a second sour
 _Avoid_: untradeable (ash_new's Untradeable holding has had no price for over five sessions), frozen, blocked
 
 **Correction**:
-A fix to one security's data in the Lake, such as a missing split, a wrong dividend or a bad bar. The Health Agent proposes it, and it applies only once Saransh approves it.
+A fix to one security's data in the Lake, such as a missing split, a wrong dividend or a bad bar. The Health Agent proposes it, and it applies only once it is approved: by Saransh, or by the Health Step in the Agent's name when the Agent is confident of it (a primary source states it, the prices agree, nothing else explains it as well) and no Book holds or may trade the security. One approved that way is applied to the prices in the same Run, and says `approved_by` in ash_new's Corrections file; one the Agent isn't confident of waits for Saransh, its security in Quarantine, and the Run goes on without it.
 _Avoid_: patch, adjustment (ash_new adjusts every price for splits and dividends)
 
 **Health Agent**:
-The read-only Agent that works out what went wrong when the stocks Pipeline's data work fails or its Health report flags something. It writes a diagnosis, a proposed fix and any Corrections for Saransh, and changes nothing itself.
+The read-only Agent that works out what went wrong when the stocks Pipeline's data work fails or its Health report flags something. It writes a diagnosis, a proposed fix and any Corrections, each saying whether it is confident of it, and changes nothing itself: the Health Step records its Corrections and approves the confident ones.
 _Avoid_: doctor, debugger, monitor
 
 ### Outputs

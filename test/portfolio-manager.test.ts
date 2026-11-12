@@ -71,8 +71,8 @@ test('the Portfolio Manager runs on Claude Code, read-only in the Run folder, gi
   assert.equal(ran.status, 0, ran.stderr)
   const [call, ...more] = ws.workerCliCalls('claude')
   assert.deepEqual(more, [])
-  assert.deepEqual(ws.workerCliCalls('codex'), [])
-  assert.equal(ws.workerCliCalls('agent').length, 1, 'Cursor attempts the independent assessment')
+  assert.equal(ws.workerCliCalls('codex').length, 1, 'Codex attempts the independent assessment')
+  assert.deepEqual(ws.workerCliCalls('agent'), [])
   assert.equal(realpathSync(call.cwd), realpathSync(join(ws.dataDir, 'runs', runId)))
   assert.equal(call.args[call.args.indexOf('--tools') + 1], 'Read,Grep,Glob,Bash', 'no tool that writes')
   assert.deepEqual(promptInput(call.stdin, 'plans'), example('plan.normal.json'))
@@ -113,23 +113,23 @@ test("the Portfolio Manager gets the Desk's views and the reviews missing, and e
   assert.deepEqual(drop.decision.views, [{ analyst: 'chart', security_id: 'IN:RATEGAIN' }])
 })
 
-test('the Portfolio Manager falls back to Codex when Claude Code fails', async () => {
+test('the Portfolio Manager falls back to Cursor when Claude Code fails', async () => {
   prepare()
   ws.setWorkerCli('claude', { stderr: 'Claude Code is down\n', exitCode: 1 })
-  ws.setWorkerCli('codex', codexAnswering(answer))
+  ws.setWorkerCli('agent', { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify(answer) }) })
 
   const ran = await step('portfolio-manager')
 
   assert.equal(ran.status, 0, ran.stderr)
-  assert.equal(ws.workerCliCalls('codex').length, 1, 'main fallback only; Cursor is the adversary')
+  assert.equal(ws.workerCliCalls('agent').length, 1, 'main fallback only; Codex is the adversary')
   assert.equal(result().status, 'answered')
-  assert.match(ws.readRunFile(runId, 'logs', 'portfolio-manager.log'), /portfolio-manager failed on claude-code[\s\S]*retrying once on codex[\s\S]*portfolio-manager answered on codex/)
+  assert.match(ws.readRunFile(runId, 'logs', 'portfolio-manager.log'), /portfolio-manager failed on claude-code[\s\S]*retrying once on cursor[\s\S]*portfolio-manager answered on cursor/)
 })
 
 test('after both Workers fail, the failure is recorded and the Check Step sends the Rule plans with a note the Brief shows', async () => {
   prepare()
   ws.setWorkerCli('claude', { stderr: 'Claude Code is down\n', exitCode: 1 })
-  ws.setWorkerCli('codex', { stderr: 'Codex is overloaded\n', exitCode: 1 })
+  ws.setWorkerCli('agent', { stderr: 'Cursor is down\n', exitCode: 1 })
   ws.setPd({ check: { example: 'check.recorded.json' }, 'paper-books': { example: 'paper-books.json' }, judgement: { example: 'judgement-show.books.json' }, orders: { example: 'orders.empty.json' } })
 
   const ran = await step('portfolio-manager')
@@ -139,7 +139,7 @@ test('after both Workers fail, the failure is recorded and the Check Step sends 
   assert.equal(ran.status, 1)
   assert.equal(status('portfolio-manager'), 'failed')
   assert.equal(result().status, 'failed')
-  assert.match(result().error, /claude-code failed: Claude Code is down; then codex failed: Codex is overloaded/)
+  assert.match(result().error, /claude-code failed: Claude Code is down; then cursor failed: Cursor is down/)
   assert.equal(checked.status, 0, checked.stderr)
   const judgement = JSON.parse(ws.readRunFile(runId, 'judgement.json'))
   assert.equal(judgement.status, 'failed')
@@ -338,23 +338,23 @@ test('Health adversarial diagnoses and corrections never enter Portfolio Manager
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'health.json')), { ...health, adversary }, 'the Brief keeps the original assessment')
 })
 
-test('the stocks Portfolio Manager honors --worker while keeping Cursor as its adversary', async () => {
+test('the stocks Portfolio Manager honors --worker while keeping Codex as its adversary', async () => {
   prepare()
-  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'codex' })
-  ws.setWorkerCli('codex', codexAnswering(answer))
-  ws.setWorkerCli('agent', {
-    stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify(answer) }),
-    byPrompt: { 'Your only task now is to compare': { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify({ points: [], missed: [] }) }) } },
+  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'cursor' })
+  ws.setWorkerCli('agent', { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify(answer) }) })
+  ws.setWorkerCli('codex', {
+    ...codexAnswering(answer),
+    byPrompt: { 'Your only task now is to compare': codexAnswering({ points: [], missed: [] }) },
   })
   assert.equal((await step('portfolio-manager')).status, 0)
-  assert.equal(ws.workerCliCalls('codex').length, 1)
+  assert.equal(ws.workerCliCalls('agent').length, 1)
   assert.deepEqual(ws.workerCliCalls('claude'), [])
-  assert.equal(ws.workerCliCalls('agent').length, 2)
+  assert.equal(ws.workerCliCalls('codex').length, 2)
   for (const call of ws.workerCliCalls('agent')) {
     assert.equal(call.args[call.args.indexOf('--model') + 1], 'grok-4.7-xhigh')
     assert.equal(call.args[call.args.indexOf('--mode') + 1], 'ask')
   }
   assert.equal(result().adversary.status, 'compared')
-  assert.equal(result().adversary.mainWorker.name, 'codex')
-  assert.equal(result().adversary.worker.name, 'cursor')
+  assert.equal(result().adversary.mainWorker.name, 'cursor')
+  assert.equal(result().adversary.worker.name, 'codex')
 })

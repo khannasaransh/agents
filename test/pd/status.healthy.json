@@ -54,6 +54,7 @@
       "proposed_by": "the Health Agent, Run 2026-10-26-0930",
       "proposed_at": "2026-10-26T01:52:10.441210+00:00",
       "decided_at": null,
+      "decided_by": null,
       "name": "Bhagyanagar India <Ltd>",
       "effect": "The dividend on 2025-03-12 dropped: the total-return index's move that day goes from +122.4% to -0.1%"
     }

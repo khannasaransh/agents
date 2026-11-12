@@ -231,10 +231,25 @@ test('overriding the main Worker keeps Cursor Grok separate, including when the 
   }
 })
 
-test('every bundled Agent uses Cursor Grok 4.7 at extra-high effort as its third Worker', async () => {
-  for (const name of ['reviewer', 'pm', 'docs', 'health', 'events', 'chart', 'risk', 'portfolio-manager']) {
+test('every bundled Agent keeps its adversary on a different CLI from its main and fallback Workers', async () => {
+  const cursor = { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' }
+  const stocks = {
+    health: { name: 'claude-code', model: 'opus', effort: 'high' },
+    events: { name: 'claude-code', model: 'opus', effort: 'medium' },
+    chart: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+    risk: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+    'portfolio-manager': { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  }
+  for (const name of ['reviewer', 'pm', 'docs']) {
     const { config } = await loadAgent(name)
-    assert.deepEqual(config.adversaryWorker, { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' }, name)
+    assert.deepEqual(config.adversaryWorker, cursor, name)
+    assert.notEqual(config.adversaryWorker?.name, config.worker.name)
+    assert.notEqual(config.adversaryWorker?.name, config.fallbackWorker.name)
+  }
+  for (const [name, adversary] of Object.entries(stocks)) {
+    const { config } = await loadAgent(name)
+    assert.deepEqual(config.fallbackWorker, cursor, name)
+    assert.deepEqual(config.adversaryWorker, adversary, name)
     assert.notEqual(config.adversaryWorker?.name, config.worker.name)
     assert.notEqual(config.adversaryWorker?.name, config.fallbackWorker.name)
   }

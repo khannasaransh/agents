@@ -161,9 +161,9 @@ test('a stocks Run whose refresh fails twice calls the Health Agent and ends par
   // Every Worker's CLI fails in a test unless told otherwise, so the Health Agent, the Desk's three analysts and the Portfolio Manager fail on both.
   assert.equal(ws.workerCliCalls('codex').length, 5)
   assert.equal(ws.workerCliCalls('claude').length, 5)
-  // Cursor can't keep the Desk's analysts from reading the data area, so only the Health Agent's and the Portfolio Manager's independent assessments reach it.
-  assert.equal(ws.workerCliCalls('agent').length, 2, 'Cursor attempts the two independent assessments it can hold to their reads')
-  assert.match(ws.readRunFile(id, 'logs', 'desk.log'), /chart-adversary failed on cursor .*can't keep the chart-adversary Agent from reading/)
+  // Cursor is the fallback for Health and the Portfolio Manager. The Desk denies the data folder, so Cursor refuses those fallbacks before the CLI runs.
+  assert.equal(ws.workerCliCalls('agent').length, 2, 'Cursor is the fallback for Health and the Portfolio Manager')
+  assert.match(ws.readRunFile(id, 'logs', 'desk.log'), /chart failed on cursor .*can't keep the chart Agent from reading/)
   const judgement = JSON.parse(ws.readRunFile(id, 'judgement.json'))
   assert.equal(judgement.status, 'failed')
   // So the buys the Desk had to review are missing their reviews, and wait a session.

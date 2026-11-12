@@ -58,7 +58,7 @@ import { fetchLine } from '../../src/marketsmith.ts'
 import { brokerInboxDir } from '../../src/paths.ts'
 import { changeText, decisionText, modeName, proposalText, sentence } from '../../src/judgement.ts'
 import { orderWhat, ownTradeText, stateText } from '../../src/orders.ts'
-import type { PdBook, PdBookState, PdEarlyExit, PdHolding, PdFeeds, PdFillCosts, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrder, PdOrderList, PdOrders, PdPaperBook, PdPaperBooks, PdPlan, PdRealGap, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally, PdYearlyKind, PdYearlyProposal, PdYearlyReview } from '../../src/pd.ts'
+import type { CorrectionChange, PdBook, PdBookState, PdEarlyExit, PdHolding, PdFeeds, PdFillCosts, PdJudgementProposal, PdJudgementShow, PdMarketSmith, PdOrder, PdOrderList, PdOrders, PdPaperBook, PdPaperBooks, PdPlan, PdRealGap, PdReview, PdRulePlan, PdScorecard, PdSleeve, PdStageProposal, PdStagesCheck, PdStatus, PdTally, PdYearlyKind, PdYearlyProposal, PdYearlyReview } from '../../src/pd.ts'
 import { analystName, breadthOf, conditionName, cutText, percent, ruleName, signalText, stateOf } from '../../src/plans.ts'
 import { readRun, stepsNotSucceeded, type RunRecord } from '../../src/run.ts'
 import { stageName } from '../../src/stages.ts'
@@ -68,7 +68,7 @@ import { readTodos } from '../../src/todos.ts'
 import type { AnswersResult } from './answers.ts'
 import type { BrokerInboxResult } from './broker-inbox.ts'
 import type { CheckResult } from './check.ts'
-import type { HealthResult, Proposals } from './health.ts'
+import type { Approvals, HealthResult, Proposals } from './health.ts'
 import type { Delisting } from '../../src/delistings.ts'
 import type { LakeResult, RefreshAttempt } from './lake.ts'
 import type { BookStates } from './plan.ts'
@@ -134,16 +134,38 @@ function proposalsLine(proposals: Proposals, proposed: number): string {
   if (proposals.status === 'dry-run') return `It proposed ${corrections}; a dry run records none in ash_new.`
   if (proposals.status === 'failed') return `It proposed ${corrections}, but they couldn't be recorded in ash_new: ${esc(proposals.error)}`
   const { recorded, known, refused } = proposals.printed
+  const approved = proposals.approvals?.approved ?? []
+  const waiting = recorded.filter((r) => !approved.some((a) => a.id === r.id)).length
   const parts = [
-    `${recorded.length} recorded, waiting for your approval`,
+    approved.length ? `${recorded.length} recorded, ${waiting} of them waiting for your approval` : `${recorded.length} recorded, waiting for your approval`,
     ...(known.length ? [`${known.length} proposed before`] : []),
     ...(refused.length ? [`${refused.length} refused by ash_new (${refused.map((r) => esc(r.why)).join('; ')})`] : []),
   ]
-  return `It proposed ${corrections}: ${parts.join(', ')}.`
+  return [`It proposed ${corrections}: ${parts.join(', ')}.`, ...approvalsPart(proposals.approvals)].join('</p>\n<p>')
+}
+
+/** What became of the Corrections the Health Agent was confident of: those it approved by itself, whether they were applied, and those left for Saransh with why. */
+function approvalsPart(approvals: Approvals | undefined): string[] {
+  if (!approvals) return []
+  const { approved, left, applied, error, standing } = approvals
+  const one = (c: Approvals['approved'][number]) => `${c.id === null ? '' : `${c.id}, `}${esc(c.security_id)}, ${esc(correctionText(c))}`
+  const applying =
+    applied === 'applied'
+      ? "They are applied: their securities' prices were built again in this Run, before the Rule plans."
+      : `They couldn't be applied in this Run (${esc(error ?? 'pd corrections apply failed')}), so no Rule plan trades their securities until the next refresh applies them.`
+  return [
+    ...(approved.length
+      ? [
+          `It was confident of ${plural(approved.length, 'Correction')} and approved ${approved.length === 1 ? 'it' : 'them'} by itself: ${approved.map(one).join('; ')}. ${applying} To undo one, remove its entry (it says <code>approved_by</code>) from ash_new's <code>config/corrections.yaml</code>: the next refresh builds the prices again without it.`,
+        ]
+      : []),
+    ...(standing.length ? [`Applied, but the flag still stands, so check it: ${standing.map(esc).join('; ')}.`] : []),
+    ...(left.length ? [`It was confident of ${plural(left.length, 'Correction')} that ${left.length === 1 ? 'waits' : 'wait'} for you all the same: ${left.map((c) => `${one(c)} (${esc(c.why)})`).join('; ')}.`] : []),
+  ]
 }
 
 /** A Correction in a few words: "Split of 11.655 for 1 on 2026-10-08". */
-function correctionText(c: PdStatus['corrections'][number]): string {
+function correctionText(c: Pick<CorrectionChange, 'kind' | 'date' | 'ratio' | 'value'>): string {
   if (c.kind === 'split') return `Split of ${c.ratio} for 1 on ${c.date}`
   if (c.kind === 'demerger') return `Demerger on ${c.date}, the company keeping ${Math.round((c.ratio ?? 0) * 1000) / 10}% of its value`
   if (c.kind === 'bar') return `Bar of ${c.date} left out`

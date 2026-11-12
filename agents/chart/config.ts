@@ -3,10 +3,11 @@ import { analystOutputSchema } from '../../src/desk.ts'
 
 const chart: AgentConfig = {
   // Claude Code first: on Windows, Codex's unelevated sandbox can't enforce a deny-read rule, so Codex
-  // refuses to start there (see the Health Agent). No web access on either.
+  // refuses to start as the main Worker (see the Health Agent). Cursor with Grok 4.7 at extra-high
+  // effort is the fallback; it cannot deny a folder, so a Desk call refuses there. Codex is the adversary.
   worker: { name: 'claude-code', model: 'opus', effort: 'medium' },
-  fallbackWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
-  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  adversaryWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
   permissions: 'read-only',
   inputs: {
     names: "The buys you review today, each with its Book, its paper Book's plan, and what you read of its dossier: its last session, about a year of daily bars (open, high, low, close, volume, the RS Rating that day and the close's distance from its 52-week high) and the strategy and signal behind its order",

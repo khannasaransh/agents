@@ -53,6 +53,8 @@ export interface PdCorrection extends CorrectionChange {
   proposed_by: string
   proposed_at: string
   decided_at: string | null
+  /** Who approved or rejected it: Saransh, or the Health Agent with its Run for one it approved by itself; null while it waits, and for one decided before 11 November 2026. */
+  decided_by: string | null
 }
 
 /**
@@ -114,6 +116,16 @@ export interface PdCorrectionsPropose {
 export interface PdDecided {
   changed: boolean
   why: string | null
+}
+
+/**
+ * What `pd corrections approve|reject` prints in full (contract/corrections-decide.schema.json), as
+ * the Health Step reads it when it approves a Correction its Agent is confident of: the Correction
+ * as it is now (null when there is none) and the Quarantines the approval lifted.
+ */
+export interface PdCorrectionDecided extends PdDecided {
+  correction: PdCorrection | null
+  lifted: PdQuarantine[]
 }
 
 /**

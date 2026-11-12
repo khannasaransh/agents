@@ -127,6 +127,8 @@ async function setTab(next) {
     if (tab === 'agents') agents()
     if (portfolioView && tab === 'holdings') portfolioHoldings()
     if (portfolioView && tab === 'attention') portfolioAttention()
+    if (portfolioView && tab === 'orders') $('#content').innerHTML = portfolioOrders()
+    if (portfolioView && tab === 'manager') $('#content').innerHTML = portfolioManager()
     if (tab === 'brief') await brief(selectionVersion)
     if (tab === 'logs') await logs(selectionVersion)
     if (tab === 'artifacts') artifacts()

@@ -49,11 +49,15 @@ const answer = {
   delistings: [] as unknown[],
 }
 
-/** The Corrections the Health Agent proposes for the known data issues. */
+/** The Corrections the Health Agent proposes for the known data issues, confident of neither. */
 const corrections = [
-  { security_id: 'IN:BHAGYANGR', kind: 'split', date: '2026-10-08', ratio: 11.655, value: null, why: 'A -90.9% close with no action recorded, its open about 1/11.7 of the close before' },
-  { security_id: 'US:NFE', kind: 'dividend', date: '2023-01-03', ratio: null, value: null, why: 'A 150.00 dividend on a 42.42 close' },
+  { security_id: 'IN:BHAGYANGR', kind: 'split', date: '2026-10-08', ratio: 11.655, value: null, why: 'A -90.9% close with no action recorded, its open about 1/11.7 of the close before', confident: false },
+  { security_id: 'US:NFE', kind: 'dividend', date: '2023-01-03', ratio: null, value: null, why: 'A 150.00 dividend on a 42.42 close', confident: false },
 ]
+/** The same, as `pd corrections propose` is given them: in the Corrections file's format. */
+const asFiled = corrections.map(({ confident: _confident, ...change }) => change)
+/** The same, the Agent confident of the split, which ash_new records (corrections-propose.recorded.json) as Correction 7. */
+const confidentOfTheSplit = corrections.map((c) => ({ ...c, confident: c.kind === 'split' }))
 
 /** What `codex exec --json` prints when its schema-checked answer is `answer`. */
 const codexAnswering = (answer: unknown) => ({
@@ -101,8 +105,8 @@ test("after a failed Lake Step, the Health Agent runs on Codex in ash_new's fold
   assert.equal(result.status, 0, result.stderr)
   const [call, ...more] = ws.workerCliCalls('codex')
   assert.deepEqual(more, [])
-  assert.deepEqual(ws.workerCliCalls('claude'), [])
-  assert.equal(ws.workerCliCalls('agent').length, 1, 'Cursor attempts the independent assessment')
+  assert.equal(ws.workerCliCalls('claude').length, 1, 'Claude Code attempts the independent assessment')
+  assert.deepEqual(ws.workerCliCalls('agent'), [])
   assert.equal(realpathSync(call.cwd), realpathSync(ashNew))
   const permissions = call.args.find((arg) => arg.startsWith('permissions.agent='))
   assert.ok(permissions?.includes('extends=":read-only"'), 'read-only')
@@ -286,21 +290,22 @@ test("a second source's gap is always among the Quarantines the Health Agent is 
   assert.deepEqual(promptInput(call.stdin, 'leftOut'), { flags: 5, quarantines: 5 })
 })
 
-test('a Health Agent that fails on Codex and then on Claude Code is recorded as failed, with both errors, and fails the Step', async () => {
+test('a Health Agent that fails on Codex and then on Cursor is recorded as failed, with both errors, and fails the Step', async () => {
   prepare({ lake: 'failed', status: 'status.hold.json' })
-  ws.setWorkerCli('claude', { stderr: 'Claude Code is down\n', exitCode: 1 })
+  ws.setWorkerCli('agent', { stderr: 'Cursor is down\n', exitCode: 1 })
   ws.setWorkerCli('codex', { stdout: JSON.stringify({ type: 'turn.failed', error: { message: "You've hit your usage limit." } }), exitCode: 1 })
 
   const result = await step()
 
   assert.equal(result.status, 1)
   assert.equal(ws.workerCliCalls('codex').length, 1)
-  assert.equal(ws.workerCliCalls('claude').length, 1, 'main fallback only; Cursor is the adversary')
+  assert.equal(ws.workerCliCalls('agent').length, 1, 'main fallback only; Claude Code is the adversary')
+  assert.equal(ws.workerCliCalls('claude').length, 1)
   const recorded = health()
   assert.equal(recorded.status, 'failed')
   assert.equal(recorded.why[0], 'The Lake Step failed.')
-  assert.match(recorded.error, /codex failed: You've hit your usage limit\.; then claude-code failed: Claude Code is down/)
-  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /health failed on codex[\s\S]*retrying once on claude-code[\s\S]*health failed on claude-code/)
+  assert.match(recorded.error, /codex failed: You've hit your usage limit\.; then cursor failed: Cursor is down/)
+  assert.match(ws.readRunFile(runId, 'logs', 'health.log'), /health failed on codex[\s\S]*retrying once on cursor[\s\S]*health failed on cursor/)
 })
 
 test("a Health Step that can't find ash_new is recorded as failed, saying where it looked", async () => {
@@ -356,8 +361,8 @@ test('the Corrections the Health Agent proposes are recorded in ash_new to wait 
   assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'health', 'status.json')), example('status.healthy.json'))
   const file = call.args[2]
   assert.deepEqual([...call.args.slice(0, 2), ...call.args.slice(3)], ['corrections', 'propose', '--by', `the Health Agent, Run ${runId}`])
-  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { corrections })
-  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'health', 'corrections.json')), { corrections }, 'kept in the Run folder')
+  assert.deepEqual(JSON.parse(readFileSync(file, 'utf8')), { corrections: asFiled }, "without `confident`, which the Corrections file doesn't have")
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'health', 'corrections.json')), { corrections: asFiled }, 'kept in the Run folder')
   const recorded = health()
   assert.deepEqual(recorded.corrections, corrections)
   assert.deepEqual(recorded.proposals, { status: 'recorded', printed: example('corrections-propose.recorded.json') })
@@ -400,16 +405,117 @@ test('a dry run records no Correction in ash_new', async () => {
   assert.deepEqual(health().proposals, { status: 'dry-run' })
 })
 
-test('the Health Step honors --worker without moving its Cursor adversary', async () => {
+test('a Correction the Health Agent is confident of is approved in its name and applied in the same Run, and the one it is not confident of waits', async () => {
+  prepare({ status: 'status.healthy.json' })
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections: confidentOfTheSplit }))
+  ws.setPd({
+    corrections: [{ example: 'corrections-propose.recorded.json' }, { example: 'corrections-decide.approved.json' }, { stdout: 'US prices: building again 1 securities whose Corrections changed\n' }],
+    status: { example: 'status.clean.json' },
+  })
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  assert.deepEqual(
+    ws.pdCalls().map((call) => call.args.filter((arg) => !arg.endsWith('corrections.json'))),
+    [['corrections', 'propose', '--by', `the Health Agent, Run ${runId}`], ['corrections', 'approve', '7', '--by', `the Health Agent, Run ${runId}`], ['corrections', 'apply'], ['status']],
+    'proposed, the confident one approved, applied, then the status read again',
+  )
+  const split = { id: 7, security_id: 'IN:BHAGYANGR', kind: 'split', date: '2026-10-08', ratio: 11.655, value: null }
+  assert.deepEqual(health().proposals.approvals, { approved: [split], left: [], applied: 'applied', standing: [] })
+  assert.deepEqual(JSON.parse(ws.readRunFile(runId, 'todos', 'health.json')), [], 'nothing is left for Saransh to do about it')
+  const log = ws.readRunFile(runId, 'logs', 'health.log')
+  assert.match(log, /Approved by the Health Agent, confident of it: Correction 7, IN:BHAGYANGR, split on 2026-10-08/)
+  assert.match(log, /building again 1 securities whose Corrections changed/, "pd corrections apply's output is in the Step's log")
+  assert.match(log, /Applied to the Lake's prices in this Run/)
+})
+
+test('a confident Correction on a security a Book holds or may trade waits for Saransh', async () => {
+  prepare({ status: 'status.healthy.json' })
+  watch('IN:BHAGYANGR')
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections: confidentOfTheSplit }))
+  ws.setPd({ corrections: { example: 'corrections-propose.recorded.json' }, status: { example: 'status.healthy.json' } })
+
+  assert.equal((await step()).status, 0)
+
+  assert.deepEqual(ws.pdCalls().map((call) => call.args.slice(0, 2).join(' ')), ['corrections propose', 'status'], 'neither approved nor applied')
+  const { approved, left, applied } = health().proposals.approvals
+  assert.deepEqual([approved, applied], [[], null])
+  assert.deepEqual(left.map((c: { id: number; why: string }) => [c.id, c.why]), [[7, 'a Book holds or may trade its security, so it is yours to approve']])
+})
+
+test('HEALTH_AUTO_APPROVE=false leaves every confident Correction waiting', async () => {
+  prepare({ status: 'status.healthy.json' })
+  ws.writeEnvFile(`ASH_NEW_FOLDER=${ashNew}\nHEALTH_AUTO_APPROVE=false\n`)
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections: confidentOfTheSplit }))
+  ws.setPd({ corrections: { example: 'corrections-propose.recorded.json' }, status: { example: 'status.healthy.json' } })
+
+  assert.equal((await step()).status, 0)
+
+  assert.deepEqual(ws.pdCalls().map((call) => call.args.slice(0, 2).join(' ')), ['corrections propose', 'status'])
+  assert.match(health().proposals.approvals.left[0].why, /HEALTH_AUTO_APPROVE is false/)
+})
+
+test("an approval that can't be applied doesn't fail the Step: a To-do says no Rule plan trades its security until it is", async () => {
+  prepare({ status: 'status.healthy.json' })
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections: confidentOfTheSplit }))
+  ws.setPd({
+    corrections: [{ example: 'corrections-propose.recorded.json' }, { example: 'corrections-decide.approved.json' }, { stderr: 'Not started: a refresh is running', exitCode: 1 }],
+    status: { example: 'status.healthy.json' },
+  })
+
+  const result = await step()
+
+  assert.equal(result.status, 0, result.stderr)
+  const { approved, applied, error } = health().proposals.approvals
+  assert.deepEqual([approved.length, applied, error], [1, 'failed', 'pd corrections apply exited with 1'])
+  const [todo, ...more] = JSON.parse(ws.readRunFile(runId, 'todos', 'health.json')) as string[]
+  assert.deepEqual(more, [])
+  assert.match(todo, /^The Health Agent approved Correction 7 \(IN:BHAGYANGR\), but they couldn't be applied to the Lake's prices in this Run \(pd corrections apply exited with 1\)\. No Rule plan trades their securities until they are/)
+})
+
+test('a Correction applied whose flag still stands is a To-do', async () => {
+  prepare({ status: 'status.healthy.json' })
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections: confidentOfTheSplit }))
+  // The status read after applying still flags the split's day.
+  const stillFlagged = example('status.healthy.json')
+  stillFlagged.health.flags = [{ market: 'IN', security_id: 'IN:BHAGYANGR', name: 'Bhagyanagar India Ltd', check: 'jump', date: '2026-10-08', detail: 'Closed at 41.40 after 454.55 (-90.9%)' }]
+  ws.setPd({
+    corrections: [{ example: 'corrections-propose.recorded.json' }, { example: 'corrections-decide.approved.json' }, { stdout: '' }],
+    status: { stdout: JSON.stringify(stillFlagged) },
+  })
+
+  assert.equal((await step()).status, 0)
+
+  assert.deepEqual(health().proposals.approvals.standing, ['IN:BHAGYANGR: jump on 2026-10-08'])
+  assert.match(JSON.parse(ws.readRunFile(runId, 'todos', 'health.json'))[0], /its flag still stands \(IN:BHAGYANGR: jump on 2026-10-08\): check it\. To undo it, remove its entry from ash_new's config\/corrections\.yaml/)
+})
+
+test('more confident Corrections at once than the Step may approve by itself all wait', async () => {
+  prepare({ status: 'status.healthy.json' })
+  const many = Array.from({ length: 11 }, (_, i) => ({ security_id: `US:S${i}`, kind: 'split', date: '2026-10-08', ratio: 2, value: null, why: 'The filing', confident: true }))
+  const recorded = many.map(({ confident: _confident, ...c }, i) => ({ ...c, id: 20 + i, market: 'US', status: 'waiting', proposed_by: 'the Health Agent', proposed_at: '2026-10-27T01:52:10+00:00', decided_at: null, decided_by: null }))
+  ws.setWorkerCli('codex', codexAnswering({ ...answer, corrections: many }))
+  ws.setPd({ corrections: { stdout: JSON.stringify({ recorded, known: [], refused: [] }) }, status: { example: 'status.healthy.json' } })
+
+  assert.equal((await step()).status, 0)
+
+  assert.deepEqual(ws.pdCalls().map((call) => call.args.slice(0, 2).join(' ')), ['corrections propose', 'status'])
+  const { approved, left } = health().proposals.approvals
+  assert.deepEqual([approved.length, left.length], [0, 11])
+  assert.match(left[0].why, /confident of 11 at once, over the 10 it may approve by itself in a Run/)
+})
+
+test('the Health Step honors --worker without moving its Claude Code adversary', async () => {
   prepare({ lake: 'failed', status: 'status.hold.json' })
-  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'claude-code' })
-  ws.setWorkerCli('claude', claudeCodeAnswering(answer))
+  ws.writeRunFile(runId, 'run.json', { ...ws.readRun(runId), worker: 'cursor' })
+  ws.setWorkerCli('agent', { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify(answer) }) })
   assert.equal((await step()).status, 0)
   assert.deepEqual(ws.workerCliCalls('codex'), [])
-  assert.equal(ws.workerCliCalls('claude').length, 1)
   assert.equal(ws.workerCliCalls('agent').length, 1)
-  assert.equal(health().adversary.mainWorker.name, 'claude-code')
-  assert.equal(health().adversary.worker.name, 'cursor')
+  assert.equal(ws.workerCliCalls('claude').length, 1)
+  assert.equal(health().adversary.mainWorker.name, 'cursor')
+  assert.equal(health().adversary.worker.name, 'claude-code')
 })
 
 test("what the Health Agent finds out about securities no longer priced is kept, given to a later Run's Agent, and searched for on the web", async () => {

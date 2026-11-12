@@ -71,6 +71,16 @@ export function adversaryEnabled(): boolean {
   return raw?.trim().toLowerCase() !== 'false'
 }
 
+/**
+ * Whether the Health Step approves by itself the Corrections its Agent is confident of (and applies
+ * them to the Lake's prices in the same Run). On unless `HEALTH_AUTO_APPROVE=false`, in the
+ * environment or the env file; the environment wins. Off, every Correction waits for Saransh.
+ */
+export function healthAutoApprove(): boolean {
+  const raw = process.env.HEALTH_AUTO_APPROVE ?? readEnvFile().HEALTH_AUTO_APPROVE
+  return raw?.trim().toLowerCase() !== 'false'
+}
+
 /** Saransh's git author emails, lowercased, from SARANSH_GIT_EMAILS (comma-separated) in the env file. */
 export function saranshEmails(): string[] {
   return (readEnvFile().SARANSH_GIT_EMAILS ?? '')
