@@ -68,7 +68,7 @@ export function codexCommandLine(agent: Agent, inputs: Inputs, { cwd, denyRead =
       ...(foundSkills.length ? ['--config', `skills.config=[${foundSkills.map((file) => `{path=${JSON.stringify(file)},enabled=false}`).join(',')}]`] : []),
       '--cd',
       cwd,
-      // An Agent with no Repo to read, such as the PM, runs in its Run folder, which isn't a git repo.
+      // An Agent with no Repo to read, such as the PM, runs in a folder that isn't a git repo.
       '--skip-git-repo-check',
       '--json',
       ...(outputSchema ? ['--output-schema', schemaFile] : []),

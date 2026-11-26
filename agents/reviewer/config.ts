@@ -21,9 +21,10 @@ const finding: JsonSchema = {
 
 const reviewer: AgentConfig = {
   // A different model from the one that usually writes the code, for a genuine second opinion.
-  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
-  fallbackWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
-  adversaryWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  // Codex first. Cursor with Grok 4.7 at extra-high effort is the fallback. Claude Code is the adversary.
+  worker: { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
+  fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
+  adversaryWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
   permissions: 'read-only',
   inputs: {
     repo: 'The Repo name',

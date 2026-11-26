@@ -3,7 +3,7 @@ import type { AgentConfig } from '../../src/agent.ts'
 const health: AgentConfig = {
   // Codex CLI first, using the provisioned Windows sandbox with deny-read support.
   // Cursor with Grok 4.7 at extra-high effort is the fallback. Claude Code is the adversary.
-  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  worker: { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
   fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   adversaryWorker: { name: 'claude-code', model: 'opus', effort: 'high' },
   permissions: 'read-only',

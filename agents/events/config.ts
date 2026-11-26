@@ -3,7 +3,7 @@ import { analystOutputSchema } from '../../src/desk.ts'
 
 const events: AgentConfig = {
   // Codex first. Cursor with Grok 4.7 at extra-high effort is the fallback. Claude Code is the adversary.
-  worker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  worker: { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
   fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
   adversaryWorker: { name: 'claude-code', model: 'opus', effort: 'medium' },
   permissions: 'read-only',

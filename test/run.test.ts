@@ -210,10 +210,10 @@ test('agents run daily --worker codex runs the PM Agent on Codex, with the model
   assert.equal(ws.readRun(id).worker, 'codex')
   const [call, ...more] = ws.workerCliCalls('codex')
   assert.deepEqual(more, [])
-  assert.ok(call.args.includes('gpt-6-astra'), call.args.join(' '))
+  assert.ok(call.args.includes('gpt-6.2-astra'), call.args.join(' '))
   assert.ok(call.args.includes('model_reasoning_effort="high"'), call.args.join(' '))
-  assert.deepEqual(ws.workerCliCalls('claude'), [])
-  assert.equal(ws.workerCliCalls('agent').length, 1, 'Cursor attempts the independent PM assessment')
+  assert.equal(ws.workerCliCalls('claude').length, 1, 'Claude Code attempts the independent PM assessment')
+  assert.deepEqual(ws.workerCliCalls('agent'), [])
 })
 
 test('agents run refuses a Worker that can only be a fallback, and a dry run that also names a Worker', async () => {

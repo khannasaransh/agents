@@ -142,10 +142,10 @@ test('re-running PM after it answered calls no Worker, unless forced', async () 
   assert.deepEqual(answered, written)
 })
 
-test('a PM Agent that fails on Codex is retried on Claude Code outside any git repo, and when that fails too the Step fails and the Run records why', async () => {
+test('a PM Agent that fails on Codex is retried on Cursor outside any git repo, and when that fails too the Step fails and the Run records why', async () => {
   ws = makeWorkspace()
   prepareRun()
-  ws.setWorkerCli('claude', { stdout: JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'Session limit reached' }), exitCode: 1 })
+  ws.setWorkerCli('agent', { stderr: 'Session limit reached\n', exitCode: 1 })
   ws.setWorkerCli('codex', { stderr: 'Codex is overloaded', exitCode: 1 })
 
   const result = await pm()
@@ -155,7 +155,7 @@ test('a PM Agent that fails on Codex is retried on Claude Code outside any git r
   assert.ok(codex.args.includes('--skip-git-repo-check'), codex.args.join(' '))
   const recorded = JSON.parse(ws.readRunFile(runId, 'pm.json'))
   assert.equal(recorded.status, 'failed')
-  assert.match(recorded.error, /^codex failed: Codex is overloaded; then claude-code failed: Session limit reached$/)
+  assert.match(recorded.error, /^codex failed: Codex is overloaded; then cursor failed: Session limit reached$/)
 })
 
 test('re-running PM answers again once an earlier Step changed what its answer was given, such as a forced re-read of Discord', async () => {

@@ -286,21 +286,21 @@ test('a Run that is not a dry run reviews each changed Repo on Codex, in its wor
   assert.deepEqual(more, [])
   assert.ok(call.cwd.startsWith(realpathSync(join(ws.dataDir, 'worktrees'))), call.cwd)
   assert.ok(call.stdin.includes(to), call.stdin)
-  assert.deepEqual(ws.workerCliCalls('claude'), [])
-  assert.equal(ws.workerCliCalls('agent').length, 1, 'Cursor attempts the independent assessment')
+  assert.equal(ws.workerCliCalls('claude').length, 1, 'Claude Code attempts the independent assessment')
+  assert.deepEqual(ws.workerCliCalls('agent'), [])
   const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review').filter(attempt => attempt.agent === 'reviewer')
   assert.equal(attempts[0].usage?.totalTokens, 1280)
   assert.equal(attempts[0].target, 'crux_flutter')
 })
 
-test('a review that fails on Codex, such as on a quota limit, is retried once on Claude Code, and both attempts are logged in the Run', async () => {
+test('a review that fails on Codex, such as on a quota limit, is retried once on Cursor, and both attempts are logged in the Run', async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
   repo.pushCommit('Add paywall')
   const quotaLimit = { type: 'turn.failed', error: { message: "You've hit your usage limit. Try again at 4:12 PM." } }
   ws.setWorkerCli('codex', { stdout: `${JSON.stringify({ type: 'turn.started' })}\n${JSON.stringify(quotaLimit)}\n`, exitCode: 1 })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
+  ws.setWorkerCli('agent', { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify({ summary: 'Adds a paywall.', findings: [], memory: null }) }) })
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -308,41 +308,41 @@ test('a review that fails on Codex, such as on a quota limit, is retried once on
   assert.equal(result.status, 0, result.stderr)
   assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
   assert.equal(ws.workerCliCalls('codex').length, 1)
-  assert.equal(ws.workerCliCalls('claude').length, 1, 'main fallback only; Cursor is the adversary')
+  assert.equal(ws.workerCliCalls('agent').length, 1, 'main fallback only; Claude Code is the adversary')
+  assert.equal(ws.workerCliCalls('claude').length, 1)
   assert.match(
     ws.readRunFile(runId, 'logs', 'review.log'),
-    /crux_flutter: reviewer failed on codex \(gpt-6-astra, high\) after \d+s: You've hit your usage limit\. Try again at 4:12 PM\.; retrying once on claude-code \(opus, high\)\ncrux_flutter: reviewer answered on claude-code \(opus, high\) in \d+s/,
+    /crux_flutter: reviewer failed on codex \(gpt-6\.2-astra, high\) after \d+s: You've hit your usage limit\. Try again at 4:12 PM\.; retrying once on cursor \(grok-4\.7, xhigh\)\ncrux_flutter: reviewer answered on cursor \(grok-4\.7, xhigh\) in \d+s/,
   )
 })
 
-test("a Codex call that runs past the Agent's timeout is ended, with the command it started, and retried on Claude Code", { timeout: 30_000 }, async () => {
+test("a Codex call that runs past the Agent's timeout is ended, with the command it started, and retried on Cursor", { timeout: 30_000 }, async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
   repo.pushCommit('Add paywall')
   ws.writeAgent('reviewer', { 'config.ts': `export default ${JSON.stringify({ ...reviewer, timeoutSeconds: 5 })}\n`, 'instructions.md': '# Reviewer\n' })
   ws.setWorkerCli('codex', { hang: true })
-  ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
+  ws.setWorkerCli('agent', { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify({ summary: 'Adds a paywall.', findings: [], memory: null }) }) })
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
 
   assert.equal(result.status, 0, result.stderr)
   assert.equal(ws.reviewResult(runId, 'crux_flutter').summary, 'Adds a paywall.')
-  assert.match(ws.readRunFile(runId, 'logs', 'review.log'), /reviewer failed on codex \(gpt-6-astra, high\) after 5s: timed out after 5s; retrying once on claude-code/)
+  assert.match(ws.readRunFile(runId, 'logs', 'review.log'), /reviewer failed on codex \(gpt-6\.2-astra, high\) after \d+s: timed out after 5s; retrying once on cursor/)
   const [{ pid, childPid }] = ws.workerCliCalls('codex')
   for (const id of [pid, childPid!]) assert.ok(!isRunning(id), `process ${id} is still running`)
 })
 
-test('a review fails, naming both failures, when Codex answers in the wrong shape and Claude Code fails too', async () => {
+test('a review fails, naming both failures, when Codex answers in the wrong shape and Cursor fails too', async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
   const to = repo.pushCommit('Add paywall')
   const finding = { severity: 'urgent', file: 'lib/paywall.dart', line: 42, commit: to, author: 'Test Author', summary: 'Price shows before it loads' }
   ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.', findings: [finding], memory: null }))
-  const sessionLimit = { type: 'result', subtype: 'success', is_error: true, result: "You've hit your session limit · resets 3:45pm" }
-  ws.setWorkerCli('claude', { stdout: JSON.stringify(sessionLimit), exitCode: 1 })
+  ws.setWorkerCli('agent', { stderr: "You've hit your session limit · resets 3:45pm\n", exitCode: 1 })
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
@@ -352,7 +352,7 @@ test('a review fails, naming both failures, when Codex answers in the wrong shap
   assert.equal(crux.status, 'failed')
   assert.match(
     crux.error,
-    /^codex failed: The reviewer Agent's answer doesn't match its output schema: answer\.findings\[0\]\.severity must be one of critical, high, medium, low \(got "urgent"\); then claude-code failed: You've hit your session limit · resets 3:45pm$/,
+    /^codex failed: The reviewer Agent's answer doesn't match its output schema: answer\.findings\[0\]\.severity must be one of critical, high, medium, low \(got "urgent"\); then cursor failed: You've hit your session limit · resets 3:45pm$/,
   )
 })
 
@@ -370,23 +370,29 @@ test("an Agent's Tools and skills reach each Worker without a file being added o
     'skills/checklist/SKILL.md': skill,
     'skills/checklist/list.md': '- mounted checks\n',
   })
-  // Codex answers in the wrong shape, so the review falls back to Claude Code and reaches both Workers.
+  // Codex answers in the wrong shape, so the review falls back to Cursor. Claude Code, the adversary, is called too.
   ws.setWorkerCli('codex', codexAnswering({ summary: 'Adds a paywall.' }))
   ws.setWorkerCli('claude', claudeCodeAnswering({ summary: 'Adds a paywall.', findings: [], memory: null }))
+  ws.setWorkerCli('agent', { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify({ summary: 'Adds a paywall.', findings: [], memory: null }) }) })
   prepareRun([[repo, from]], { dryRun: false })
 
   const result = await review()
 
   assert.equal(result.status, 0, result.stderr)
+  const promptOf = (call: { stdin: string; promptFile?: string; args: string[] }) => call.stdin || call.promptFile || call.args.at(-1) || ''
   const [codex] = ws.workerCliCalls('codex')
+  const [cursor] = ws.workerCliCalls('agent')
   const [claude] = ws.workerCliCalls('claude')
-  for (const call of [codex, claude]) {
+  const tool = new RegExp(`- \`[^\`]+[\\\\/]reviewer[\\\\/]tools[\\\\/]blame\`: ${usage}\n`)
+  // The adversary call drops executable Tools. Codex and Cursor, the main attempt and the fallback, still get them.
+  for (const call of [codex, cursor]) {
     assert.equal(call.cwdChanges, '')
-    assert.match(call.stdin, new RegExp(`- \`[^\`]+[\\\\/]reviewer[\\\\/]tools[\\\\/]blame\`: ${usage}\n`))
+    assert.match(promptOf(call), tool)
+    assert.ok(promptOf(call).includes(skill.trim()), promptOf(call))
   }
-  assert.ok(codex.stdin.includes(skill.trim()), codex.stdin)
+  assert.equal(claude.cwdChanges, '')
   assert.deepEqual(claude.pluginFiles, {
-    '.claude-plugin/plugin.json': '{"name":"reviewer"}',
+    '.claude-plugin/plugin.json': '{"name":"reviewer-adversary"}',
     'skills/checklist/SKILL.md': skill,
     'skills/checklist/list.md': '- mounted checks\n',
   })
@@ -600,45 +606,39 @@ test("a review fails when the Step doesn't pass every input the Reviewer's confi
 })
 
 
-test('token usage survives schema failure and fallback, and is counted for both attempts', async () => {
+test('token usage survives a schema failure, and the Cursor fallback records none', async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
   repo.pushCommit('Add paywall')
   ws.setWorkerCli('codex', codexAnswering({ summary: 'Missing required fields.' }))
-  ws.setWorkerCli('claude', { stdout: JSON.stringify({
-    type: 'result', subtype: 'success', is_error: false,
-    structured_output: { summary: 'Reviewed.', findings: [], memory: null },
-    usage: { input_tokens: 100, output_tokens: 40, cache_read_input_tokens: 500, cache_creation_input_tokens: 200 },
-  }) })
+  ws.setWorkerCli('agent', { stdout: JSON.stringify({ subtype: 'success', result: JSON.stringify({ summary: 'Reviewed.', findings: [], memory: null }) }) })
   prepareRun([[repo, from]], { dryRun: false })
   assert.equal((await review()).status, 0)
   const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review').filter(attempt => attempt.agent === 'reviewer')
   assert.equal(attempts.length, 2)
   assert.equal(attempts[0].outcome, 'failed')
   assert.equal(attempts[0].usage?.totalTokens, 1280)
-  assert.equal(attempts[1].worker, 'claude-code')
-  assert.equal(attempts[1].usage?.totalTokens, 840)
-  assert.equal(summarizeTokenUsage(attempts).tokens?.totalTokens, 2120)
-  assert.equal(summarizeTokenUsage(attempts).complete, true)
+  assert.equal(attempts[1].worker, 'cursor')
+  assert.equal(attempts[1].usage, null)
+  assert.equal(summarizeTokenUsage(attempts).tokens?.totalTokens, 1280)
+  assert.equal(summarizeTokenUsage(attempts).complete, false)
 })
 
-test('a failed Claude result retains usage even when both workers fail', async () => {
+test('a failed Cursor fallback records no usage, so the total stays incomplete', async () => {
   ws = makeWorkspace()
   const repo = ws.addRepo('crux_flutter')
   const from = lastFetched(repo)
   repo.pushCommit('Add paywall')
   ws.setWorkerCli('codex', { stdout: JSON.stringify({ type: 'turn.failed', error: { message: 'quota' } }), exitCode: 1 })
-  ws.setWorkerCli('claude', { stdout: JSON.stringify({
-    type: 'result', subtype: 'error_max_turns', is_error: true,
-    usage: { input_tokens: 100, output_tokens: 40, cache_read_input_tokens: 500, cache_creation_input_tokens: 200 },
-  }), exitCode: 1 })
+  ws.setWorkerCli('agent', { stderr: 'quota\n', exitCode: 1 })
   prepareRun([[repo, from]], { dryRun: false })
   assert.notEqual((await review()).status, 0)
   const attempts = agentAttempts(ws.readRunFile(runId, 'logs', 'review.log'), 'review').filter(attempt => attempt.agent === 'reviewer')
   assert.equal(attempts.length, 2)
   assert.equal(attempts[0].usage, null)
+  assert.equal(attempts[1].worker, 'cursor')
   assert.equal(attempts[1].outcome, 'failed')
-  assert.equal(attempts[1].usage?.totalTokens, 840)
+  assert.equal(attempts[1].usage, null)
   assert.equal(summarizeTokenUsage(attempts).complete, false)
 })

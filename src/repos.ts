@@ -1,6 +1,7 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { reposFile } from './env.ts'
 import { agentsRoot } from './paths.ts'
 
 /** In the order the Brief lists them. */
@@ -26,9 +27,9 @@ export interface Repo {
   branch: string
 }
 
-/** Loads the Repo list (repos.ts, or the file named by AGENTS_REPOS_FILE). */
+/** Loads the Repo list (repos.ts, or the file AGENTS_REPOS_FILE names in the environment or the env file). */
 export async function loadRepos(): Promise<Repo[]> {
-  const file = process.env.AGENTS_REPOS_FILE ?? join(agentsRoot, 'repos.ts')
+  const file = reposFile() ?? join(agentsRoot, 'repos.ts')
   const repos: Repo[] = (await import(pathToFileURL(file).href)).default
   return repos.map((repo) => ({ ...repo, folder: repo.folder.replace(/^~(?=\/|$)/, homedir()) }))
 }

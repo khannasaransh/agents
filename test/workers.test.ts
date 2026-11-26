@@ -50,7 +50,7 @@ const inputs = {
   to: 'b'.repeat(40),
   commits: [{ sha: 'b'.repeat(40), author: 'Asha', email: 'asha@example.com', date: '2026-10-21T10:00:00+05:30', subject: 'Add paywall' }],
 }
-const codexOptions = { cwd, model: 'gpt-6-astra', effort: 'high' as const, schemaFile: '/tmp/x/output-schema.json', undeclaredTools: [commit, blame, secret], foundSkills }
+const codexOptions = { cwd, model: 'gpt-6.2-astra', effort: 'high' as const, schemaFile: '/tmp/x/output-schema.json', undeclaredTools: [commit, blame, secret], foundSkills }
 const claudeCodeOptions = { cwd, model: 'opus', effort: 'high', pluginDir: '/tmp/y/plugin' } as const
 const antigravityHome = '/agents-data/antigravity-home'
 const antigravityOptions = { cwd, model: 'gemini-3.8-flash', effort: 'high', home: antigravityHome } as const
@@ -89,7 +89,7 @@ test('the Codex Worker runs a read-only Agent through codex exec with only its b
     '--config',
     'web_search="disabled"',
     '--model',
-    'gpt-6-astra',
+    'gpt-6.2-astra',
     '--config',
     'model_reasoning_effort="high"',
     '--config',

@@ -383,7 +383,7 @@ test("setup installs the Workers' config into the home, with the captured machin
   try {
     machine.addWorkerConfig('claude-code/.claude/settings.json', `${JSON.stringify({ model: 'opus', statusLine: { type: 'command', command: '{{home}}/.claude/statusline.sh' } }, null, 2)}\n`)
     machine.addWorkerConfig('claude-code/.claude/statusline.sh', '#!/usr/bin/env bash\necho status\n')
-    machine.addWorkerConfig('codex/.codex/config.toml', `model = "gpt-6-astra"\n\n[projects.'{{root}}/backend/ash_backend']\ntrust_level = "trusted"\n\n[projects."{{home}}"]\ntrust_level = "trusted"\n`)
+    machine.addWorkerConfig('codex/.codex/config.toml', `model = "gpt-6.2-astra"\n\n[projects.'{{root}}/backend/ash_backend']\ntrust_level = "trusted"\n\n[projects."{{home}}"]\ntrust_level = "trusted"\n`)
     machine.addWorkerConfig('antigravity/.gemini/antigravity-cli/keybindings.json', '{\n  "cli.exit": ["ctrl+d"]\n}\n')
 
     const result = await machine.setup()
@@ -508,7 +508,7 @@ test("setup capture copies this machine's Workers' config into the repo, with it
     writeHomeFile(home, '.codex/auth.json', '{"OPENAI_API_KEY":"sk-openai-secret"}')
     const runtime = join(home, 'AppData', 'Local', 'OpenAI', 'Codex', 'runtimes', 'cua_node', '78fb')
     writeHomeFile(home, '.codex/config.toml', [
-      'model = "gpt-6-astra"',
+      'model = "gpt-6.2-astra"',
       `notify = [ ${JSON.stringify(join(runtime, 'codex-computer-use.exe'))}, "turn-ended" ]`,
       '',
       '[marketplaces.openai-bundled]',
@@ -602,8 +602,8 @@ test("setup capture copies this machine's Workers' config into the repo, with it
 test('setup capture refuses a file holding a secret it has no setting to leave out of, and leaves the repo as it was', async () => {
   const machine = makeMachine()
   try {
-    machine.addWorkerConfig('codex/.codex/config.toml', 'model = "gpt-6-astra"\n')
-    writeHomeFile(machine.home, '.codex/config.toml', 'model = "gpt-6-astra-2"\n')
+    machine.addWorkerConfig('codex/.codex/config.toml', 'model = "gpt-6.2-astra"\n')
+    writeHomeFile(machine.home, '.codex/config.toml', 'model = "gpt-6.2-astra-2"\n')
     writeHomeFile(machine.home, '.claude/statusline.sh', '#!/usr/bin/env bash\ngh api user -H "Authorization: Bearer ghp_abcdefghijklmnopqrstuvwxyz0123456789"\n')
 
     const result = await machine.setup('capture')
@@ -611,7 +611,7 @@ test('setup capture refuses a file holding a secret it has no setting to leave o
     assert.equal(result.status, 1)
     assert.match(result.stderr, /statusline\.sh: it holds what looks like a secret/)
     assert.ok(!result.stderr.includes('abcdefghijklmnop'), result.stderr)
-    assert.deepEqual(filesIn(machine.workerConfig), { 'codex/.codex/config.toml': 'model = "gpt-6-astra"\n' })
+    assert.deepEqual(filesIn(machine.workerConfig), { 'codex/.codex/config.toml': 'model = "gpt-6.2-astra"\n' })
   } finally {
     machine.cleanup()
   }

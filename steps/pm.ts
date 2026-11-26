@@ -19,6 +19,7 @@ import { readPmBacklog, readWeeklyPmBacklog } from '../src/state.ts'
 import { runAsStep } from '../src/step.ts'
 import type { AdversaryResult, WithAdversary } from '../src/adversary.ts'
 import { callAgent } from '../src/worker.ts'
+import { withTempFolder } from '../src/workers/cli.ts'
 import { isWeekly } from '../src/weekly.ts'
 import { pmMemory, type TaskStatus } from '../agents/pm/config.ts'
 import type { BranchesRead } from './branches.ts'
@@ -132,7 +133,10 @@ await runAsStep(async ({ runId, runFolder, force }) => {
   const inputs = { ...fromRuns, runHealth, memory, sprint: forStatus, previousTaskStatus, branches }
   try {
     let adversary: AdversaryResult | undefined
-    const answer = (await callAgent(pm, inputs, { cwd: runFolder, dryRun: run.dryRun ?? false, worker: run.worker, onAdversary: result => { adversary = result } })) as PmAnswer
+    // PM reads only its inputs, so it runs in an empty folder of its own. Not the Run folder: that is
+    // inside this repo, where Codex's Windows sandbox, with the PM's other Agents' Tools denied,
+    // fails to start (CreateProcessWithLogonW 267) while it loads the repo's AGENTS.md.
+    const answer = (await withTempFolder('agents-pm-', (cwd) => callAgent(pm, inputs, { cwd, dryRun: run.dryRun ?? false, worker: run.worker, onAdversary: result => { adversary = result } }))) as PmAnswer
     const { taskStatus, ...rest } = answer
     const report = sprint && taskReport(sprint, taskStatus, previous?.report ?? null)
     writeJson(out, { status: 'answered', ...rest, taskReport: report, runs, inputs: fingerprint(fromRuns), memoryRead: memory, ...(adversary && { adversary }) } satisfies PmResult)

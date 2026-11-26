@@ -20,7 +20,8 @@
 // session is over. ash_new records nothing for a plan made from a Book state, Mandate or Playbook
 // that is no longer current, and says why; it starts a paper Book and its rules-only paper Book
 // together. A list for a session that already has one (a Run started again) supersedes it, and no
-// order is recorded twice. This Step records nothing unless this Run's Plan Step succeeded: it says
+// order is recorded twice; but once the session has opened, a paper Book's list recorded before the
+// open stands, and one made after it isn't recorded. This Step records nothing unless this Run's Plan Step succeeded: it says
 // why and skips itself. A dry run records nothing (`--dry-run`). Either way it then runs `pd
 // paper-books`, `pd judgement show` (each Book's Judgement modes and the proposals waiting on
 // Saransh) and `pd orders show` (each real Book's orders, stops and own trades), kept as

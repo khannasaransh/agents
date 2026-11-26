@@ -700,7 +700,7 @@ for (const tool of ['regions', 'stamp']) {
 test('when both Workers fail, the Run still records what waits on the docs branch, and the failed forced retry replaces the earlier success', async () => {
   ws = makeWorkspace()
   const { wiki, firstTip } = await afterFirstDocsRun()
-  ws.setWorkerCli('claude', { stderr: 'Session limit reached', exitCode: 1 })
+  ws.setWorkerCli('agent', { stderr: 'Session limit reached\n', exitCode: 1 })
   ws.setWorkerCli('codex', { stderr: 'Codex is overloaded', exitCode: 1 })
 
   const forced = await docs('--force')
@@ -709,7 +709,7 @@ test('when both Workers fail, the Run still records what waits on the docs branc
   assert.equal(git(wiki.folder, 'rev-parse', docsBranch), firstTip)
   const recorded = JSON.parse(ws.readRunFile(runId, 'docs.json'))
   assert.equal(recorded.status, 'failed')
-  assert.match(recorded.error, /Session limit reached/)
+  assert.match(recorded.error, /then cursor failed/)
   assert.deepEqual(recorded.waiting, { commits: 1, pages: [paywallPage] })
 })
 
@@ -721,7 +721,7 @@ test('commits whose documentation failed are documented in a later Run, though t
   const wiki = ws.addWiki()
   wiki.commit('Document the paywall', { [paywallPage]: page([paywallSource]) })
   prepareRun(wiki, [[repo, from]])
-  ws.setWorkerCli('claude', { stderr: 'Session limit reached', exitCode: 1 })
+  ws.setWorkerCli('agent', { stderr: 'Session limit reached\n', exitCode: 1 })
   assert.equal((await docs()).status, 1)
   const saved = await ws.agents('step', 'save-state', '--run', runId)
   assert.equal(saved.status, 0, saved.stderr)

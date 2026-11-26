@@ -103,7 +103,7 @@ const portfolioManager: AgentConfig = {
   // effort is the fallback. Codex is the adversary.
   worker: { name: 'claude-code', model: 'opus', effort: 'high' },
   fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
-  adversaryWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  adversaryWorker: { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
   permissions: 'read-only',
   // Save state applies the Journal; each Lesson waits for Saransh's Answer.
   memoryChanges: { [journalMemory]: 'apply', lessons: 'review' },

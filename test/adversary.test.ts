@@ -37,7 +37,7 @@ test('independent work sees only original inputs; comparison sees both; the Step
     assert.deepEqual(given, inputs)
     return primary
   })
-  t.mock.method(cursorWorker, 'call', async (target: Agent, given: Inputs) => {
+  t.mock.method(claudeCodeWorker, 'call', async (target: Agent, given: Inputs) => {
     calls.push(target.name)
     assert.equal(target.config.permissions, 'read-only')
     assert.deepEqual(target.tools, [])
@@ -64,10 +64,10 @@ test('fallback retains its own provenance and does not replace the independent a
   const agent = await reviewer()
   let result: AdversaryResult | undefined
   t.mock.method(codexWorker, 'call', async () => { throw new Error('quota') })
-  t.mock.method(claudeCodeWorker, 'call', async () => primary)
-  t.mock.method(cursorWorker, 'call', async (target: Agent) => target.name.endsWith('-adversary') ? independent : target.name.endsWith('-contest') ? agree : primary)
+  t.mock.method(cursorWorker, 'call', async () => primary)
+  t.mock.method(claudeCodeWorker, 'call', async (target: Agent) => target.name.endsWith('-adversary') ? independent : target.name.endsWith('-contest') ? agree : primary)
   assert.equal(await callAgent(agent, inputs, { cwd: '.', dryRun: false, log() {}, onAdversary: value => { result = value } }), primary)
-  assert.equal(result?.mainWorker.name, 'claude-code')
+  assert.equal(result?.mainWorker.name, 'cursor')
   assert.deepEqual(result?.independentAnswer, independent)
   assert.equal(result?.status, 'compared')
   if (result?.status === 'compared') assert.deepEqual(result.points, [])
@@ -78,7 +78,7 @@ test('independent failure or invalid comparison is recorded without failing the 
   t.mock.method(codexWorker, 'call', async () => primary)
   for (const failure of ['independent', 'schema', 'evidence', 'missed']) {
     let result: AdversaryResult | undefined
-    const mock = t.mock.method(cursorWorker, 'call', async (target: Agent) => {
+    const mock = t.mock.method(claudeCodeWorker, 'call', async (target: Agent) => {
       if (failure === 'independent') throw new Error('adversary unavailable')
       if (target.name.endsWith('-adversary')) return independent
       if (failure === 'schema') return { unexpected: true }
@@ -133,7 +133,7 @@ test('read-only adversarial calls remove write permissions and executable Tools 
     assert.deepEqual(target.config.permissions, { write: ['.'] })
     return primary
   })
-  t.mock.method(cursorWorker, 'call', async (target: Agent) => {
+  t.mock.method(claudeCodeWorker, 'call', async (target: Agent) => {
     assert.equal(target.config.permissions, 'read-only')
     assert.deepEqual(target.config.tools, {})
     assert.deepEqual(target.tools, [])
@@ -202,51 +202,48 @@ test('the dashboard includes usage for independent and comparison calls', () => 
 test('rejects an adversary shared with either main attempt before running any Worker', async t => {
   const base = await reviewer()
   const called = t.mock.method(fakeWorker, 'call', async () => primary)
-  for (const worker of [undefined, 'claude-code'] as const) {
+  for (const worker of [undefined, 'cursor'] as const) {
     const agent = { ...base, config: { ...base.config, adversaryWorker: base.config.fallbackWorker } }
     await assert.rejects(callAgent(agent, inputs, { cwd: '.', dryRun: true, worker, log() {} }), /adversaryWorker must differ from both/)
   }
   assert.equal(called.mock.callCount(), 0)
 })
 
-test('overriding the main Worker keeps Cursor Grok separate, including when the override falls back', async t => {
+test('overriding the main Worker keeps the adversary separate, including when the override falls back', async t => {
   const agent = await reviewer()
-  t.mock.method(cursorWorker, 'call', async (target: Agent, _inputs: Inputs, options: { model: string; effort: string }) => {
-    assert.equal(options.model, 'grok-4.7')
-    assert.equal(options.effort, 'xhigh')
+  t.mock.method(claudeCodeWorker, 'call', async (target: Agent, _inputs: Inputs, options: { model: string; effort: string }) => {
+    assert.equal(options.model, 'opus')
+    assert.equal(options.effort, 'high')
     return target.name.endsWith('-contest') ? { points: [point], missed: [] } : independent
   })
   t.mock.method(codexWorker, 'call', async () => primary)
   for (const failOverride of [false, true]) {
-    const mock = t.mock.method(claudeCodeWorker, 'call', async () => {
+    const mock = t.mock.method(cursorWorker, 'call', async () => {
       if (failOverride) throw new Error('quota')
       return primary
     })
     let result: AdversaryResult | undefined
-    assert.equal(await callAgent(agent, inputs, { cwd: '.', dryRun: false, worker: 'claude-code', log() {}, onAdversary: value => { result = value } }), primary)
+    assert.equal(await callAgent(agent, inputs, { cwd: '.', dryRun: false, worker: 'cursor', log() {}, onAdversary: value => { result = value } }), primary)
     assert.equal(result?.status, 'compared')
-    assert.equal(result?.mainWorker.name, failOverride ? 'codex' : 'claude-code')
-    assert.deepEqual(result?.worker, { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' })
+    assert.equal(result?.mainWorker.name, failOverride ? 'codex' : 'cursor')
+    assert.deepEqual(result?.worker, { name: 'claude-code', model: 'opus', effort: 'high' })
     mock.mock.restore()
   }
 })
 
-test('every bundled Agent keeps its adversary on a different CLI from its main and fallback Workers', async () => {
+test('every bundled Agent uses Cursor Grok 4.7 at extra-high effort as its fallback', async () => {
   const cursor = { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' }
-  const stocks = {
+  const adversaries = {
+    reviewer: { name: 'claude-code', model: 'opus', effort: 'high' },
+    pm: { name: 'claude-code', model: 'opus', effort: 'medium' },
+    docs: { name: 'claude-code', model: 'opus', effort: 'high' },
     health: { name: 'claude-code', model: 'opus', effort: 'high' },
     events: { name: 'claude-code', model: 'opus', effort: 'medium' },
-    chart: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
-    risk: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
-    'portfolio-manager': { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+    chart: { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
+    risk: { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
+    'portfolio-manager': { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
   }
-  for (const name of ['reviewer', 'pm', 'docs']) {
-    const { config } = await loadAgent(name)
-    assert.deepEqual(config.adversaryWorker, cursor, name)
-    assert.notEqual(config.adversaryWorker?.name, config.worker.name)
-    assert.notEqual(config.adversaryWorker?.name, config.fallbackWorker.name)
-  }
-  for (const [name, adversary] of Object.entries(stocks)) {
+  for (const [name, adversary] of Object.entries(adversaries)) {
     const { config } = await loadAgent(name)
     assert.deepEqual(config.fallbackWorker, cursor, name)
     assert.deepEqual(config.adversaryWorker, adversary, name)

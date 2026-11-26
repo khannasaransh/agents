@@ -63,6 +63,16 @@ export function wikiFolder(): string | null {
 }
 
 /**
+ * The Repo list file this machine reads instead of repos.ts, from AGENTS_REPOS_FILE in the
+ * environment or the env file, or null when neither sets it. The environment wins, so tests and a
+ * Run's `--env` override the file. A relative path is taken from this repo's folder.
+ */
+export function reposFile(): string | null {
+  const file = (process.env.AGENTS_REPOS_FILE ?? readEnvFile().AGENTS_REPOS_FILE)?.trim()
+  return file ? resolve(agentsRoot, file) : null
+}
+
+/**
  * Whether Agent calls also run their adversary Worker. On unless `ADVERSARY=false`, in the
  * environment or the env file. The environment wins, so a Run's `--env` overrides the file.
  */

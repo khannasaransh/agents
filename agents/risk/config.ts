@@ -6,7 +6,7 @@ const risk: AgentConfig = {
   // is the fallback; it cannot deny a folder, so a Desk call refuses there. Codex is the adversary.
   worker: { name: 'claude-code', model: 'opus', effort: 'high' },
   fallbackWorker: { name: 'cursor', model: 'grok-4.7', effort: 'xhigh' },
-  adversaryWorker: { name: 'codex', model: 'gpt-6-astra', effort: 'high' },
+  adversaryWorker: { name: 'codex', model: 'gpt-6.2-astra', effort: 'high' },
   permissions: 'read-only',
   // Only to check one item, citing its source; nothing about Saransh's money is in its inputs to search for.
   webSearch: true,

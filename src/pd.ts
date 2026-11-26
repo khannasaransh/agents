@@ -970,7 +970,7 @@ export interface PdRulePlan {
   pool?: (PdBuyable & { strategies: string[]; signalled: string })[]
   /** A paper Book's plan's: each holding on the last close, Sleeve by Sleeve (Legacy ones under legacy). */
   holdings?: { sleeve: string; security_id: string; name: string | null; shares: number; close: number; sector: string | null; rs_rating: number | null; value: number; stop: number | null; sellable: boolean }[]
-  /** A paper Book's plan's: the cash its open orders reserve. */
+  /** The cash its open orders reserve that its list won't supersede, which the final check takes from its cash: a real Book's placed buys'; a paper Book's always 0, as its list supersedes its waiting one. */
   reserved?: number
   /** A paper Book's plan's: the buys made to wait that may still be bought on its session, each by its Override's id. */
   waits?: (PdBuyable & { id: number; sleeve: string; shares: number; until: string })[]
